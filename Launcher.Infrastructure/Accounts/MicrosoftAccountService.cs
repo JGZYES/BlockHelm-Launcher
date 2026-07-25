@@ -22,6 +22,7 @@ using Launcher.Domain.Models;
 using Launcher.Infrastructure.Accounts.Credentials;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
+using System.Net;
 using System.Net.Http;
 
 namespace Launcher.Infrastructure.Accounts;
@@ -146,9 +147,34 @@ public sealed class MicrosoftAccountService : IMicrosoftAccountService
             logger.LogInformation("Interactive Microsoft account login completed with fallback profile. AccountId={AccountId}", fallbackAccount.Id);
             return fallbackAccount;
         }
+        catch (MicrosoftAccountAuthenticationException exception)
+        {
+            var reason = exception.Reason switch
+            {
+                LaunchAccountSessionFailureReason.AuthenticationNotConfigured
+                    => MicrosoftAccountLoginFailureReason.NotConfigured,
+                LaunchAccountSessionFailureReason.AuthenticationApplicationNotAuthorized
+                    => MicrosoftAccountLoginFailureReason.ApplicationNotAuthorized,
+                LaunchAccountSessionFailureReason.AuthenticationServerUnavailable
+                    => MicrosoftAccountLoginFailureReason.AuthenticationServerUnavailable,
+                LaunchAccountSessionFailureReason.CredentialStorageFailed
+                    => MicrosoftAccountLoginFailureReason.CredentialStorageFailed,
+                _ => MicrosoftAccountLoginFailureReason.Unknown
+            };
+            logger.LogWarning(
+                "Interactive Microsoft account login failed. Reason={Reason} ErrorType={ErrorType}",
+                reason,
+                exception.InnerException?.GetType().FullName ?? exception.GetType().FullName);
+            throw new MicrosoftAccountLoginException(
+                reason,
+                "Microsoft account login failed.",
+                exception);
+        }
         catch (Exception exception) when (exception is not OperationCanceledException)
         {
-            logger.LogError(exception, "Interactive Microsoft account login failed.");
+            logger.LogError(
+                "Interactive Microsoft account login failed. ErrorType={ErrorType}",
+                exception.GetType().FullName);
             throw;
         }
     }
@@ -211,12 +237,23 @@ public sealed class MicrosoftAccountService : IMicrosoftAccountService
         }
         catch (MicrosoftAccountAuthenticationException exception)
         {
-            var reason = exception.Reason == LaunchAccountSessionFailureReason.CredentialStorageFailed
-                ? MicrosoftAccountReauthenticationFailureReason.CredentialStorageFailed
-                : exception.Reason == LaunchAccountSessionFailureReason.ReauthenticationRequired
-                    ? MicrosoftAccountReauthenticationFailureReason.AccountMismatch
-                    : MicrosoftAccountReauthenticationFailureReason.Unknown;
-            logger.LogWarning(exception, "Interactive Microsoft account reauthentication failed. AccountId={AccountId} Reason={Reason}", account.Id, reason);
+            var reason = exception.Reason switch
+            {
+                LaunchAccountSessionFailureReason.AuthenticationNotConfigured
+                    => MicrosoftAccountReauthenticationFailureReason.NotConfigured,
+                LaunchAccountSessionFailureReason.AuthenticationApplicationNotAuthorized
+                    => MicrosoftAccountReauthenticationFailureReason.ApplicationNotAuthorized,
+                LaunchAccountSessionFailureReason.CredentialStorageFailed
+                    => MicrosoftAccountReauthenticationFailureReason.CredentialStorageFailed,
+                LaunchAccountSessionFailureReason.ReauthenticationRequired
+                    => MicrosoftAccountReauthenticationFailureReason.AccountMismatch,
+                _ => MicrosoftAccountReauthenticationFailureReason.Unknown
+            };
+            logger.LogWarning(
+                "Interactive Microsoft account reauthentication failed. AccountId={AccountId} Reason={Reason} ErrorType={ErrorType}",
+                account.Id,
+                reason,
+                exception.InnerException?.GetType().FullName ?? exception.GetType().FullName);
             throw new MicrosoftAccountReauthenticationException(reason, "Microsoft account reauthentication failed.", exception);
         }
         catch (MicrosoftAccountReauthenticationException)
@@ -225,7 +262,10 @@ public sealed class MicrosoftAccountService : IMicrosoftAccountService
         }
         catch (Exception exception) when (exception is not OperationCanceledException)
         {
-            logger.LogError(exception, "Interactive Microsoft account reauthentication failed. AccountId={AccountId}", account.Id);
+            logger.LogError(
+                "Interactive Microsoft account reauthentication failed. AccountId={AccountId} ErrorType={ErrorType}",
+                account.Id,
+                exception.GetType().FullName);
             throw new MicrosoftAccountReauthenticationException(
                 MicrosoftAccountReauthenticationFailureReason.Unknown,
                 "Microsoft account reauthentication failed.",
@@ -252,6 +292,15 @@ public sealed class MicrosoftAccountService : IMicrosoftAccountService
             logger.LogDebug("Microsoft account capes loaded. AccountId={AccountId} CapeCount={CapeCount}", account.Id, capes.Count);
             return capes;
         }
+        catch (MicrosoftAccountAuthenticationException ex) when (
+            ex.Reason == LaunchAccountSessionFailureReason.ReauthenticationRequired)
+        {
+            throw CreateSessionExpiredException(ex);
+        }
+        catch (MinecraftProfileRequestException ex) when (ex.StatusCode == HttpStatusCode.Unauthorized)
+        {
+            throw CreateSessionExpiredException(ex);
+        }
         catch (MinecraftProfileRequestException ex)
         {
             logger.LogWarning(ex, "Microsoft account capes load failed. AccountId={AccountId} ErrorCode={ErrorCode}", account.Id, ex.ErrorCode);
@@ -269,6 +318,15 @@ public sealed class MicrosoftAccountService : IMicrosoftAccountService
             var refreshed = await RefreshSavedAccountAsync(account, cancellationToken);
             logger.LogDebug("Microsoft account profile refreshed. AccountId={AccountId}", refreshed.Id);
             return refreshed;
+        }
+        catch (MicrosoftAccountAuthenticationException ex) when (
+            ex.Reason == LaunchAccountSessionFailureReason.ReauthenticationRequired)
+        {
+            throw CreateSessionExpiredException(ex);
+        }
+        catch (MinecraftProfileRequestException ex) when (ex.StatusCode == HttpStatusCode.Unauthorized)
+        {
+            throw CreateSessionExpiredException(ex);
         }
         catch (MinecraftProfileRequestException ex)
         {
@@ -290,6 +348,15 @@ public sealed class MicrosoftAccountService : IMicrosoftAccountService
             logger.LogInformation("Microsoft account skin uploaded. AccountId={AccountId} SkinModel={SkinModel}", updated.Id, skinModel);
             return updated;
         }
+        catch (MicrosoftAccountAuthenticationException ex) when (
+            ex.Reason == LaunchAccountSessionFailureReason.ReauthenticationRequired)
+        {
+            throw CreateSessionExpiredException(ex);
+        }
+        catch (MinecraftProfileRequestException ex) when (ex.StatusCode == HttpStatusCode.Unauthorized)
+        {
+            throw CreateSessionExpiredException(ex);
+        }
         catch (MinecraftProfileRequestException ex)
         {
             logger.LogWarning(ex, "Microsoft account skin upload failed. AccountId={AccountId} SkinModel={SkinModel} ErrorCode={ErrorCode}", account.Id, skinModel, ex.ErrorCode);
@@ -307,6 +374,15 @@ public sealed class MicrosoftAccountService : IMicrosoftAccountService
             logger.LogDebug("Microsoft account active cape update requested. AccountId={AccountId} HasCape={HasCape}", account.Id, !string.IsNullOrWhiteSpace(capeId));
             await capeService.SetActiveCapeAsync(account, capeId, cancellationToken);
             logger.LogInformation("Microsoft account active cape updated. AccountId={AccountId} HasCape={HasCape}", account.Id, !string.IsNullOrWhiteSpace(capeId));
+        }
+        catch (MicrosoftAccountAuthenticationException ex) when (
+            ex.Reason == LaunchAccountSessionFailureReason.ReauthenticationRequired)
+        {
+            throw CreateSessionExpiredException(ex);
+        }
+        catch (MinecraftProfileRequestException ex) when (ex.StatusCode == HttpStatusCode.Unauthorized)
+        {
+            throw CreateSessionExpiredException(ex);
         }
         catch (MinecraftProfileRequestException ex)
         {
@@ -340,6 +416,15 @@ public sealed class MicrosoftAccountService : IMicrosoftAccountService
             logger.LogInformation("Microsoft account name changed. AccountId={AccountId}", updatedAccount.Id);
             return updatedAccount;
         }
+        catch (MicrosoftAccountAuthenticationException ex) when (
+            ex.Reason == LaunchAccountSessionFailureReason.ReauthenticationRequired)
+        {
+            throw CreateSessionExpiredException(ex);
+        }
+        catch (MinecraftProfileRequestException ex) when (ex.StatusCode == HttpStatusCode.Unauthorized)
+        {
+            throw CreateSessionExpiredException(ex);
+        }
         catch (MinecraftProfileRequestException ex)
         {
             logger.LogWarning(
@@ -364,6 +449,13 @@ public sealed class MicrosoftAccountService : IMicrosoftAccountService
             MinecraftProfileErrorKind.ConstraintViolation => MicrosoftAccountNameChangeFailureReason.InvalidName,
             _ => MicrosoftAccountNameChangeFailureReason.Unknown
         };
+    }
+
+    private static MicrosoftAccountSessionExpiredException CreateSessionExpiredException(Exception exception)
+    {
+        return new MicrosoftAccountSessionExpiredException(
+            "The Microsoft account session has expired and requires interactive reauthentication.",
+            exception);
     }
 
     private async Task<MinecraftProfileResponse?> TryGetCurrentProfileAsync(

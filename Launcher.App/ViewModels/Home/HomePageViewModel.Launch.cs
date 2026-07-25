@@ -79,9 +79,22 @@ public sealed partial class HomePageViewModel
             statusService.Report(Strings.Status_LaunchCanceled);
             floatingMessageService.Show(Strings.Status_LaunchCanceled);
         }
-        catch (LaunchAccountSessionException)
+        catch (LaunchAccountSessionException exception)
         {
-            statusService.Report(Strings.Status_LaunchAccountUnavailable);
+            var message = exception.Reason switch
+            {
+                LaunchAccountSessionFailureReason.AuthenticationNotConfigured
+                    => Strings.Status_MicrosoftLoginNotConfigured,
+                LaunchAccountSessionFailureReason.AuthenticationApplicationNotAuthorized
+                    => Strings.Status_MicrosoftApplicationNotAuthorized,
+                LaunchAccountSessionFailureReason.AuthenticationServerUnavailable
+                    => Strings.Status_MicrosoftAuthenticationServerUnavailable,
+                LaunchAccountSessionFailureReason.CredentialStorageFailed
+                    => Strings.Status_MicrosoftCredentialStorageFailed,
+                _ => Strings.Status_LaunchAccountUnavailable
+            };
+            statusService.Report(message);
+            floatingMessageService.Show(message);
         }
         catch (LaunchFailedException exception)
         {

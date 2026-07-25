@@ -32,17 +32,20 @@ public sealed partial class AccountCapeViewModel : ObservableObject
     private readonly AccountListViewModel accountList;
     private readonly IMicrosoftAccountService microsoftAccountService;
     private readonly AccountProfileViewModel profile;
+    private readonly MicrosoftAccountOperationRetryHandler microsoftOperationRetryHandler;
     private readonly ILogger logger;
 
     internal AccountCapeViewModel(
         AccountListViewModel accountList,
         IMicrosoftAccountService microsoftAccountService,
         AccountProfileViewModel profile,
+        MicrosoftAccountOperationRetryHandler microsoftOperationRetryHandler,
         ILogger logger)
     {
         this.accountList = accountList;
         this.microsoftAccountService = microsoftAccountService;
         this.profile = profile;
+        this.microsoftOperationRetryHandler = microsoftOperationRetryHandler;
         this.logger = logger;
         profile.PropertyChanged += (_, _) => NotifyState();
     }
@@ -111,15 +114,17 @@ public sealed partial class AccountCapeViewModel : ObservableObject
         var operation = profile.BeginOperation(account, Strings.Status_LoadingAccountProfile);
         try
         {
-            var capes = await microsoftAccountService.GetCapesAsync(account, operation.Token);
-            if (!profile.IsCurrent(account, operation))
+            var result = await microsoftOperationRetryHandler.ExecuteAsync(
+                account,
+                current => microsoftAccountService.GetCapesAsync(current, operation.Token));
+            if (!profile.IsCurrent(result.Account, operation))
                 return;
-            var hasCapes = capes.Any(cape => !cape.IsNone);
-            Populate(capes);
-            await StoreCacheAsync(account);
+            var hasCapes = result.Value.Any(cape => !cape.IsNone);
+            Populate(result.Value);
+            await StoreCacheAsync(result.Account);
             profile.SetMessage(hasCapes ? Strings.Account_ProfileLoaded : Strings.Account_ProfileNoCapes);
         }
-        catch (OperationCanceledException) when (!profile.IsCurrent(account, operation))
+        catch (OperationCanceledException)
         {
         }
         catch (Exception exception)
@@ -146,15 +151,23 @@ public sealed partial class AccountCapeViewModel : ObservableObject
         var operation = profile.BeginOperation(account, Strings.Status_ChangingCape);
         try
         {
-            await microsoftAccountService.SetActiveCapeAsync(account, cape.Id);
-            if (!profile.IsCurrent(account, operation))
+            var effectiveAccount = await microsoftOperationRetryHandler.ExecuteAsync(
+                account,
+                current => microsoftAccountService.SetActiveCapeAsync(
+                    current,
+                    cape.Id,
+                    operation.Token));
+            if (!profile.IsCurrent(effectiveAccount, operation))
                 return;
             var message = cape.IsNone
                 ? Strings.Status_CapeRemoved
                 : string.Format(Strings.Status_CapeChangedFormat, AccountCapeTextProvider.GetDisplayName(cape));
             MarkActive(cape);
-            await StoreCacheAsync(account);
+            await StoreCacheAsync(effectiveAccount);
             profile.SetMessage(message, showFloating: true);
+        }
+        catch (OperationCanceledException)
+        {
         }
         catch (Exception exception)
         {

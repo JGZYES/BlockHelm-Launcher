@@ -9,6 +9,8 @@ namespace Launcher.Application.Accounts;
 public enum LaunchAccountSessionFailureReason
 {
     Unknown,
+    AuthenticationNotConfigured,
+    AuthenticationApplicationNotAuthorized,
     ReauthenticationRequired,
     AuthenticationServerUnavailable,
     InvalidAuthenticationResponse,

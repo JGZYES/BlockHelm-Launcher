@@ -32,6 +32,7 @@ public sealed partial class AccountProfileViewModel : ObservableObject
     private readonly IMicrosoftAccountService microsoftAccountService;
     private readonly IThirdPartyAccountService thirdPartyAccountService;
     private readonly AccountAppearanceOperationCoordinator operations;
+    private readonly MicrosoftAccountOperationRetryHandler microsoftOperationRetryHandler;
     private readonly IFloatingMessageService? floatingMessageService;
     private readonly ILogger logger;
 
@@ -40,6 +41,7 @@ public sealed partial class AccountProfileViewModel : ObservableObject
         IMicrosoftAccountService microsoftAccountService,
         IThirdPartyAccountService thirdPartyAccountService,
         AccountAppearanceOperationCoordinator operations,
+        MicrosoftAccountOperationRetryHandler microsoftOperationRetryHandler,
         IFloatingMessageService? floatingMessageService,
         ILogger logger)
     {
@@ -47,6 +49,7 @@ public sealed partial class AccountProfileViewModel : ObservableObject
         this.microsoftAccountService = microsoftAccountService;
         this.thirdPartyAccountService = thirdPartyAccountService;
         this.operations = operations;
+        this.microsoftOperationRetryHandler = microsoftOperationRetryHandler;
         this.floatingMessageService = floatingMessageService;
         this.logger = logger;
         operations.PropertyChanged += (_, e) =>
@@ -98,19 +101,23 @@ public sealed partial class AccountProfileViewModel : ObservableObject
         SetMessage(Strings.Status_RefreshingAccountProfile);
         try
         {
-            var refreshed = account.IsMicrosoft
-                ? await microsoftAccountService.RefreshAccountProfileAsync(account, operation.Token)
-                : await thirdPartyAccountService.RefreshAccountProfileAsync(account, operation.Token);
-            if (!operations.IsCurrent(account, operation))
+            var result = account.IsMicrosoft
+                ? await microsoftOperationRetryHandler.ExecuteAsync(
+                    account,
+                    current => microsoftAccountService.RefreshAccountProfileAsync(current, operation.Token))
+                : new MicrosoftAccountOperationResult<LauncherAccount>(
+                    account,
+                    await thirdPartyAccountService.RefreshAccountProfileAsync(account, operation.Token));
+            if (!operations.IsCurrent(result.Account, operation))
                 return;
             var updated = account.IsMicrosoft
-                ? AccountMapper.WithCapeCache(refreshed, account.CachedCapeOptions)
-                : refreshed;
-            accountList.ReplaceSelectedAccount(account, updated);
+                ? AccountMapper.WithCapeCache(result.Value, result.Account.CachedCapeOptions)
+                : result.Value;
+            accountList.ReplaceSelectedAccount(result.Account, updated);
             await accountList.PersistAccountOrderAsync();
             SetMessage(Strings.Status_AccountProfileRefreshed);
         }
-        catch (OperationCanceledException) when (!operations.IsCurrent(account, operation))
+        catch (OperationCanceledException)
         {
         }
         catch (Exception exception)

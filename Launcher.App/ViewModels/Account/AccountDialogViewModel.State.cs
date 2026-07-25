@@ -46,6 +46,7 @@ public sealed partial class AccountDialogViewModel
         OnPropertyChanged(nameof(IsThirdPartyIdentityReadOnly));
         OnPropertyChanged(nameof(IsMicrosoftLoginStep));
         OnPropertyChanged(nameof(IsMicrosoftLoginResultStep));
+        OnPropertyChanged(nameof(IsMicrosoftReauthenticationPromptStep));
         OnPropertyChanged(nameof(IsMicrosoftReauthenticationStep));
         OnPropertyChanged(nameof(IsMicrosoftReauthenticationResultStep));
         OnPropertyChanged(nameof(IsMicrosoftStatusStep));

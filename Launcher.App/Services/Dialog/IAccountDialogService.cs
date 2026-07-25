@@ -25,7 +25,12 @@ using Launcher.App.Views.Account.Dialogs;
 
 namespace Launcher.App.Services;
 
-public interface IAccountDialogService
+public interface IMicrosoftAccountReauthenticationDialogService
+{
+    Task<bool> ShowMicrosoftReauthenticationDialogAsync(LauncherAccount account);
+}
+
+public interface IAccountDialogService : IMicrosoftAccountReauthenticationDialogService
 {
     void Attach(
         AccountPageViewModel accountPage,
@@ -39,8 +44,6 @@ public interface IAccountDialogService
     void ShowAddAccountDialog();
 
     Task<bool> ShowThirdPartyReauthenticationDialogAsync(LauncherAccount account);
-
-    Task<bool> ShowMicrosoftReauthenticationDialogAsync(LauncherAccount account);
 
     void ShowDeleteAccountDialog(LauncherAccount account);
 

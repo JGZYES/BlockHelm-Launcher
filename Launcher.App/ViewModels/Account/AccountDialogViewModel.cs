@@ -173,10 +173,13 @@ public sealed partial class AccountDialogViewModel : ObservableObject
     public bool IsThirdPartyImportResultStep => AddAccountDialogStep == AccountDialogSteps.AddAccountThirdPartyImportResult;
     public bool IsMicrosoftLoginStep => AddAccountDialogStep == AccountDialogSteps.AddAccountMicrosoftLogin;
     public bool IsMicrosoftLoginResultStep => AddAccountDialogStep == AccountDialogSteps.AddAccountMicrosoftResult;
+    public bool IsMicrosoftReauthenticationPromptStep =>
+        AddAccountDialogStep == AccountDialogSteps.AddAccountMicrosoftReauthenticationPrompt;
     public bool IsMicrosoftReauthenticationStep => AddAccountDialogStep == AccountDialogSteps.AddAccountMicrosoftReauthentication;
     public bool IsMicrosoftReauthenticationResultStep => AddAccountDialogStep == AccountDialogSteps.AddAccountMicrosoftReauthenticationResult;
     public bool IsMicrosoftReauthenticationMode => AccountPendingMicrosoftReauthentication is not null;
     public bool IsMicrosoftStatusStep => IsMicrosoftLoginStep || IsMicrosoftLoginResultStep
+        || IsMicrosoftReauthenticationPromptStep
         || IsMicrosoftReauthenticationStep || IsMicrosoftReauthenticationResultStep;
     public bool CanShowAddAccountBackButton => !IsAddAccountDialogBusy
         && (IsOfflineNameStep || IsThirdPartyCredentialsStep || IsMicrosoftLoginStep);
@@ -185,6 +188,7 @@ public sealed partial class AccountDialogViewModel : ObservableObject
     public bool IsAddAccountFooterEnabled => !IsAddAccountDialogBusy;
     public bool CanConfirmAddAccountDialog => !IsAddAccountDialogBusy
         && (IsMicrosoftLoginResultStep
+            || IsMicrosoftReauthenticationPromptStep
             || IsMicrosoftReauthenticationResultStep
             || IsOfflineNameStep
             || (IsThirdPartyFormStep && ThirdParty.CanConfirm)
@@ -203,11 +207,14 @@ public sealed partial class AccountDialogViewModel : ObservableObject
         && (IsRenameAccountResultStep || (IsRenameAccountInputStep && !string.IsNullOrWhiteSpace(RenameAccountName)));
     public bool HasRenameAccountErrorCode => !string.IsNullOrWhiteSpace(RenameAccountErrorCodeMessage);
 
-    public string? MicrosoftLoginIconKey => IsMicrosoftLoginStep || IsMicrosoftReauthenticationStep
-        ? "general/general_external-web"
-        : IsMicrosoftLoginResultStep || IsMicrosoftReauthenticationResultStep
-            ? IsMicrosoftLoginSuccessful ? "general/general_passed" : "general/general_attention"
-            : null;
+    public string? MicrosoftLoginIconKey =>
+        IsMicrosoftLoginStep || IsMicrosoftReauthenticationStep
+            ? "general/general_external-web"
+            : IsMicrosoftReauthenticationPromptStep
+                ? "general/general_attention"
+                : IsMicrosoftLoginResultStep || IsMicrosoftReauthenticationResultStep
+                    ? IsMicrosoftLoginSuccessful ? "general/general_passed" : "general/general_attention"
+                    : null;
 
     public string? RenameAccountIconKey => IsRenameAccountResultStep
         ? IsRenameAccountSuccessful ? "general/general_passed" : "general/general_attention"
@@ -221,6 +228,7 @@ public sealed partial class AccountDialogViewModel : ObservableObject
 
     public string AddAccountDialogTitle => AddAccountDialogStep switch
     {
+        AccountDialogSteps.AddAccountMicrosoftReauthenticationPrompt => Strings.Dialog_MicrosoftAccountExpiredTitle,
         AccountDialogSteps.AddAccountMicrosoftReauthentication => Strings.Dialog_ReauthenticateMicrosoftAccountTitle,
         AccountDialogSteps.AddAccountMicrosoftReauthenticationResult => Strings.Dialog_ReauthenticateMicrosoftAccountTitle,
         AccountDialogSteps.AddAccountThirdPartyReauthentication => Strings.Dialog_ReauthenticateThirdPartyAccountTitle,
@@ -235,6 +243,7 @@ public sealed partial class AccountDialogViewModel : ObservableObject
 
     public string AddAccountDialogSubtitle => AddAccountDialogStep switch
     {
+        AccountDialogSteps.AddAccountMicrosoftReauthenticationPrompt => Strings.Dialog_MicrosoftAccountExpiredSubtitle,
         AccountDialogSteps.AddAccountMicrosoftReauthentication => Strings.Dialog_ReauthenticateMicrosoftAccountSubtitle,
         AccountDialogSteps.AddAccountMicrosoftReauthenticationResult => Strings.Dialog_ReauthenticateMicrosoftAccountSubtitle,
         AccountDialogSteps.AddAccountThirdPartyReauthentication => Strings.Dialog_ReauthenticateThirdPartyAccountSubtitle,

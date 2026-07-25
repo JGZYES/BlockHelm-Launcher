@@ -3468,10 +3468,16 @@ The current game folder will be backed up first.</value>
   <data name="Account_ThirdPartyPlatformFormat" xml:space="preserve"><value>{0} · {1}</value></data>
   <data name="Dialog_ReauthenticateMicrosoftAccountTitle" xml:space="preserve"><value>Sign in to Microsoft account again</value></data>
   <data name="Dialog_ReauthenticateMicrosoftAccountSubtitle" xml:space="preserve"><value>Your sign-in has expired. Complete Microsoft authorization in your browser again.</value></data>
+  <data name="Dialog_MicrosoftAccountExpiredTitle" xml:space="preserve"><value>Microsoft account expired</value></data>
+  <data name="Dialog_MicrosoftAccountExpiredSubtitle" xml:space="preserve"><value>Your Microsoft account needs to be verified again</value></data>
+  <data name="Dialog_MicrosoftAccountExpiredMessageFormat" xml:space="preserve"><value>The sign-in for “{0}” has expired. Select Confirm to open your browser and sign in again.</value></data>
   <data name="Status_MicrosoftReauthenticationRequired" xml:space="preserve"><value>Your Microsoft account sign-in has expired. Sign in again.</value></data>
   <data name="Status_MicrosoftReauthenticationSuccessful" xml:space="preserve"><value>Microsoft account sign-in restored. Continuing launch.</value></data>
   <data name="Status_MicrosoftReauthenticationAccountMismatch" xml:space="preserve"><value>The Microsoft account you signed in with does not match the current account.</value></data>
   <data name="Status_MicrosoftCredentialStorageFailed" xml:space="preserve"><value>Could not securely save Microsoft account sign-in information.</value></data>
+  <data name="Status_MicrosoftLoginNotConfigured" xml:space="preserve"><value>This build does not include the BlockHelm Launcher Microsoft application identity, so Microsoft sign-in is unavailable.</value></data>
+  <data name="Status_MicrosoftApplicationNotAuthorized" xml:space="preserve"><value>BlockHelm Launcher has not been authorized by Minecraft sign-in services yet. Please try again later.</value></data>
+  <data name="Status_MicrosoftAuthenticationServerUnavailable" xml:space="preserve"><value>Microsoft sign-in services are temporarily unavailable. Please try again later.</value></data>
   <data name="SelectAll_Button" xml:space="preserve"><value>Select all</value></data><data name="Retry_Button" xml:space="preserve"><value>Retry</value></data>
   <data name="Dialog_ThirdPartyProfileSelectionTitle" xml:space="preserve"><value>Select profiles</value></data><data name="Dialog_ThirdPartyProfileSelectionSubtitle" xml:space="preserve"><value>Select one or more profiles to import.</value></data>
   <data name="Dialog_ThirdPartyImportProgressTitle" xml:space="preserve"><value>Importing profiles</value></data><data name="Dialog_ThirdPartyImportProgressSubtitle" xml:space="preserve"><value>Saving profile data and sign-in information.</value></data>

@@ -60,6 +60,24 @@
     "licenseText": "MIT License"
   },
   {
+    "name": "Microsoft.Identity.Client",
+    "copyrightNotice": "Copyright (c) Microsoft Corporation. All rights reserved.",
+    "projectUrl": "https://github.com/AzureAD/microsoft-authentication-library-for-dotnet",
+    "licenseText": "MIT License"
+  },
+  {
+    "name": "Microsoft.Identity.Client.Extensions.Msal",
+    "copyrightNotice": "Copyright (c) Microsoft Corporation. All rights reserved.",
+    "projectUrl": "https://github.com/AzureAD/microsoft-authentication-extensions-for-dotnet",
+    "licenseText": "MIT License"
+  },
+  {
+    "name": "XboxAuthNet.Game.Msal",
+    "copyrightNotice": "Copyright (c) 2023 AlphaBs",
+    "projectUrl": "https://github.com/AlphaBs/XboxAuthNet",
+    "licenseText": "MIT License"
+  },
+  {
     "name": "SharpCompress",
     "copyrightNotice": "Copyright (c) Adam Hathcock",
     "projectUrl": "https://github.com/adamhathcock/sharpcompress",

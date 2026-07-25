@@ -116,11 +116,12 @@ jobs:
             Remove-Item $env:PUBLISH_DIR -Recurse -Force
           }
 
-      - name: Prepare embedded API keys
+      - name: Prepare embedded service configuration
         shell: pwsh
         env:
           CURSEFORGE_API_KEY: ${{ secrets.CURSEFORGE_API_KEY }}
           BHL_API_KEY: ${{ secrets.BHL_API_KEY }}
+          MICROSOFT_CLIENT_ID: ${{ vars.MICROSOFT_CLIENT_ID }}
         run: |
           if ([string]::IsNullOrWhiteSpace($env:CURSEFORGE_API_KEY)) {
             throw "Repository secret CURSEFORGE_API_KEY is not configured. Configure it before publishing a beta release."
@@ -130,9 +131,16 @@ jobs:
             throw "Repository secret BHL_API_KEY is not configured. Configure it before publishing a beta release."
           }
 
+          $parsedMicrosoftClientId = [Guid]::Empty
+          if (-not [Guid]::TryParse($env:MICROSOFT_CLIENT_ID, [ref]$parsedMicrosoftClientId) -or
+              $parsedMicrosoftClientId -eq [Guid]::Empty) {
+            throw "Repository variable MICROSOFT_CLIENT_ID is missing or invalid. Configure the BlockHelm Launcher application client ID before publishing a beta release."
+          }
+
           New-Item -ItemType Directory -Force ".local-secrets" | Out-Null
           Set-Content -Path ".local-secrets/curseforge.key" -Value $env:CURSEFORGE_API_KEY.Trim() -NoNewline -Encoding utf8
           Set-Content -Path ".local-secrets/mcres-bhl.key" -Value $env:BHL_API_KEY.Trim() -NoNewline -Encoding utf8
+          Set-Content -Path ".local-secrets/microsoft-client-id" -Value $parsedMicrosoftClientId.ToString("D") -NoNewline -Encoding utf8
 
       - name: Publish win-x64 single file
         run: dotnet publish Launcher.App/Launcher.App.csproj -c Release -p:PublishProfile=WinX64FrameworkDependentSingleFile

@@ -50,10 +50,23 @@ public sealed partial class AccountDialogViewModel
     {
         ResetAddAccountDialogState(clearOfflineName: true);
         AccountPendingMicrosoftReauthentication = account;
+        AddAccountDialogStep = AccountDialogSteps.AddAccountMicrosoftReauthenticationPrompt;
+        IsAddAccountDialogBusy = false;
+        ResetMicrosoftLoginResultState(string.Format(
+            Strings.Dialog_MicrosoftAccountExpiredMessageFormat,
+            account.DisplayName));
+        IsAddAccountDialogOpen = true;
+        ReportStatus(Strings.Status_MicrosoftReauthenticationRequired);
+    }
+
+    public void BeginMicrosoftAccountReauthentication()
+    {
+        if (AccountPendingMicrosoftReauthentication is null)
+            return;
+
         AddAccountDialogStep = AccountDialogSteps.AddAccountMicrosoftReauthentication;
         IsAddAccountDialogBusy = true;
         ResetMicrosoftLoginResultState(MicrosoftLoginActiveMessage);
-        IsAddAccountDialogOpen = true;
         ReportStatus(Strings.Status_OpeningMicrosoftLogin);
     }
 
@@ -133,9 +146,31 @@ public sealed partial class AccountDialogViewModel
             ReportStatus(message);
             ShowMicrosoftLoginResult(false, message);
         }
+        catch (MicrosoftAccountLoginException exception)
+        {
+            logger.LogWarning(
+                "Microsoft account login failed. Reason={Reason}",
+                exception.Reason);
+            var message = exception.Reason switch
+            {
+                MicrosoftAccountLoginFailureReason.NotConfigured
+                    => Strings.Status_MicrosoftLoginNotConfigured,
+                MicrosoftAccountLoginFailureReason.ApplicationNotAuthorized
+                    => Strings.Status_MicrosoftApplicationNotAuthorized,
+                MicrosoftAccountLoginFailureReason.AuthenticationServerUnavailable
+                    => Strings.Status_MicrosoftAuthenticationServerUnavailable,
+                MicrosoftAccountLoginFailureReason.CredentialStorageFailed
+                    => Strings.Status_MicrosoftCredentialStorageFailed,
+                _ => Strings.Status_LoginFailed
+            };
+            ReportStatus(message);
+            ShowMicrosoftLoginResult(false, message);
+        }
         catch (Exception exception)
         {
-            logger.LogError(exception, "Microsoft account login failed.");
+            logger.LogError(
+                "Microsoft account login failed. ErrorType={ErrorType}",
+                exception.GetType().FullName);
             var message = Strings.Status_LoginFailed;
             ReportStatus(message);
             ShowMicrosoftLoginResult(false, message);

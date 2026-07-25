@@ -34,7 +34,11 @@ internal sealed partial class AccountAppearanceOperationCoordinator : Observable
 
     public void SetAccount(LauncherAccount? account)
     {
-        accountId = account?.Id;
+        var nextAccountId = account?.Id;
+        if (string.Equals(accountId, nextAccountId, StringComparison.Ordinal))
+            return;
+
+        accountId = nextAccountId;
         Interlocked.Increment(ref generation);
         var previousLifetime = Interlocked.Exchange(ref accountLifetime, new CancellationTokenSource());
         previousLifetime.Cancel();

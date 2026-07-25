@@ -157,6 +157,26 @@ public sealed class LaunchServiceTests : TestTempDirectory
     }
 
     [Fact]
+    public async Task ReauthenticationRequiredIsPropagatedForAccountDialogHandling()
+    {
+        var expected = new LaunchAccountSessionException(
+            LaunchAccountSessionFailureReason.ReauthenticationRequired,
+            "Interactive Microsoft authentication is required.");
+        var service = CreateService(accountSession: new FailingAccountSession(expected));
+        var settings = CreateSettings();
+        settings.DefaultCheckFilesBeforeLaunch = false;
+
+        var actual = await Assert.ThrowsAsync<LaunchAccountSessionException>(() =>
+            service.LaunchAsync(
+                CreateInstance(settings.MinecraftDirectory, "Microsoft Reauthentication"),
+                CreateAccount(),
+                settings,
+                progress: null));
+
+        Assert.Same(expected, actual);
+    }
+
+    [Fact]
     public async Task QuickExitWritesRedactedDiagnostic()
     {
         var settings = CreateSettings();
@@ -410,6 +430,14 @@ public sealed class LaunchServiceTests : TestTempDirectory
                 "super-secret-access-token",
                 account.Uuid!,
                 account.IsOffline));
+    }
+
+    private sealed class FailingAccountSession(LaunchAccountSessionException exception) : ILaunchAccountSessionService
+    {
+        public Task<LaunchAccountSession> CreateSessionAsync(
+            LauncherAccount account,
+            CancellationToken cancellationToken = default) =>
+            Task.FromException<LaunchAccountSession>(exception);
     }
 
     private sealed class InlineProgress(List<LauncherProgress> reports) : IProgress<LauncherProgress>

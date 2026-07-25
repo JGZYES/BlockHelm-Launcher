@@ -37,9 +37,7 @@ public sealed partial class AccountDialogViewModel
         if (account is null)
             return false;
 
-        AddAccountDialogStep = AccountDialogSteps.AddAccountMicrosoftReauthentication;
-        IsAddAccountDialogBusy = true;
-        ResetMicrosoftLoginResultState(MicrosoftLoginActiveMessage);
+        BeginMicrosoftAccountReauthentication();
         try
         {
             var refreshed = await microsoftAccountService.ReauthenticateInteractivelyAsync(account);
@@ -57,9 +55,14 @@ public sealed partial class AccountDialogViewModel
         }
         catch (MicrosoftAccountReauthenticationException exception)
         {
-            logger.LogWarning(exception, "Microsoft account reauthentication failed. AccountId={AccountId} Reason={Reason}", account.Id, exception.Reason);
+            logger.LogWarning(
+                "Microsoft account reauthentication failed. AccountId={AccountId} Reason={Reason}",
+                account.Id,
+                exception.Reason);
             var message = exception.Reason switch
             {
+                MicrosoftAccountReauthenticationFailureReason.NotConfigured => Strings.Status_MicrosoftLoginNotConfigured,
+                MicrosoftAccountReauthenticationFailureReason.ApplicationNotAuthorized => Strings.Status_MicrosoftApplicationNotAuthorized,
                 MicrosoftAccountReauthenticationFailureReason.AccountMismatch => Strings.Status_MicrosoftReauthenticationAccountMismatch,
                 MicrosoftAccountReauthenticationFailureReason.CredentialStorageFailed => Strings.Status_MicrosoftCredentialStorageFailed,
                 _ => Strings.Status_LoginFailed
@@ -69,7 +72,10 @@ public sealed partial class AccountDialogViewModel
         }
         catch (Exception exception)
         {
-            logger.LogError(exception, "Microsoft account reauthentication failed. AccountId={AccountId}", account.Id);
+            logger.LogError(
+                "Microsoft account reauthentication failed. AccountId={AccountId} ErrorType={ErrorType}",
+                account.Id,
+                exception.GetType().FullName);
             ShowMicrosoftReauthenticationFailure(Strings.Status_LoginFailed);
             return false;
         }

@@ -46,11 +46,15 @@ public sealed class AccountAppearanceViewModel : ObservableObject, IDisposable
         this.accountList = accountList;
         var resolvedLogger = logger ?? NullLogger<AccountAppearanceViewModel>.Instance;
         operations = new AccountAppearanceOperationCoordinator();
+        var microsoftOperationRetryHandler = new MicrosoftAccountOperationRetryHandler(
+            accountList,
+            dialogService);
         Profile = new AccountProfileViewModel(
             accountList,
             microsoftAccountService,
             thirdPartyAccountService,
             operations,
+            microsoftOperationRetryHandler,
             floatingMessageService,
             resolvedLogger);
         SkinLibrary = new AccountSkinLibraryViewModel(
@@ -62,8 +66,14 @@ public sealed class AccountAppearanceViewModel : ObservableObject, IDisposable
             filePickerService,
             skinFileValidator,
             Profile,
+            microsoftOperationRetryHandler,
             resolvedLogger);
-        Cape = new AccountCapeViewModel(accountList, microsoftAccountService, Profile, resolvedLogger);
+        Cape = new AccountCapeViewModel(
+            accountList,
+            microsoftAccountService,
+            Profile,
+            microsoftOperationRetryHandler,
+            resolvedLogger);
 
         Profile.PropertyChanged += Child_PropertyChanged;
         SkinLibrary.PropertyChanged += Child_PropertyChanged;

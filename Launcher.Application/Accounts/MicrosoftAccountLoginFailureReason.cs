@@ -6,11 +6,11 @@
 
 namespace Launcher.Application.Accounts;
 
-public enum MicrosoftAccountReauthenticationFailureReason
+public enum MicrosoftAccountLoginFailureReason
 {
     Unknown,
     NotConfigured,
     ApplicationNotAuthorized,
-    AccountMismatch,
+    AuthenticationServerUnavailable,
     CredentialStorageFailed
 }

@@ -3468,10 +3468,16 @@
   <data name="Account_ThirdPartyPlatformFormat" xml:space="preserve"><value>{0} · {1}</value></data>
   <data name="Dialog_ReauthenticateMicrosoftAccountTitle" xml:space="preserve"><value>重新登入正版帳戶</value></data>
   <data name="Dialog_ReauthenticateMicrosoftAccountSubtitle" xml:space="preserve"><value>登入已過期，請在瀏覽器中重新完成 Microsoft 授權。</value></data>
+  <data name="Dialog_MicrosoftAccountExpiredTitle" xml:space="preserve"><value>正版帳戶已過期</value></data>
+  <data name="Dialog_MicrosoftAccountExpiredSubtitle" xml:space="preserve"><value>需要重新驗證 Microsoft 帳戶</value></data>
+  <data name="Dialog_MicrosoftAccountExpiredMessageFormat" xml:space="preserve"><value>帳戶「{0}」的登入狀態已過期。點擊「確定」後將開啟瀏覽器，請重新登入。</value></data>
   <data name="Status_MicrosoftReauthenticationRequired" xml:space="preserve"><value>正版帳戶登入已過期，請重新登入。</value></data>
   <data name="Status_MicrosoftReauthenticationSuccessful" xml:space="preserve"><value>正版帳戶重新登入成功，正在繼續啟動。</value></data>
   <data name="Status_MicrosoftReauthenticationAccountMismatch" xml:space="preserve"><value>登入的 Microsoft 帳戶與目前帳戶不一致。</value></data>
   <data name="Status_MicrosoftCredentialStorageFailed" xml:space="preserve"><value>無法安全儲存正版帳戶登入資訊。</value></data>
+  <data name="Status_MicrosoftLoginNotConfigured" xml:space="preserve"><value>此版本未設定 BlockHelm Launcher 的 Microsoft 應用程式身分，無法進行正版登入。</value></data>
+  <data name="Status_MicrosoftApplicationNotAuthorized" xml:space="preserve"><value>BlockHelm Launcher 尚未獲得 Minecraft 登入服務授權，請稍後再試。</value></data>
+  <data name="Status_MicrosoftAuthenticationServerUnavailable" xml:space="preserve"><value>Microsoft 登入服務暫時無法使用，請稍後再試。</value></data>
   <data name="SelectAll_Button" xml:space="preserve"><value>全選</value></data><data name="Retry_Button" xml:space="preserve"><value>重試</value></data>
   <data name="Dialog_ThirdPartyProfileSelectionTitle" xml:space="preserve"><value>選擇角色</value></data><data name="Dialog_ThirdPartyProfileSelectionSubtitle" xml:space="preserve"><value>選擇要匯入的一個或多個角色。</value></data>
   <data name="Dialog_ThirdPartyImportProgressTitle" xml:space="preserve"><value>正在匯入角色</value></data><data name="Dialog_ThirdPartyImportProgressSubtitle" xml:space="preserve"><value>正在儲存角色資料和登入資訊。</value></data>

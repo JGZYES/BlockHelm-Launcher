@@ -41,6 +41,7 @@ public sealed partial class AccountSkinLibraryViewModel : ObservableObject
     private readonly IFilePickerService filePickerService;
     private readonly IMinecraftSkinFileValidator skinFileValidator;
     private readonly AccountProfileViewModel profile;
+    private readonly MicrosoftAccountOperationRetryHandler microsoftOperationRetryHandler;
     private readonly ILogger logger;
     private LauncherSkinRecord? skinPendingModelChange;
 
@@ -53,6 +54,7 @@ public sealed partial class AccountSkinLibraryViewModel : ObservableObject
         IFilePickerService filePickerService,
         IMinecraftSkinFileValidator skinFileValidator,
         AccountProfileViewModel profile,
+        MicrosoftAccountOperationRetryHandler microsoftOperationRetryHandler,
         ILogger logger)
     {
         this.accountList = accountList;
@@ -63,6 +65,7 @@ public sealed partial class AccountSkinLibraryViewModel : ObservableObject
         this.filePickerService = filePickerService;
         this.skinFileValidator = skinFileValidator;
         this.profile = profile;
+        this.microsoftOperationRetryHandler = microsoftOperationRetryHandler;
         this.logger = logger;
         profile.PropertyChanged += (_, _) => NotifyCommandState();
     }
@@ -200,21 +203,30 @@ public sealed partial class AccountSkinLibraryViewModel : ObservableObject
         var operation = profile.BeginOperation(account, Strings.Status_UploadingSkin);
         try
         {
-            var uploaded = await microsoftAccountService.UploadSkinAsync(account, ResolveLocalPath(skin.Source), skin.SkinModel);
-            if (!profile.IsCurrent(account, operation))
+            var result = await microsoftOperationRetryHandler.ExecuteAsync(
+                account,
+                current => microsoftAccountService.UploadSkinAsync(
+                    current,
+                    ResolveLocalPath(skin.Source),
+                    skin.SkinModel,
+                    operation.Token));
+            if (!profile.IsCurrent(result.Account, operation))
                 return;
             var updated = AccountMapper.WithCapeCache(
                 AccountMapper.WithSkinLibrary(
-                    AccountMapper.WithAppearanceFallback(uploaded, account),
-                    account.SkinLibrary,
+                    AccountMapper.WithAppearanceFallback(result.Value, result.Account),
+                    result.Account.SkinLibrary,
                     skin.Id,
                     skin.Source,
                     skin.SkinModel),
-                account.CachedCapeOptions);
-            accountList.ReplaceSelectedAccount(account, updated);
+                result.Account.CachedCapeOptions);
+            accountList.ReplaceSelectedAccount(result.Account, updated);
             Populate(updated, skin.Id);
             await accountList.PersistAccountOrderAsync();
             profile.SetMessage(Strings.Status_SkinUpdated, showFloating: true);
+        }
+        catch (OperationCanceledException)
+        {
         }
         catch (Exception exception)
         {

@@ -56,6 +56,34 @@ public sealed class UpdateReleaseWorkflowContractTests
             StringComparison.Ordinal);
     }
 
+    [Theory]
+    [InlineData("release.yml")]
+    [InlineData("beta.yml")]
+    [InlineData("manual-build.yml")]
+    public void WorkflowEmbedsValidatedMicrosoftClientIdBeforePublishing(string fileName)
+    {
+        var root = FindRepositoryRoot();
+        var workflow = File.ReadAllText(Path.Combine(root.FullName, ".github", "workflows", fileName));
+
+        var variableMapping = workflow.IndexOf(
+            "MICROSOFT_CLIENT_ID: ${{ vars.MICROSOFT_CLIENT_ID }}",
+            StringComparison.Ordinal);
+        var validation = workflow.IndexOf(
+            "[Guid]::TryParse($env:MICROSOFT_CLIENT_ID",
+            StringComparison.Ordinal);
+        var clientIdWrite = workflow.IndexOf(
+            "Set-Content -Path \".local-secrets/microsoft-client-id\"",
+            StringComparison.Ordinal);
+        var publish = workflow.IndexOf(
+            "dotnet publish Launcher.App/Launcher.App.csproj",
+            StringComparison.Ordinal);
+
+        Assert.True(variableMapping >= 0);
+        Assert.True(validation > variableMapping);
+        Assert.True(clientIdWrite > validation);
+        Assert.True(publish > clientIdWrite);
+    }
+
     [Fact]
     public void ManualBuildWorkflowUploadsArtifactWithoutPublishingOrTagging()
     {
@@ -69,8 +97,13 @@ public sealed class UpdateReleaseWorkflowContractTests
         Assert.Contains("workflow_dispatch:", workflow, StringComparison.Ordinal);
         Assert.Contains("contents: read", workflow, StringComparison.Ordinal);
         Assert.Contains("BHL_API_KEY: ${{ secrets.BHL_API_KEY }}", workflow, StringComparison.Ordinal);
+        Assert.Contains("MICROSOFT_CLIENT_ID: ${{ vars.MICROSOFT_CLIENT_ID }}", workflow, StringComparison.Ordinal);
         Assert.Contains(
             "Set-Content -Path \".local-secrets/mcres-bhl.key\"",
+            workflow,
+            StringComparison.Ordinal);
+        Assert.Contains(
+            "Set-Content -Path \".local-secrets/microsoft-client-id\"",
             workflow,
             StringComparison.Ordinal);
         Assert.Contains(

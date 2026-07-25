@@ -88,7 +88,6 @@ public sealed class AccountDialogService : IAccountDialogService
             TaskCreationOptions.RunContinuationsAsynchronously);
         accountPage.Dialog.OpenMicrosoftReauthenticationDialog(account);
         addAccountHost.Show();
-        _ = CompleteMicrosoftReauthenticationAsync();
         return microsoftReauthenticationCompletion.Task;
     }
 
@@ -192,6 +191,12 @@ public sealed class AccountDialogService : IAccountDialogService
         var previousHeight = addAccountHost.SurfaceBorder.ActualHeight;
 
         if (accountPage.Dialog.IsMicrosoftReauthenticationResultStep)
+        {
+            await CompleteMicrosoftReauthenticationAsync();
+            return;
+        }
+
+        if (accountPage.Dialog.IsMicrosoftReauthenticationPromptStep)
         {
             await CompleteMicrosoftReauthenticationAsync();
             return;

@@ -157,7 +157,11 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<IAccountSkinLibraryService, AccountSkinLibraryService>();
         services.AddSingleton<IMinecraftSkinFileValidator, MinecraftSkinFileValidator>();
         services.AddSingleton<IOfflineAccountUuidService, OfflineAccountUuidService>();
-        services.AddSingleton(serviceProvider => new MicrosoftAuthProvider(serviceProvider.GetRequiredService<LauncherPathProvider>()));
+        services.AddSingleton(serviceProvider => new MicrosoftClientIdProvider(
+            serviceProvider.GetService<Microsoft.Extensions.Logging.ILogger<MicrosoftClientIdProvider>>()));
+        services.AddSingleton(serviceProvider => new MicrosoftAuthProvider(
+            serviceProvider.GetRequiredService<LauncherPathProvider>(),
+            serviceProvider.GetRequiredService<MicrosoftClientIdProvider>()));
         services.AddSingleton<ILaunchAccountSessionService, LaunchAccountSessionService>();
         return services;
     }
