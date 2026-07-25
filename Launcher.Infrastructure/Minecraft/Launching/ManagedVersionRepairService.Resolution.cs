@@ -30,43 +30,24 @@ namespace Launcher.Infrastructure.Minecraft;
 
 internal sealed partial class ManagedVersionRepairService
 {
-internal async Task<ResolvedVersionMetadata> EnsureVersionIsSelfContainedAsync(
+internal async Task<ResolvedVersionMetadata> FinalizePreparedVersionAsync(
         string minecraftDirectory,
         string versionName,
         string versionDirectory,
         DownloadSourcePreference downloadSourcePreference,
         CancellationToken cancellationToken,
-        bool allowRepair = true,
         int downloadSpeedLimitMbPerSecond = 0)
     {
-        // 禁止修复时只验证现状，绝不写文件或下载；继承未消除即视为不可启动。
-        if (!allowRepair)
-        {
-            var versionJson = await ReadVersionJsonAsync(versionDirectory, versionName, cancellationToken);
-            if (!string.IsNullOrWhiteSpace(GetStringProperty(versionJson, "inheritsFrom")))
-            {
-                throw new InstanceRepairException(
-                    $"Version {versionName} still depends on another version and automatic repair is disabled.");
-            }
-
-            var jarPath = Path.Combine(versionDirectory, $"{versionName}.jar");
-            return new ResolvedVersionMetadata(
-                versionName,
-                versionJson,
-                File.Exists(jarPath) ? jarPath : null,
-                VanillaVersionMetadataClient.GetClientJarUrl(versionJson),
-                WasModified: false,
-                ClientJarSha1: VanillaVersionMetadataClient.GetClientJarSha1(versionJson),
-                ClientJarSize: VanillaVersionMetadataClient.GetClientJarSize(versionJson));
-        }
-
+        // This method is used only while a new loader version is still being
+        // constructed in its private sandbox, before it becomes an instance.
         var result = await ResolveCurrentVersionAsync(
             minecraftDirectory,
             versionName,
             versionDirectory,
             downloadSourcePreference,
             cancellationToken,
-            downloadSpeedLimitMbPerSecond);
+            downloadSpeedLimitMbPerSecond,
+            allowRemoteParentResolution: true);
 
         if (!string.IsNullOrWhiteSpace(GetStringProperty(result.VersionJson, "inheritsFrom")))
             throw new InstanceRepairException($"Version {versionName} still depends on another version after repair.");
@@ -83,6 +64,29 @@ internal async Task<ResolvedVersionMetadata> EnsureVersionIsSelfContainedAsync(
     }
 
     /// <summary>
+    /// Resolves an existing instance and its inheritance chain entirely in
+    /// memory. A valid instance JSON is never normalized or written back.
+    /// </summary>
+    internal Task<ResolvedVersionMetadata> ResolveVersionForRepairAsync(
+        string minecraftDirectory,
+        string versionName,
+        string versionDirectory,
+        DownloadSourcePreference downloadSourcePreference,
+        CancellationToken cancellationToken,
+        bool allowRemoteParentResolution,
+        int downloadSpeedLimitMbPerSecond = 0)
+    {
+        return ResolveCurrentVersionAsync(
+            minecraftDirectory,
+            versionName,
+            versionDirectory,
+            downloadSourcePreference,
+            cancellationToken,
+            downloadSpeedLimitMbPerSecond,
+            allowRemoteParentResolution);
+    }
+
+    /// <summary>
     /// 读取当前版本；存在父版本时递归解析并合并为可独立使用的元数据。
     /// </summary>
     private async Task<ResolvedVersionMetadata> ResolveCurrentVersionAsync(
@@ -91,7 +95,8 @@ internal async Task<ResolvedVersionMetadata> EnsureVersionIsSelfContainedAsync(
         string versionDirectory,
         DownloadSourcePreference downloadSourcePreference,
         CancellationToken cancellationToken,
-        int downloadSpeedLimitMbPerSecond)
+        int downloadSpeedLimitMbPerSecond,
+        bool allowRemoteParentResolution)
     {
         var versionJson = await ReadVersionJsonAsync(versionDirectory, versionName, cancellationToken);
         var currentJarPath = Path.Combine(versionDirectory, $"{versionName}.jar");
@@ -114,7 +119,8 @@ internal async Task<ResolvedVersionMetadata> EnsureVersionIsSelfContainedAsync(
             inheritsFrom,
             downloadSourcePreference,
             cancellationToken,
-            downloadSpeedLimitMbPerSecond);
+            downloadSpeedLimitMbPerSecond,
+            allowRemoteParentResolution);
         var mergedVersion = VersionJsonMergeHelper.MergeFlattenedVersion(parent.VersionJson, versionJson, versionName);
 
         return new ResolvedVersionMetadata(
@@ -135,7 +141,8 @@ internal async Task<ResolvedVersionMetadata> EnsureVersionIsSelfContainedAsync(
         string parentVersionName,
         DownloadSourcePreference downloadSourcePreference,
         CancellationToken cancellationToken,
-        int downloadSpeedLimitMbPerSecond)
+        int downloadSpeedLimitMbPerSecond,
+        bool allowRemoteParentResolution)
     {
         var parentDirectory = Path.Combine(minecraftDirectory, "versions", parentVersionName);
         if (Directory.Exists(parentDirectory)
@@ -147,7 +154,14 @@ internal async Task<ResolvedVersionMetadata> EnsureVersionIsSelfContainedAsync(
                 parentDirectory,
                 downloadSourcePreference,
                 cancellationToken,
-                downloadSpeedLimitMbPerSecond);
+                downloadSpeedLimitMbPerSecond,
+                allowRemoteParentResolution);
+        }
+
+        if (!allowRemoteParentResolution)
+        {
+            throw new InstanceRepairException(
+                $"Inherited version metadata is missing for {parentVersionName} and automatic repair is disabled.");
         }
 
         JsonObject remoteVersionJson;

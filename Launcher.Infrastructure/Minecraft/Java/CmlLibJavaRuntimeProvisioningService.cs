@@ -17,7 +17,9 @@
  * SPDX-License-Identifier: GPL-3.0-only
  */
 
+using System.Net.Http;
 using CmlLib.Core;
+using CmlLib.Core.Version;
 using Launcher.Application.Services;
 using Launcher.Domain.Models;
 using Microsoft.Extensions.Logging;
@@ -31,6 +33,7 @@ public sealed class CmlLibJavaRuntimeProvisioningService
     private const double ProgressStartPercent = 90;
     private const double ProgressEndPercent = 94;
     private readonly IDownloadSpeedLimitState? downloadSpeedLimitState;
+    private readonly HttpClient? metadataHttpClient;
     private readonly ILogger logger;
 
     public CmlLibJavaRuntimeProvisioningService(
@@ -39,6 +42,16 @@ public sealed class CmlLibJavaRuntimeProvisioningService
     {
         this.downloadSpeedLimitState = downloadSpeedLimitState;
         this.logger = logger ?? NullLogger<CmlLibJavaRuntimeProvisioningService>.Instance;
+    }
+
+    internal CmlLibJavaRuntimeProvisioningService(
+        HttpClient metadataHttpClient,
+        IDownloadSpeedLimitState? downloadSpeedLimitState = null,
+        ILogger? logger = null)
+    {
+        this.metadataHttpClient = metadataHttpClient;
+        this.downloadSpeedLimitState = downloadSpeedLimitState;
+        this.logger = logger ?? NullLogger.Instance;
     }
 
     public async Task EnsureForLaunchAsync(
@@ -137,7 +150,23 @@ public sealed class CmlLibJavaRuntimeProvisioningService
                 downloadOperation,
                 javaFileMode: CmlLibJavaFileMode.Only);
             VanillaLoaderProvider.AttachProgress(launcher, provisioningProgress);
-            await launcher.InstallAsync(request.MinecraftVersion, cancellationToken).ConfigureAwait(false);
+            using var ownedMetadataHttpClient = metadataHttpClient is null
+                ? MinecraftHttpClientFactory.CreateTransportClient()
+                : null;
+            var effectiveMetadataHttpClient = metadataHttpClient ?? ownedMetadataHttpClient!;
+            var versionJson = await VanillaVersionMetadataClient.DownloadVersionJsonAsync(
+                    effectiveMetadataHttpClient,
+                    request.MinecraftVersion,
+                    request.DownloadSourcePreference,
+                    request.DownloadSpeedLimitMbPerSecond,
+                    downloadSpeedLimitState,
+                    logger,
+                    cancellationToken)
+                .ConfigureAwait(false);
+            var version = JsonVersionParser.ParseFromJsonString(
+                versionJson.ToJsonString(),
+                new JsonVersionParserOptions());
+            await launcher.InstallAsync(version, cancellationToken).ConfigureAwait(false);
 
             logger.LogInformation(
                 "Java runtime preparation completed for loader installer. VersionName={VersionName} MinecraftVersion={MinecraftVersion}",

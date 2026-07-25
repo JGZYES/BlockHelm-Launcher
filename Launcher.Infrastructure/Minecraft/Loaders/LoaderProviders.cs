@@ -345,6 +345,16 @@ public sealed class VanillaLoaderProvider : ILoaderProvider, ISeparatedInstallPa
         {
             Timeout = Timeout.InfiniteTimeSpan
         };
+        parameters.VersionLoader = new InstanceAuthoritativeVersionLoader(
+            path,
+            (versionName, cancellationToken) => VanillaVersionMetadataClient.DownloadVersionJsonAsync(
+                parameters.HttpClient,
+                versionName,
+                downloadSourcePreference,
+                downloadSpeedLimitMbPerSecond,
+                downloadSpeedLimitState,
+                logger,
+                cancellationToken));
         var runtimeHttpClient = MinecraftHttpClientFactory.CreateTransportClient();
         var runtimeExecutor = new MinecraftDownloadRequestExecutor(
             runtimeHttpClient,

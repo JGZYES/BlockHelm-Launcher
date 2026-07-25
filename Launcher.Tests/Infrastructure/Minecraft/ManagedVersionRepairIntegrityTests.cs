@@ -81,6 +81,53 @@ public sealed class ManagedVersionRepairIntegrityTests : TestTempDirectory
         Assert.Equal(0, handler.RequestCount);
     }
 
+    [Fact]
+    public async Task RepairResolvesLocalInheritanceWithoutRewritingChildJson()
+    {
+        const string jarContent = "inherited-client";
+        var minecraftDirectory = Path.Combine(TempRoot, ".minecraft");
+        var parentDirectory = Path.Combine(minecraftDirectory, "versions", "26.2");
+        var childDirectory = Path.Combine(minecraftDirectory, "versions", "fabric-child");
+        WriteFile(Path.Combine(parentDirectory, "26.2.json"), new JsonObject
+        {
+            ["id"] = "26.2",
+            ["type"] = "release",
+            ["mainClass"] = "net.minecraft.client.main.Main",
+            ["downloads"] = new JsonObject
+            {
+                ["client"] = DownloadMetadata("https://example.test/client.jar", jarContent)
+            },
+            ["libraries"] = new JsonArray()
+        }.ToJsonString());
+        WriteFile(Path.Combine(parentDirectory, "26.2.jar"), jarContent);
+        WriteFile(Path.Combine(childDirectory, "fabric-child.jar"), jarContent);
+        var childJsonPath = Path.Combine(childDirectory, "fabric-child.json");
+        var childJson = """
+            {
+              "id": "fabric-child",
+              "inheritsFrom": "26.2",
+              "mainClass": "net.fabricmc.loader.impl.launch.knot.KnotClient",
+              "libraries": []
+            }
+            """;
+        WriteFile(childJsonPath, childJson);
+        var originalBytes = await File.ReadAllBytesAsync(childJsonPath);
+        var handler = new ContentHandler(new Dictionary<string, string>());
+        var service = new ManagedVersionRepairService(new HttpClient(handler));
+
+        await service.RepairAsync(
+            minecraftDirectory,
+            "fabric-child",
+            childDirectory,
+            progress: null,
+            allowRepair: false,
+            CancellationToken.None,
+            DownloadSourcePreference.Official);
+
+        Assert.Equal(originalBytes, await File.ReadAllBytesAsync(childJsonPath));
+        Assert.Equal(0, handler.RequestCount);
+    }
+
     private string CreateVersion(
         string minecraftDirectory,
         ExpectedFiles expected,

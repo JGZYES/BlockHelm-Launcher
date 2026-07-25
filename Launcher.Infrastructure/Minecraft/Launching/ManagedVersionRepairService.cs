@@ -186,13 +186,13 @@ internal sealed partial class ManagedVersionRepairService : IManagedVersionRepai
             allowRepair ? LaunchProgressStages.RepairingMetadata : LaunchProgressStages.CheckingFiles,
             allowRepair ? "Repairing version metadata" : "Checking launch files",
             18);
-        var resolvedVersion = await EnsureVersionIsSelfContainedAsync(
+        var resolvedVersion = await ResolveVersionForRepairAsync(
             minecraftDirectory,
             versionName,
             versionDirectory,
             downloadSourcePreference,
             cancellationToken,
-            allowRepair,
+            allowRemoteParentResolution: allowRepair,
             downloadSpeedLimitMbPerSecond);
 
         ReportProgress(

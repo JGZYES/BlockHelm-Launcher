@@ -197,7 +197,7 @@ private async Task DownloadInstallerAsync(
     {
         var versionDirectory = Path.Combine(gameDirectory, "versions", finalVersionName);
         var repairService = new ManagedVersionRepairService(httpClient, downloadSpeedLimitState, logger);
-        await repairService.EnsureVersionIsSelfContainedAsync(
+        await repairService.FinalizePreparedVersionAsync(
             gameDirectory,
             finalVersionName,
             versionDirectory,
