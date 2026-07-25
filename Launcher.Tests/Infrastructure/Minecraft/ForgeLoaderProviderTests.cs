@@ -97,6 +97,35 @@ public sealed class ForgeLoaderProviderTests : TestTempDirectory
     }
 
     [Fact]
+    public async Task ForgeLoaderCanInstallWithOfficialVersionNameWithoutPublishingVanillaJson()
+    {
+        const string versionName = "1.20.1";
+        var minecraftDirectory = Path.Combine(TempRoot, ".minecraft");
+        var provider = CreateProvider(new ScriptedForgeInstallerRunner((gameDirectory, _, _) =>
+            CreateSandboxForgeInstallAsync(
+                gameDirectory,
+                "forge-1.20.1-47.4.20",
+                versionName,
+                "1.20.1-47.4.20")));
+
+        var installedName = await provider.InstallAsync(
+            versionName,
+            minecraftDirectory,
+            versionName,
+            "47.4.20",
+            progress: null);
+
+        var jsonPath = Path.Combine(minecraftDirectory, "versions", versionName, $"{versionName}.json");
+        var versionJson = JsonNode.Parse(await File.ReadAllTextAsync(jsonPath))!.AsObject();
+        Assert.Equal(versionName, installedName);
+        Assert.Equal("net.minecraftforge.client.loading.ClientModLoader", versionJson["mainClass"]!.GetValue<string>());
+        Assert.Contains(
+            versionJson["libraries"]!.AsArray(),
+            node => node?["name"]?.GetValue<string>() == "net.minecraftforge:forge:1.20.1-47.4.20");
+        Assert.False(versionJson.ContainsKey("inheritsFrom"));
+    }
+
+    [Fact]
     public async Task ForgeInstallerRunnerDoesNotStartWhenAlreadyCanceled()
     {
         var started = false;
@@ -137,7 +166,7 @@ public sealed class ForgeLoaderProviderTests : TestTempDirectory
     }
 
     [Fact]
-    public async Task ForgeIntegrityRepairUsesInstallerManifestWithoutLegacyMarkerAndPreservesUserContent()
+    public async Task ForgeIntegrityRepairPreservesVersionJsonBytesAndUserContent()
     {
         const string versionName = "Better MC [FORGE] BMC4";
         var minecraftDirectory = Path.Combine(TempRoot, ".minecraft");
@@ -168,6 +197,7 @@ public sealed class ForgeLoaderProviderTests : TestTempDirectory
             ["schemaVersion"] = 2
         };
         await File.WriteAllTextAsync(versionJsonPath, versionJson.ToJsonString());
+        var originalVersionJsonBytes = await File.ReadAllBytesAsync(versionJsonPath);
 
         var missingRelativePaths = new[]
         {
@@ -230,8 +260,9 @@ public sealed class ForgeLoaderProviderTests : TestTempDirectory
             Assert.Contains(
                 manifest.Manifest!.Artifacts,
                 artifact => artifact.RelativePath == $"libraries/{relativePath}"));
-        using var repairedVersionJson = JsonDocument.Parse(await File.ReadAllTextAsync(versionJsonPath));
-        Assert.False(
+        Assert.Equal(originalVersionJsonBytes, await File.ReadAllBytesAsync(versionJsonPath));
+        using var repairedVersionJson = JsonDocument.Parse(originalVersionJsonBytes);
+        Assert.True(
             repairedVersionJson.RootElement.GetProperty("launcher").TryGetProperty(
                 "forgeProcessorArtifacts",
                 out _));
@@ -581,6 +612,7 @@ public sealed class ForgeLoaderProviderTests : TestTempDirectory
 
     private sealed class ForgeHttpHandler : HttpMessageHandler
     {
+        private const string OfficialVersionJson = """{"id":"1.20.1","type":"release","mainClass":"net.minecraft.client.main.Main"}""";
         private readonly bool include1201Html;
         private readonly bool include1102Html;
         private readonly byte[]? legacyInstallerBytes;
@@ -612,6 +644,18 @@ public sealed class ForgeLoaderProviderTests : TestTempDirectory
             RequestUris.Add(request.RequestUri!);
             var uri = request.RequestUri!.AbsoluteUri
                 .Replace("https://bmclapi2.bangbang93.com/maven/", "https://maven.minecraftforge.net/", StringComparison.OrdinalIgnoreCase);
+            if (uri == "https://piston-meta.mojang.com/mc/game/version_manifest_v2.json")
+            {
+                var sha1 = Convert.ToHexString(SHA1.HashData(Encoding.UTF8.GetBytes(OfficialVersionJson)))
+                    .ToLowerInvariant();
+                return Task.FromResult(CreateJsonResponse(
+                    request,
+                    $$"""{"versions":[{"id":"1.20.1","url":"https://piston-meta.mojang.com/v1/packages/test/1.20.1.json","sha1":"{{sha1}}"}]}"""));
+            }
+
+            if (uri == "https://piston-meta.mojang.com/v1/packages/test/1.20.1.json")
+                return Task.FromResult(CreateJsonResponse(request, OfficialVersionJson));
+
             if (uri == "https://files.minecraftforge.net/net/minecraftforge/forge/promotions_slim.json")
             {
                 return Task.FromResult(CreateJsonResponse(request, promotionsJson));

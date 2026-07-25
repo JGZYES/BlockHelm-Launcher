@@ -1682,6 +1682,9 @@
   <data name="Status_LaunchPreparingProcess" xml:space="preserve">
     <value>起動引数を生成中...</value>
   </data>
+  <data name="Status_LaunchPreparingOfflineSkin" xml:space="preserve">
+    <value>オフラインスキンを準備しています...</value>
+  </data>
   <data name="Status_LaunchStartingProcess" xml:space="preserve">
     <value>ゲームプロセスを起動中...</value>
   </data>
@@ -1711,6 +1714,9 @@
   </data>
   <data name="Status_LaunchFailed" xml:space="preserve">
     <value>起動に失敗しました。しばらくしてから再試行してください。</value>
+  </data>
+  <data name="Status_LaunchOfflineSkinUnavailable" xml:space="preserve">
+    <value>ゲームは起動しましたが、オフラインスキンを読み込めませんでした。今回はデフォルトスキンを使用します。</value>
   </data>
   <data name="Status_LaunchInstanceRepairFailed" xml:space="preserve">
     <value>現在のインスタンスには重要なファイルが不足しており、新しいバージョンを追加せずに自動補完できません。このインスタンスを再インストールするか、バージョンファイルを確認してください。</value>
@@ -2124,7 +2130,7 @@
     <value>スキンの変更に失敗しました。しばらくしてから再試行してください。</value>
   </data>
   <data name="Status_CapeOfflineUnsupported" xml:space="preserve">
-    <value>Microsoft アカウントのみマントを変更できます</value>
+    <value>オフラインアカウントでは現在マント管理を利用できません</value>
   </data>
   <data name="Status_ChangingCape" xml:space="preserve">
     <value>マントを変更中...</value>

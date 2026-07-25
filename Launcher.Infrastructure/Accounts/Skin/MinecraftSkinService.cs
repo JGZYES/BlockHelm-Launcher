@@ -51,9 +51,7 @@ internal sealed class MinecraftSkinService
         await profileClient.UploadSkinAsync(accessToken, skinFilePath, skinModel, cancellationToken);
 
         var profile = await profileClient.GetProfileAsync(accessToken, cancellationToken);
-        var uuid = MinecraftAccountHelpers.NormalizeUuid(profile.Id);
-        var skinSource = await skinCacheService.StoreUploadedSkinAsync(
-            uuid,
+        var uploadedSkin = await skinCacheService.StoreUploadedSkinAsync(
             skinFilePath,
             skinModel,
             cancellationToken);
@@ -70,8 +68,12 @@ internal sealed class MinecraftSkinService
             Uuid = updatedAccount.Uuid,
             OfflineUuidGenerationMode = updatedAccount.OfflineUuidGenerationMode,
             AvatarSource = updatedAccount.AvatarSource,
-            SkinSource = skinSource ?? updatedAccount.SkinSource,
-            SkinModel = skinModel,
+            SkinSource = uploadedSkin?.Source ?? updatedAccount.SkinSource,
+            SkinModel = uploadedSkin?.SkinModel ?? updatedAccount.SkinModel,
+            SkinLibrary = uploadedSkin is null
+                ? updatedAccount.SkinLibrary
+                : [uploadedSkin],
+            ActiveSkinId = uploadedSkin?.Id ?? updatedAccount.ActiveSkinId,
             Kind = updatedAccount.Kind,
             AuthenticationServerUrl = updatedAccount.AuthenticationServerUrl,
             ThirdPartyPlatformName = updatedAccount.ThirdPartyPlatformName,

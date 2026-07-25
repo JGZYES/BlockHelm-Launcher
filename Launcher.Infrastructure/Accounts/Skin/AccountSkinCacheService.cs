@@ -32,8 +32,9 @@ namespace Launcher.Infrastructure.Accounts;
 /// </summary>
 internal sealed partial class AccountSkinCacheService
 {
-    // 以 UUID 分目录隔离账户，以内容哈希命名避免相同皮肤重复写入并支持可靠去重。
+    // 微软与离线账户共用全局皮肤库；仅第三方账户继续使用独立目录。
     private const string SkinCacheVersion = "v1";
+    private const string SharedLibraryDirectoryName = "_shared-library";
 
     private readonly HttpClient httpClient;
     private readonly string skinDirectory;
@@ -52,55 +53,19 @@ internal sealed partial class AccountSkinCacheService
         Directory.CreateDirectory(this.skinDirectory);
     }
 
-    public async Task<string?> GetOrCreateSkinSourceAsync(
-        string uuid,
-        string? skinUrl,
-        bool forceRefresh,
-        CancellationToken cancellationToken)
-    {
-        // 优先复用账户记录指向的可用文件；只有缺失时才下载当前服务端皮肤。
-        if (string.IsNullOrWhiteSpace(uuid))
-            return null;
-
-        var cachedSkinPath = GetLatestCachedSkinPath(uuid);
-        if (!forceRefresh)
-            return cachedSkinPath is null ? null : new Uri(cachedSkinPath).AbsoluteUri;
-
-        if (string.IsNullOrWhiteSpace(skinUrl))
-            return cachedSkinPath is null ? null : new Uri(cachedSkinPath).AbsoluteUri;
-
-        try
-        {
-            var skinBytes = await httpClient.GetByteArrayAsync(skinUrl, cancellationToken);
-            var hash = ComputeSkinContentHash(skinBytes);
-            var skinPath = CreateSkinPath(uuid, hash);
-            if (!File.Exists(skinPath))
-                await File.WriteAllBytesAsync(skinPath, skinBytes, cancellationToken);
-            return new Uri(skinPath).AbsoluteUri;
-        }
-        catch
-        {
-            return cachedSkinPath is null ? null : new Uri(cachedSkinPath).AbsoluteUri;
-        }
-    }
-
-    public async Task<string?> StoreUploadedSkinAsync(
-        string uuid,
+    public async Task<LauncherSkinRecord?> StoreUploadedSkinAsync(
         string skinFilePath,
         MinecraftSkinModel skinModel,
         CancellationToken cancellationToken)
     {
-        // 上传响应字节是最终内容真相，先验证可解码再按哈希原子落盘。
-        if (string.IsNullOrWhiteSpace(uuid) || string.IsNullOrWhiteSpace(skinFilePath) || !File.Exists(skinFilePath))
-            return GetLatestCachedSkinPath(uuid) is { } cachedSkinPath
-                ? new Uri(cachedSkinPath).AbsoluteUri
-                : null;
+        if (string.IsNullOrWhiteSpace(skinFilePath) || !File.Exists(skinFilePath))
+            return null;
 
         var skinBytes = await File.ReadAllBytesAsync(skinFilePath, cancellationToken);
         var hash = ComputeSkinContentHash(skinBytes);
-        var skinPath = CreateSkinPath(uuid, hash);
+        var skinPath = CreateSharedLibrarySkinPath(hash, skinModel);
         if (!File.Exists(skinPath))
             await File.WriteAllBytesAsync(skinPath, skinBytes, cancellationToken);
-        return new Uri(skinPath).AbsoluteUri;
+        return CreateRecord(hash, skinModel, new Uri(skinPath).AbsoluteUri);
     }
 }

@@ -18,8 +18,9 @@ using Microsoft.Extensions.Logging.Abstractions;
 namespace Launcher.Infrastructure.Minecraft;
 
 /// <summary>
-/// Replays a loader provider in a same-volume sandbox and publishes only
-/// version metadata, the client jar, and artifacts named by the loader manifest.
+/// Replays a loader provider in a same-volume sandbox and publishes only the
+/// client jar and artifacts named by the loader manifest. Existing instance
+/// metadata remains authoritative and is never replaced here.
 /// </summary>
 internal sealed class LoaderArtifactRepairCoordinator
 {
@@ -174,7 +175,6 @@ internal sealed class LoaderArtifactRepairCoordinator
                     sandboxVersionName,
                     sandboxVersionDirectory,
                     loaderManifest,
-                    identity,
                     progress,
                     cancellationToken)
                 .ConfigureAwait(false);
@@ -225,7 +225,6 @@ internal sealed class LoaderArtifactRepairCoordinator
         string sandboxVersionName,
         string sandboxVersionDirectory,
         LoaderArtifactManifest? loaderManifest,
-        GameFileLoaderIdentity identity,
         IProgress<LauncherProgress>? progress,
         CancellationToken cancellationToken)
     {
@@ -247,11 +246,13 @@ internal sealed class LoaderArtifactRepairCoordinator
             Path.Combine(sandboxMinecraftDirectory, ".publish-rollback"));
         try
         {
-            var sourceJson = Path.Combine(sandboxVersionDirectory, $"{sandboxVersionName}.json");
             var targetJson = Path.Combine(versionDirectory, $"{versionName}.json");
             MinecraftPathGuard.EnsureSafeFileDestination(targetJson, versionDirectory, "Managed version metadata");
             if (!await IsJsonFileValidAsync(targetJson, cancellationToken).ConfigureAwait(false))
-                await PublishTrustedReplacementAsync(sourceJson, targetJson, rollback, cancellationToken, versionDirectory).ConfigureAwait(false);
+            {
+                throw new InstanceRepairException(
+                    $"Version metadata is missing or invalid for {versionName}; automatic loader repair will not replace it.");
+            }
 
             var sourceJar = Path.Combine(sandboxVersionDirectory, $"{sandboxVersionName}.jar");
             var targetJar = Path.Combine(versionDirectory, $"{versionName}.jar");
@@ -330,8 +331,6 @@ internal sealed class LoaderArtifactRepairCoordinator
             var targetManifest = LoaderArtifactManifestStore.GetPath(versionDirectory);
             await PublishTrustedReplacementAsync(sourceManifest, targetManifest, rollback, cancellationToken, versionDirectory)
                 .ConfigureAwait(false);
-            await RemoveLegacyLoaderMetadataAsync(targetJson, identity.LoaderKind, rollback, cancellationToken, versionDirectory)
-                .ConfigureAwait(false);
             rollback.Commit();
         }
         catch (Exception publicationException)
@@ -353,46 +352,6 @@ internal sealed class LoaderArtifactRepairCoordinator
         {
             rollback.Cleanup();
         }
-    }
-
-    private static async Task RemoveLegacyLoaderMetadataAsync(
-        string versionJsonPath,
-        LoaderKind loaderKind,
-        LoaderPublicationRollback rollback,
-        CancellationToken cancellationToken,
-        string managedRoot)
-    {
-        var legacyKey = loaderKind switch
-        {
-            LoaderKind.Forge => "forgeProcessorArtifacts",
-            LoaderKind.NeoForge => "neoForgeProcessorArtifacts",
-            _ => null
-        };
-        if (legacyKey is null)
-            return;
-
-        JsonObject versionJson;
-        await using (var stream = new FileStream(
-                         versionJsonPath,
-                         FileMode.Open,
-                         FileAccess.Read,
-                         FileShare.Read,
-                         16 * 1024,
-                         FileOptions.Asynchronous | FileOptions.SequentialScan))
-        {
-            versionJson = await JsonNode.ParseAsync(stream, cancellationToken: cancellationToken).ConfigureAwait(false) as JsonObject
-                ?? throw new InvalidDataException("Published version metadata is invalid.");
-        }
-        if (versionJson["launcher"] is not JsonObject launcher || !launcher.Remove(legacyKey))
-            return;
-        MinecraftPathGuard.EnsureSafeFileDestination(versionJsonPath, managedRoot, "Managed version metadata");
-        rollback.Prepare(versionJsonPath, managedRoot);
-        await AtomicJsonFileWriter.WriteAsync(
-                versionJsonPath,
-                versionJson,
-                new JsonSerializerOptions { WriteIndented = true },
-                cancellationToken)
-            .ConfigureAwait(false);
     }
 
     private static async Task PublishTrustedReplacementAsync(

@@ -53,13 +53,27 @@ internal static class MinecraftAccountHelpers
             ?? profile.Skins?.FirstOrDefault(skin => !string.IsNullOrWhiteSpace(skin.Url))?.Url;
     }
 
+    public static MinecraftSkinModel? GetActiveSkinModel(JEProfile profile)
+    {
+        var activeSkin = profile.Skins?
+            .FirstOrDefault(skin => IsActiveState(skin.State) && !string.IsNullOrWhiteSpace(skin.Url))
+            ?? profile.Skins?.FirstOrDefault(skin => !string.IsNullOrWhiteSpace(skin.Url));
+
+        return ParseSkinModel(activeSkin?.Variant);
+    }
+
     public static MinecraftSkinModel? GetActiveSkinModel(MinecraftProfileResponse profile)
     {
         var activeSkin = profile.Skins?
             .FirstOrDefault(skin => IsActiveState(skin.State) && !string.IsNullOrWhiteSpace(skin.Url))
             ?? profile.Skins?.FirstOrDefault(skin => !string.IsNullOrWhiteSpace(skin.Url));
 
-        return activeSkin?.Variant?.ToLowerInvariant() switch
+        return ParseSkinModel(activeSkin?.Variant);
+    }
+
+    private static MinecraftSkinModel? ParseSkinModel(string? variant)
+    {
+        return variant?.ToLowerInvariant() switch
         {
             "slim" => MinecraftSkinModel.Slim,
             "classic" => MinecraftSkinModel.Classic,

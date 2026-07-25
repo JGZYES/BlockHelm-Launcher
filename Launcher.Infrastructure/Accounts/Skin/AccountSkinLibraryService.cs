@@ -27,31 +27,145 @@ public sealed class AccountSkinLibraryService : IAccountSkinLibraryService
 {
     private static readonly HttpClient HttpClient = new();
     private readonly AccountSkinCacheService skinCacheService;
+    private readonly AccountAvatarService avatarService;
+    private readonly object sharedLibraryGate = new();
+    private IReadOnlyList<LauncherSkinRecord>? sharedSnapshot;
 
     public AccountSkinLibraryService()
+        : this(HttpClient, new LauncherPathProvider())
     {
-        skinCacheService = new AccountSkinCacheService(HttpClient, new LauncherPathProvider());
+    }
+
+    internal AccountSkinLibraryService(
+        HttpClient httpClient,
+        LauncherPathProvider pathProvider)
+    {
+        skinCacheService = new AccountSkinCacheService(httpClient, pathProvider);
+        avatarService = new AccountAvatarService(httpClient, pathProvider);
     }
 
     public IReadOnlyList<LauncherSkinRecord> GetAvailableSkins(LauncherAccount account)
     {
-        return skinCacheService.GetAvailableSkins(account);
+        return account.IsThirdParty
+            ? skinCacheService.GetAvailableSkins(account)
+            : GetSharedSkins();
     }
 
-    public Task<LauncherSkinRecord> ImportSkinAsync(
+    public IReadOnlyList<LauncherSkinRecord> GetSharedSkins()
+    {
+        lock (sharedLibraryGate)
+        {
+            sharedSnapshot ??= skinCacheService.GetSharedLibrarySkins().ToArray();
+            return sharedSnapshot!;
+        }
+    }
+
+    public Task MigrateLegacySkinsAsync(
+        IReadOnlyList<LauncherAccount> accounts,
+        CancellationToken cancellationToken = default)
+    {
+        lock (sharedLibraryGate)
+        {
+            foreach (var account in accounts.Where(account => !account.IsThirdParty))
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                skinCacheService.MigrateAccountSkinsToLibrary(account, cancellationToken);
+            }
+
+            sharedSnapshot = null;
+        }
+
+        return Task.CompletedTask;
+    }
+
+    public Task<IReadOnlyDictionary<string, LauncherSkinRecord>> SyncMicrosoftAccountSkinsAsync(
+        IReadOnlyList<LauncherAccount> accounts,
+        CancellationToken cancellationToken = default)
+    {
+        var synchronized = new Dictionary<string, LauncherSkinRecord>(
+            StringComparer.OrdinalIgnoreCase);
+        lock (sharedLibraryGate)
+        {
+            var sharedLibraryChanged = false;
+            foreach (var account in accounts.Where(account => account.IsMicrosoft))
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                var activeSkin = FindActiveSkinReference(account);
+                if (activeSkin is not null
+                    && skinCacheService.CopyExistingSkinIntoLibrary(account, activeSkin) is { } sharedSkin)
+                {
+                    synchronized[account.Id] = sharedSkin;
+                    sharedLibraryChanged |= sharedSnapshot is not null
+                        && !ContainsSkin(sharedSnapshot, sharedSkin);
+                }
+            }
+
+            if (sharedLibraryChanged)
+                sharedSnapshot = null;
+        }
+
+        return Task.FromResult<IReadOnlyDictionary<string, LauncherSkinRecord>>(synchronized);
+    }
+
+    public async Task<LauncherSkinRecord> ImportSkinAsync(
         LauncherAccount account,
         string skinFilePath,
         MinecraftSkinModel skinModel,
         CancellationToken cancellationToken = default)
     {
-        return skinCacheService.ImportSkinAsync(account, skinFilePath, skinModel, cancellationToken);
+        var imported = await skinCacheService.ImportSkinAsync(
+            account,
+            skinFilePath,
+            skinModel,
+            cancellationToken);
+        if (!account.IsThirdParty)
+            InvalidateSharedSnapshot();
+        return imported;
     }
 
-    public Task DeleteSkinAsync(
+    public Task<string?> CreateAvatarSourceAsync(
         LauncherAccount account,
         LauncherSkinRecord skin,
         CancellationToken cancellationToken = default)
     {
-        return skinCacheService.DeleteSkinAsync(account, skin, cancellationToken);
+        return avatarService.GetOrCreateAvatarSourceAsync(
+            account.Uuid ?? account.Id,
+            skin.Source,
+            forceRefresh: true,
+            cancellationToken,
+            useRemoteFallback: false);
     }
+
+    public async Task DeleteSkinAsync(
+        LauncherAccount account,
+        LauncherSkinRecord skin,
+        CancellationToken cancellationToken = default)
+    {
+        await skinCacheService.DeleteSkinAsync(account, skin, cancellationToken);
+        if (!account.IsThirdParty)
+            InvalidateSharedSnapshot();
+    }
+
+    private void InvalidateSharedSnapshot()
+    {
+        lock (sharedLibraryGate)
+            sharedSnapshot = null;
+    }
+
+    private static LauncherSkinRecord? FindActiveSkinReference(LauncherAccount account) =>
+        account.SkinLibrary.FirstOrDefault(skin =>
+                string.Equals(skin.Id, account.ActiveSkinId, StringComparison.Ordinal))
+            ?? account.SkinLibrary.FirstOrDefault(skin =>
+                account.SkinModel == skin.SkinModel
+                && string.Equals(skin.Source, account.SkinSource, StringComparison.Ordinal));
+
+    private static bool ContainsSkin(
+        IReadOnlyList<LauncherSkinRecord> skins,
+        LauncherSkinRecord candidate) =>
+        skins.Any(skin =>
+            skin.SkinModel == candidate.SkinModel
+            && string.Equals(
+                skin.ContentHash,
+                candidate.ContentHash,
+                StringComparison.OrdinalIgnoreCase));
 }

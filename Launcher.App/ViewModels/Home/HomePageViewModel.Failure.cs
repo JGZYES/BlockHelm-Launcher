@@ -34,6 +34,22 @@ namespace Launcher.App.ViewModels.Home;
 
 public sealed partial class HomePageViewModel
 {
+    private void ReportLaunchWarnings(GameLaunchSession session)
+    {
+        foreach (var warning in session.Warnings.Distinct())
+        {
+            var message = warning switch
+            {
+                LaunchWarningKind.OfflineSkinUnavailable => Strings.Status_LaunchOfflineSkinUnavailable,
+                _ => null
+            };
+            if (message is null)
+                continue;
+            statusService.Report(message);
+            floatingMessageService.Show(message);
+        }
+    }
+
 private void ObserveGameExit(GameLaunchSession session)
     {
         // 不阻塞 UI 等待游戏退出。TryMarkExitHandled 保证启动期和运行期诊断竞态下只弹一次失败。

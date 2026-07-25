@@ -957,6 +957,7 @@ public static class Strings
     public static string Status_InstallDownloadingJava => Get(nameof(Status_InstallDownloadingJava));
     public static string Status_LaunchRunningPreLaunchCommand => Get(nameof(Status_LaunchRunningPreLaunchCommand));
     public static string Status_LaunchPreparingProcess => Get(nameof(Status_LaunchPreparingProcess));
+    public static string Status_LaunchPreparingOfflineSkin => Get(nameof(Status_LaunchPreparingOfflineSkin));
     public static string Status_LaunchStartingProcess => Get(nameof(Status_LaunchStartingProcess));
     public static string Status_LaunchCheckingFiles => Get(nameof(Status_LaunchCheckingFiles));
     public static string Status_LaunchDownloadingFiles => Get(nameof(Status_LaunchDownloadingFiles));
@@ -986,6 +987,7 @@ public static class Strings
     public static string Status_LaunchAbnormalExit => Get(nameof(Status_LaunchAbnormalExit));
     public static string Status_LaunchRuntimeAbnormalExit => Get(nameof(Status_LaunchRuntimeAbnormalExit));
     public static string Status_LaunchFailed => Get(nameof(Status_LaunchFailed));
+    public static string Status_LaunchOfflineSkinUnavailable => Get(nameof(Status_LaunchOfflineSkinUnavailable));
     public static string Status_LaunchInstanceRepairFailed => Get(nameof(Status_LaunchInstanceRepairFailed));
     public static string Status_LaunchInstanceSelectedFormat => Get(nameof(Status_LaunchInstanceSelectedFormat));
     public static string Status_LaunchInstanceSelectionFailed => Get(nameof(Status_LaunchInstanceSelectionFailed));

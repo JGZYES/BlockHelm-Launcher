@@ -146,11 +146,13 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<IMicrosoftAccountService>(serviceProvider => new MicrosoftAccountService(
             serviceProvider.GetRequiredService<MicrosoftAuthProvider>(),
             serviceProvider.GetRequiredService<LauncherPathProvider>(),
+            serviceProvider.GetRequiredService<IAccountSkinLibraryService>(),
             serviceProvider.GetService<Microsoft.Extensions.Logging.ILogger<MicrosoftAccountService>>()));
         services.AddSingleton<IThirdPartyAccountTokenStore, DpapiThirdPartyAccountTokenStore>();
         services.AddSingleton<IThirdPartyAccountService, ThirdPartyAccountService>();
         services.AddSingleton<IThirdPartyLaunchSessionService, ThirdPartyLaunchSessionService>();
         services.AddSingleton<IAuthlibInjectorProvisioningService, AuthlibInjectorProvisioningService>();
+        services.AddSingleton<IOfflineSkinLaunchService, OfflineSkinYggdrasilService>();
         services.AddSingleton<ITerracottaProvisioningService, TerracottaProvisioningService>();
         services.AddSingleton<IMinecraftLanWorldDiscoveryService, MinecraftLanWorldDiscoveryService>();
         services.AddSingleton<IMultiplayerLobbyService, MultiplayerLobbyService>();

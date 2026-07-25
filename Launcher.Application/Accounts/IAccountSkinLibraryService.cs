@@ -25,10 +25,25 @@ public interface IAccountSkinLibraryService
 {
     IReadOnlyList<LauncherSkinRecord> GetAvailableSkins(LauncherAccount account);
 
+    IReadOnlyList<LauncherSkinRecord> GetSharedSkins();
+
+    Task MigrateLegacySkinsAsync(
+        IReadOnlyList<LauncherAccount> accounts,
+        CancellationToken cancellationToken = default);
+
+    Task<IReadOnlyDictionary<string, LauncherSkinRecord>> SyncMicrosoftAccountSkinsAsync(
+        IReadOnlyList<LauncherAccount> accounts,
+        CancellationToken cancellationToken = default);
+
     Task<LauncherSkinRecord> ImportSkinAsync(
         LauncherAccount account,
         string skinFilePath,
         MinecraftSkinModel skinModel,
+        CancellationToken cancellationToken = default);
+
+    Task<string?> CreateAvatarSourceAsync(
+        LauncherAccount account,
+        LauncherSkinRecord skin,
         CancellationToken cancellationToken = default);
 
     Task DeleteSkinAsync(

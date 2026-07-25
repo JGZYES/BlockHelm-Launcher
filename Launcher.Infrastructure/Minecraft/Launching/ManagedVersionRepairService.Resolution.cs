@@ -30,6 +30,8 @@ namespace Launcher.Infrastructure.Minecraft;
 
 internal sealed partial class ManagedVersionRepairService
 {
+private const int MaximumInheritanceDepth = 10;
+
 internal async Task<ResolvedVersionMetadata> FinalizePreparedVersionAsync(
         string minecraftDirectory,
         string versionName,
@@ -96,9 +98,20 @@ internal async Task<ResolvedVersionMetadata> FinalizePreparedVersionAsync(
         DownloadSourcePreference downloadSourcePreference,
         CancellationToken cancellationToken,
         int downloadSpeedLimitMbPerSecond,
-        bool allowRemoteParentResolution)
+        bool allowRemoteParentResolution,
+        HashSet<string>? visitedVersionNames = null)
     {
+        visitedVersionNames ??= new HashSet<string>(PathComparer);
+        if (visitedVersionNames.Count >= MaximumInheritanceDepth)
+        {
+            throw new InstanceRepairException(
+                $"Version inheritance exceeds the supported depth of {MaximumInheritanceDepth} at {versionName}.");
+        }
+        if (!visitedVersionNames.Add(versionName))
+            throw new InstanceRepairException($"Version inheritance cycle detected at {versionName}.");
+
         var versionJson = await ReadVersionJsonAsync(versionDirectory, versionName, cancellationToken);
+        var currentJsonPath = Path.Combine(versionDirectory, $"{versionName}.json");
         var currentJarPath = Path.Combine(versionDirectory, $"{versionName}.jar");
         var currentJarUrl = VanillaVersionMetadataClient.GetClientJarUrl(versionJson);
         var inheritsFrom = GetStringProperty(versionJson, "inheritsFrom");
@@ -110,6 +123,7 @@ internal async Task<ResolvedVersionMetadata> FinalizePreparedVersionAsync(
                 File.Exists(currentJarPath) ? currentJarPath : null,
                 currentJarUrl,
                 WasModified: false,
+                LocalMetadataPaths: [currentJsonPath],
                 ClientJarSha1: VanillaVersionMetadataClient.GetClientJarSha1(versionJson),
                 ClientJarSize: VanillaVersionMetadataClient.GetClientJarSize(versionJson));
         }
@@ -120,7 +134,8 @@ internal async Task<ResolvedVersionMetadata> FinalizePreparedVersionAsync(
             downloadSourcePreference,
             cancellationToken,
             downloadSpeedLimitMbPerSecond,
-            allowRemoteParentResolution);
+            allowRemoteParentResolution,
+            visitedVersionNames);
         var mergedVersion = VersionJsonMergeHelper.MergeFlattenedVersion(parent.VersionJson, versionJson, versionName);
 
         return new ResolvedVersionMetadata(
@@ -129,6 +144,7 @@ internal async Task<ResolvedVersionMetadata> FinalizePreparedVersionAsync(
             parent.LocalJarPath,
             VanillaVersionMetadataClient.GetClientJarUrl(mergedVersion) ?? parent.ClientJarUrl ?? currentJarUrl,
             WasModified: true,
+            LocalMetadataPaths: [currentJsonPath, .. parent.LocalMetadataPaths],
             ClientJarSha1: VanillaVersionMetadataClient.GetClientJarSha1(mergedVersion) ?? parent.ClientJarSha1,
             ClientJarSize: VanillaVersionMetadataClient.GetClientJarSize(mergedVersion) ?? parent.ClientJarSize);
     }
@@ -142,11 +158,31 @@ internal async Task<ResolvedVersionMetadata> FinalizePreparedVersionAsync(
         DownloadSourcePreference downloadSourcePreference,
         CancellationToken cancellationToken,
         int downloadSpeedLimitMbPerSecond,
-        bool allowRemoteParentResolution)
+        bool allowRemoteParentResolution,
+        HashSet<string> visitedVersionNames)
     {
-        var parentDirectory = Path.Combine(minecraftDirectory, "versions", parentVersionName);
+        var versionsDirectory = Path.Combine(minecraftDirectory, "versions");
+        var parentJsonPath = Path.Combine(
+            versionsDirectory,
+            parentVersionName,
+            $"{parentVersionName}.json");
+        try
+        {
+            parentJsonPath = MinecraftPathGuard.EnsureSafeFileDestination(
+                parentJsonPath,
+                versionsDirectory,
+                "Inherited version metadata");
+        }
+        catch (InvalidDataException exception)
+        {
+            throw new InstanceRepairException(
+                $"Inherited version metadata path is invalid for {parentVersionName}.",
+                exception);
+        }
+        var parentDirectory = Path.GetDirectoryName(parentJsonPath)
+            ?? throw new InstanceRepairException($"Inherited version metadata directory is invalid for {parentVersionName}.");
         if (Directory.Exists(parentDirectory)
-            && File.Exists(Path.Combine(parentDirectory, $"{parentVersionName}.json")))
+            && File.Exists(parentJsonPath))
         {
             return await ResolveCurrentVersionAsync(
                 minecraftDirectory,
@@ -155,7 +191,8 @@ internal async Task<ResolvedVersionMetadata> FinalizePreparedVersionAsync(
                 downloadSourcePreference,
                 cancellationToken,
                 downloadSpeedLimitMbPerSecond,
-                allowRemoteParentResolution);
+                allowRemoteParentResolution,
+                visitedVersionNames);
         }
 
         if (!allowRemoteParentResolution)
@@ -164,23 +201,43 @@ internal async Task<ResolvedVersionMetadata> FinalizePreparedVersionAsync(
                 $"Inherited version metadata is missing for {parentVersionName} and automatic repair is disabled.");
         }
 
-        JsonObject remoteVersionJson;
-        try
+        if (!remoteVersionMetadataCache.TryGetValue(
+                (parentVersionName, downloadSourcePreference),
+                out var remoteVersionJson))
         {
-            remoteVersionJson = await VanillaVersionMetadataClient.DownloadVersionJsonAsync(
-                httpClient,
-                parentVersionName,
-                downloadSourcePreference,
-                downloadSpeedLimitMbPerSecond,
-                downloadSpeedLimitState,
-                logger,
-                cancellationToken);
+            try
+            {
+                remoteVersionJson = await VanillaVersionMetadataClient.DownloadVersionJsonAsync(
+                    httpClient,
+                    parentVersionName,
+                    downloadSourcePreference,
+                    downloadSpeedLimitMbPerSecond,
+                    downloadSpeedLimitState,
+                    logger,
+                    cancellationToken);
+            }
+            catch (Exception exception) when (exception is not OperationCanceledException)
+            {
+                throw new InstanceRepairException(
+                    $"Version {parentVersionName} metadata could not be resolved in memory.",
+                    exception);
+            }
+
+            if (!string.Equals(
+                    GetStringProperty(remoteVersionJson, "id"),
+                    parentVersionName,
+                    StringComparison.Ordinal))
+            {
+                throw new InstanceRepairException(
+                    $"Resolved parent version id does not match the requested version: {parentVersionName}.");
+            }
+            remoteVersionMetadataCache.TryAdd(
+                (parentVersionName, downloadSourcePreference),
+                (JsonObject)remoteVersionJson.DeepClone());
         }
-        catch (Exception exception) when (exception is not OperationCanceledException)
+        else
         {
-            throw new InstanceRepairException(
-                $"Version {parentVersionName} metadata could not be repaired in place.",
-                exception);
+            remoteVersionJson = (JsonObject)remoteVersionJson.DeepClone();
         }
 
         return new ResolvedVersionMetadata(
@@ -189,6 +246,7 @@ internal async Task<ResolvedVersionMetadata> FinalizePreparedVersionAsync(
             LocalJarPath: null,
             VanillaVersionMetadataClient.GetClientJarUrl(remoteVersionJson),
             WasModified: false,
+            LocalMetadataPaths: [],
             ClientJarSha1: VanillaVersionMetadataClient.GetClientJarSha1(remoteVersionJson),
             ClientJarSize: VanillaVersionMetadataClient.GetClientJarSize(remoteVersionJson));
     }

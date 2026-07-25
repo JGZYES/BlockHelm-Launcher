@@ -128,6 +128,63 @@ public sealed class ManagedVersionRepairIntegrityTests : TestTempDirectory
         Assert.Equal(0, handler.RequestCount);
     }
 
+    [Fact]
+    public async Task ResolveRejectsLocalInheritanceCycleWithoutChangingMetadata()
+    {
+        var minecraftDirectory = Path.Combine(TempRoot, ".minecraft");
+        var firstDirectory = Path.Combine(minecraftDirectory, "versions", "cycle-a");
+        var secondDirectory = Path.Combine(minecraftDirectory, "versions", "cycle-b");
+        var firstPath = Path.Combine(firstDirectory, "cycle-a.json");
+        var secondPath = Path.Combine(secondDirectory, "cycle-b.json");
+        WriteFile(firstPath, """{"id":"cycle-a","inheritsFrom":"cycle-b"}""");
+        WriteFile(secondPath, """{"id":"cycle-b","inheritsFrom":"cycle-a"}""");
+        var firstBytes = await File.ReadAllBytesAsync(firstPath);
+        var secondBytes = await File.ReadAllBytesAsync(secondPath);
+        var handler = new ContentHandler(new Dictionary<string, string>());
+        var service = new ManagedVersionRepairService(new HttpClient(handler));
+
+        var exception = await Assert.ThrowsAsync<InstanceRepairException>(() =>
+            service.ResolveVersionForRepairAsync(
+                minecraftDirectory,
+                "cycle-a",
+                firstDirectory,
+                DownloadSourcePreference.Official,
+                CancellationToken.None,
+                allowRemoteParentResolution: true));
+
+        Assert.Contains("inheritance cycle", exception.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.Equal(firstBytes, await File.ReadAllBytesAsync(firstPath));
+        Assert.Equal(secondBytes, await File.ReadAllBytesAsync(secondPath));
+        Assert.Equal(0, handler.RequestCount);
+    }
+
+    [Fact]
+    public async Task ResolveRejectsInheritedMetadataPathTraversalWithoutReadingOutsideVersions()
+    {
+        var minecraftDirectory = Path.Combine(TempRoot, ".minecraft");
+        var versionDirectory = Path.Combine(minecraftDirectory, "versions", "unsafe-child");
+        var jsonPath = Path.Combine(versionDirectory, "unsafe-child.json");
+        WriteFile(jsonPath, """{"id":"unsafe-child","inheritsFrom":"..\\..\\outside"}""");
+        var originalBytes = await File.ReadAllBytesAsync(jsonPath);
+        var outsidePath = Path.Combine(minecraftDirectory, "outside", "..", "outside.json");
+        WriteFile(Path.GetFullPath(outsidePath), """{"id":"outside"}""");
+        var handler = new ContentHandler(new Dictionary<string, string>());
+        var service = new ManagedVersionRepairService(new HttpClient(handler));
+
+        var exception = await Assert.ThrowsAsync<InstanceRepairException>(() =>
+            service.ResolveVersionForRepairAsync(
+                minecraftDirectory,
+                "unsafe-child",
+                versionDirectory,
+                DownloadSourcePreference.Official,
+                CancellationToken.None,
+                allowRemoteParentResolution: true));
+
+        Assert.Contains("path is invalid", exception.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.Equal(originalBytes, await File.ReadAllBytesAsync(jsonPath));
+        Assert.Equal(0, handler.RequestCount);
+    }
+
     private string CreateVersion(
         string minecraftDirectory,
         ExpectedFiles expected,

@@ -36,6 +36,7 @@ public sealed class SkinCarousel3DControl : Grid
 {
     // Viewport3D 负责皮肤模型，普通 WPF 覆盖层负责文字提示；两层通过逻辑槽位保持一致。
     private const int AnimationMilliseconds = 600;
+    private const int PlayerModelCacheCapacity = 8;
     private const double CenterBrightness = 1;
     private const double SideBrightness = 0.48;
 
@@ -79,6 +80,8 @@ public sealed class SkinCarousel3DControl : Grid
     private readonly Border rightHoverHint;
     private readonly Dictionary<Model3D, SkinCarouselSlot> hitSlots = [];
     private readonly Dictionary<SkinCarouselSlot, SlotVisual> currentSlotVisuals = [];
+    private readonly Dictionary<PlayerModelCacheKey, Model3DGroup> playerModelCache = [];
+    private readonly Queue<PlayerModelCacheKey> playerModelCacheOrder = [];
     private bool rebuildQueued;
     private bool rebuildRequestedWhileQueued;
     private SkinCarouselDirection? pendingDirection;
@@ -243,10 +246,12 @@ public sealed class SkinCarousel3DControl : Grid
             return;
 
         // 单个皮肤加载失败只跳过该槽位，不应让中间皮肤或整个控件无法显示。
-        BitmapImage skinBitmap;
+        Model3DGroup playerModel;
         try
         {
-            skinBitmap = MinecraftSkinPreviewModelBuilder.LoadSkinBitmap(skin.Source);
+            playerModel = GetOrCreatePlayerModel(
+                skin,
+                targetSlot is SkinCarouselSlot.Center ? CenterBrightness : SideBrightness);
         }
         catch
         {
@@ -269,14 +274,38 @@ public sealed class SkinCarousel3DControl : Grid
         transform.Children.Add(translate);
 
         var slotGroup = new Model3DGroup { Transform = transform };
-        slotGroup.Children.Add(MinecraftSkinPreviewModelBuilder.BuildPlayerModel(
-            skinBitmap,
-            skin.SkinModel,
-            targetSlot is SkinCarouselSlot.Center ? CenterBrightness : SideBrightness));
+        slotGroup.Children.Add(playerModel);
         scene.Children.Add(slotGroup);
 
         RegisterHitModels(slotGroup, targetSlot);
         currentSlotVisuals[targetSlot] = new SlotVisual(skin, targetSlot, scale, translate, targetPlacement);
+    }
+
+    private Model3DGroup GetOrCreatePlayerModel(
+        LauncherSkinRecord skin,
+        double brightness)
+    {
+        var identity = !string.IsNullOrWhiteSpace(skin.ContentHash)
+            ? skin.ContentHash
+            : skin.Source;
+        var key = new PlayerModelCacheKey(identity, skin.SkinModel, brightness);
+        if (playerModelCache.TryGetValue(key, out var cached))
+            return cached;
+
+        var bitmap = MinecraftSkinPreviewModelBuilder.LoadSkinBitmap(skin.Source);
+        var model = MinecraftSkinPreviewModelBuilder.BuildPlayerModel(
+            bitmap,
+            skin.SkinModel,
+            brightness);
+        if (!model.CanFreeze)
+            return model;
+
+        model.Freeze();
+        playerModelCache[key] = model;
+        playerModelCacheOrder.Enqueue(key);
+        while (playerModelCacheOrder.Count > PlayerModelCacheCapacity)
+            playerModelCache.Remove(playerModelCacheOrder.Dequeue());
+        return model;
     }
 
     private static SkinCarouselSlotPlacement ResolveStartPlacement(
@@ -448,6 +477,11 @@ public sealed class SkinCarousel3DControl : Grid
             return new SkinCarouselSlotPlacement(Translate.OffsetX, Scale.ScaleX);
         }
     }
+
+    private readonly record struct PlayerModelCacheKey(
+        string Identity,
+        MinecraftSkinModel SkinModel,
+        double Brightness);
 }
 
 public enum SkinCarouselSlot

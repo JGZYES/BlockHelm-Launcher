@@ -31,49 +31,122 @@ internal sealed partial class AccountSkinCacheService
 {
 public IReadOnlyList<LauncherSkinRecord> GetAvailableSkins(LauncherAccount account)
     {
-        // 合并账户元数据与磁盘遗留文件，让升级前缓存仍可见，同时按内容去重。
+        return GetLibrarySkins(account);
+    }
+
+    internal void MigrateAccountSkinsToLibrary(
+        LauncherAccount account,
+        CancellationToken cancellationToken)
+    {
         var uuid = account.Uuid ?? account.Id;
         if (string.IsNullOrWhiteSpace(uuid))
-            return [];
+            return;
 
         foreach (var skin in account.SkinLibrary)
-            TryCopyExistingSkinIntoAccountDirectory(uuid, skin);
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            CopyExistingSkinIntoLibrary(account, skin);
+        }
 
-        var accountSkinDirectory = GetAccountSkinDirectory(uuid);
-        if (!Directory.Exists(accountSkinDirectory))
+        TryCopyLegacyAccountDirectoryIntoLibrary(account, uuid, cancellationToken);
+    }
+
+    internal IReadOnlyList<LauncherSkinRecord> GetSharedLibrarySkins() =>
+        GetLibrarySkins(
+            GetSharedLibrarySkinDirectory(),
+            [],
+            useContentIdentity: true);
+
+    internal IReadOnlyList<LauncherSkinRecord> GetLibrarySkins(LauncherAccount account)
+    {
+        var libraryDirectory = GetLibrarySkinDirectory(account);
+        return GetLibrarySkins(
+            libraryDirectory,
+            account.SkinLibrary,
+            useContentIdentity: !account.IsThirdParty);
+    }
+
+    private IReadOnlyList<LauncherSkinRecord> GetLibrarySkins(
+        string libraryDirectory,
+        IReadOnlyList<LauncherSkinRecord> knownSkins,
+        bool useContentIdentity)
+    {
+        if (!Directory.Exists(libraryDirectory))
             return [];
 
-        return Directory.EnumerateFiles(accountSkinDirectory, "*.png")
-            .Select(path => TryCreateRecordForFile(account.SkinLibrary, path))
+        return Directory.EnumerateFiles(libraryDirectory, "*.png")
+            .Select(path => TryCreateRecordForFile(
+                knownSkins,
+                path,
+                useContentIdentity))
             .Where(record => record is not null)
             .Select(record => record!)
             .OrderBy(record => record.AddedAtUtc)
             .ToList();
     }
 
-    private void TryCopyExistingSkinIntoAccountDirectory(string uuid, LauncherSkinRecord skin)
+    internal LauncherSkinRecord? CopyExistingSkinIntoLibrary(
+        LauncherAccount account,
+        LauncherSkinRecord skin)
     {
-        // 历史版本可能把皮肤放在共享目录；复制到新目录而非移动，以保证迁移失败可回退。
+        // 历史版本按账户存放皮肤；复制到共享目录而非移动，保证迁移可回退。
         var sourcePath = ResolveSkinSourcePath(skin.Source);
         if (sourcePath is null || !File.Exists(sourcePath))
+            return null;
+
+        var libraryDirectory = Path.GetFullPath(GetLibrarySkinDirectory(account));
+        var hash = ComputeSkinContentHash(File.ReadAllBytes(sourcePath));
+        if (IsPathInDirectory(Path.GetFullPath(sourcePath), libraryDirectory))
+            return CreateRecord(hash, skin.SkinModel, new Uri(sourcePath).AbsoluteUri);
+
+        var targetPath = CreateLibrarySkinPath(account, hash, skin.SkinModel);
+        if (string.Equals(Path.GetFullPath(sourcePath), Path.GetFullPath(targetPath), StringComparison.OrdinalIgnoreCase))
+            return CreateRecord(hash, skin.SkinModel, new Uri(targetPath).AbsoluteUri);
+
+        if (!File.Exists(targetPath))
+            File.Copy(sourcePath, targetPath);
+        return CreateRecord(hash, skin.SkinModel, new Uri(targetPath).AbsoluteUri);
+    }
+
+    private void TryCopyLegacyAccountDirectoryIntoLibrary(
+        LauncherAccount account,
+        string uuid,
+        CancellationToken cancellationToken)
+    {
+        if (account.IsThirdParty)
             return;
 
-        try
+        var legacyDirectory = GetAccountSkinDirectory(uuid);
+        var libraryDirectory = GetLibrarySkinDirectory(account);
+        if (!Directory.Exists(legacyDirectory)
+            || string.Equals(
+                Path.GetFullPath(legacyDirectory),
+                Path.GetFullPath(libraryDirectory),
+                StringComparison.OrdinalIgnoreCase))
         {
-            var hash = ComputeSkinContentHash(File.ReadAllBytes(sourcePath));
-            var targetPath = CreateSkinPath(uuid, hash);
-            if (string.Equals(Path.GetFullPath(sourcePath), Path.GetFullPath(targetPath), StringComparison.OrdinalIgnoreCase))
-                return;
-
-            if (!File.Exists(targetPath))
-                File.Copy(sourcePath, targetPath);
+            return;
         }
-        catch
+
+        foreach (var legacyPath in Directory.EnumerateFiles(legacyDirectory, "*.png"))
         {
+            cancellationToken.ThrowIfCancellationRequested();
+            var record = TryCreateRecordForFile(
+                account.SkinLibrary,
+                legacyPath,
+                useContentIdentity: true);
+            if (record is null)
+                continue;
+
+            var targetPath = CreateLibrarySkinPath(account, record.ContentHash, record.SkinModel);
+            if (!File.Exists(targetPath))
+                File.Copy(legacyPath, targetPath);
         }
     }
 
-    private LauncherSkinRecord? TryCreateRecordForFile(IReadOnlyList<LauncherSkinRecord> skins, string skinPath)
+    private LauncherSkinRecord? TryCreateRecordForFile(
+        IReadOnlyList<LauncherSkinRecord> skins,
+        string skinPath,
+        bool useContentIdentity = false)
     {
         try
         {
@@ -81,7 +154,7 @@ public IReadOnlyList<LauncherSkinRecord> GetAvailableSkins(LauncherAccount accou
             var skinModel = TryParseSkinModel(skinPath) ?? FindModelForFile(skins, skinPath, hash) ?? MinecraftSkinModel.Classic;
             var existing = FindExisting(skins, hash, skinModel)
                 ?? FindExistingBySource(skins, skinPath);
-            return existing is null
+            return existing is null || useContentIdentity
                 ? CreateRecord(hash, skinModel, new Uri(skinPath).AbsoluteUri)
                 : CopyRecordWithSource(existing, new Uri(skinPath).AbsoluteUri, hash);
         }

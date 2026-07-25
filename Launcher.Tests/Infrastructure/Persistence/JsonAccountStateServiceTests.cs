@@ -45,6 +45,8 @@ public sealed class JsonAccountStateServiceTests : TestTempDirectory
         var state = await service.LoadAsync();
         state.SelectedAccountId = "microsoft-alex";
         state.MicrosoftAccountsImported = true;
+        state.SharedSkinLibraryMigrationVersion =
+            LauncherAccountState.CurrentSharedSkinLibraryMigrationVersion;
         state.Accounts =
         [
             new LauncherAccountRecord
@@ -73,6 +75,9 @@ public sealed class JsonAccountStateServiceTests : TestTempDirectory
 
         Assert.Equal("microsoft-alex", loaded.SelectedAccountId);
         Assert.True(loaded.MicrosoftAccountsImported);
+        Assert.Equal(
+            LauncherAccountState.CurrentSharedSkinLibraryMigrationVersion,
+            loaded.SharedSkinLibraryMigrationVersion);
         Assert.Equal(
             ["offline-first", "microsoft-alex", "offline-last"],
             loaded.Accounts.Select(account => account.Id));

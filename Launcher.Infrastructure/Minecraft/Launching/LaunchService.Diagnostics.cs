@@ -370,8 +370,10 @@ public sealed partial class LaunchService
     private sealed record PreparedLaunchRuntime(
         LaunchAccountSession AccountSession,
         AuthlibInjectorArtifact? AuthlibInjector,
+        OfflineSkinLaunchContext? OfflineSkin,
         JavaRuntimeInfo? JavaRuntime,
-        LaunchDiagnosticContext DiagnosticContext);
+        LaunchDiagnosticContext DiagnosticContext,
+        IReadOnlyList<LaunchWarningKind> Warnings);
 
     private sealed record StartedLaunchProcess(
         System.Diagnostics.Process Process,

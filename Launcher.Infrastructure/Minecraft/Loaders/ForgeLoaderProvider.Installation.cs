@@ -119,7 +119,10 @@ private async Task<string> InstallCoreAsync(
                 installerPlan.ProcessorOutputs.Count,
                 planReadStopwatch.ElapsedMilliseconds);
 
-            var prerequisiteSeeder = new LoaderInstallerPrerequisiteSeeder(logger);
+            var prerequisiteSeeder = new LoaderInstallerPrerequisiteSeeder(
+                httpClient,
+                downloadSpeedLimitState,
+                logger);
             var prerequisitesStopwatch = Stopwatch.StartNew();
         logger.LogDebug(
                 "Forge installer prerequisites preparation started. MinecraftVersion={MinecraftVersion} LoaderVersion={LoaderVersion}",
@@ -130,6 +133,8 @@ private async Task<string> InstallCoreAsync(
                 installerMinecraftDirectory,
                 minecraftVersion,
                 installerJarPath,
+                downloadSourcePreference,
+                downloadSpeedLimitMbPerSecond,
                 cancellationToken).ConfigureAwait(false);
             await installerArtifactService.MaterializePrerequisitesAsync(
                 installerJarPath,

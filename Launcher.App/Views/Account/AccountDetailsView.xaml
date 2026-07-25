@@ -237,16 +237,6 @@
                                        HorizontalAlignment="Center"
                                        VerticalAlignment="Center"
                                        Visibility="{Binding Appearance.SkinLibrary.CanShowPreviewEmptyState, Converter={StaticResource BooleanToMenuTextVisibilityConverter}}" />
-                            <TextBlock Width="260"
-                                       Margin="14"
-                                       Text="{x:Static res:Strings.Account_AppearanceOfflineUnsupported}"
-                                       Foreground="{DynamicResource Brush.8FFFFFFF}"
-                                       FontSize="13"
-                                       TextAlignment="Center"
-                                       TextWrapping="Wrap"
-                                       HorizontalAlignment="Center"
-                                       VerticalAlignment="Center"
-                                       Visibility="{Binding Appearance.SkinLibrary.IsOffline, Converter={StaticResource BooleanToMenuTextVisibilityConverter}}" />
                         </Grid>
                     </StackPanel>
                 </GroupBox>
@@ -295,7 +285,7 @@
                                                                    Visibility="{Binding Appearance.Cape.HasPreview, Converter={StaticResource BooleanToMenuTextVisibilityConverter}}" />
                             <TextBlock Width="260"
                                        Margin="14"
-                                       Text="{x:Static res:Strings.Account_AppearanceOfflineUnsupported}"
+                                       Text="{x:Static res:Strings.Status_CapeOfflineUnsupported}"
                                        Foreground="{DynamicResource Brush.8FFFFFFF}"
                                        FontSize="13"
                                        TextAlignment="Center"

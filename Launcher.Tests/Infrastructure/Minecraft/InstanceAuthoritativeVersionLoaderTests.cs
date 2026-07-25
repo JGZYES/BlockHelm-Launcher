@@ -134,25 +134,33 @@ public sealed class InstanceAuthoritativeVersionLoaderTests : TestTempDirectory
             """);
         var originalChildBytes = await File.ReadAllBytesAsync(childPath);
         var path = new MinecraftPath(minecraftDirectory);
+        var remoteRequestCount = 0;
         var loader = new InstanceAuthoritativeVersionLoader(
             path,
-            (versionName, _) => Task.FromResult(
-                JsonNode.Parse(
-                    $$"""
-                    {
-                      "id": "{{versionName}}",
-                      "type": "release",
-                      "mainClass": "net.minecraft.client.main.Main",
-                      "libraries": []
-                    }
-                    """)!.AsObject()));
+            (versionName, _) =>
+            {
+                remoteRequestCount++;
+                return Task.FromResult(
+                    JsonNode.Parse(
+                        $$"""
+                        {
+                          "id": "{{versionName}}",
+                          "type": "release",
+                          "mainClass": "net.minecraft.client.main.Main",
+                          "libraries": []
+                        }
+                        """)!.AsObject());
+            });
         var versions = await loader.GetVersionMetadatasAsync();
 
         var version = await versions.GetAndSaveVersionAsync("fabric-child", path, CancellationToken.None);
+        var repeatedVersion = await versions.GetAndSaveVersionAsync("fabric-child", path, CancellationToken.None);
 
         Assert.Equal(FabricMainClass, version.MainClass);
+        Assert.Equal(FabricMainClass, repeatedVersion.MainClass);
         Assert.NotNull(version.ParentVersion);
         Assert.Equal("26.2", version.ParentVersion!.Id);
+        Assert.Equal(1, remoteRequestCount);
         Assert.Equal(originalChildBytes, await File.ReadAllBytesAsync(childPath));
         Assert.False(File.Exists(Path.Combine(minecraftDirectory, "versions", "26.2", "26.2.json")));
     }

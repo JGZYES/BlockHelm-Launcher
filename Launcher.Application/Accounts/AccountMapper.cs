@@ -90,6 +90,13 @@ public static class AccountMapper
             avatarSource: string.IsNullOrWhiteSpace(account.AvatarSource) ? avatarSource : account.AvatarSource);
     }
 
+    public static LauncherAccount WithAvatar(LauncherAccount account, string? avatarSource)
+    {
+        return CreateCopy(
+            account,
+            avatarSource: string.IsNullOrWhiteSpace(avatarSource) ? account.AvatarSource : avatarSource);
+    }
+
     public static LauncherAccount WithAppearanceFallback(LauncherAccount account, LauncherAccount fallback)
     {
         // 远端刷新缺少外观时保留旧缓存，避免短暂 API 缺失让头像消失。
@@ -166,12 +173,43 @@ public static class AccountMapper
         MinecraftSkinModel? skinModel)
     {
         // 更新皮肤库时同时校正 ActiveSkinId，删除当前皮肤后不能留下悬空引用。
-        return CreateCopy(
+        return new LauncherAccount
+        {
+            Id = account.Id,
+            DisplayName = account.DisplayName,
+            Kind = account.Kind,
+            Uuid = account.Uuid,
+            AuthenticationServerUrl = account.AuthenticationServerUrl,
+            ThirdPartyPlatformName = account.ThirdPartyPlatformName,
+            ThirdPartyLoginUsername = account.ThirdPartyLoginUsername,
+            OfflineUuidGenerationMode = account.OfflineUuidGenerationMode,
+            AvatarSource = account.AvatarSource,
+            SkinSource = skinSource,
+            SkinModel = skinModel,
+            SkinLibrary = CopySkinRecords(skinLibrary),
+            ActiveSkinId = activeSkinId,
+            HasFreshProfile = account.HasFreshProfile,
+            CachedCapeOptions = account.CachedCapeOptions
+        };
+    }
+
+    public static LauncherAccount WithCurrentSkinReferenceOnly(LauncherAccount account)
+    {
+        if (account.IsThirdParty)
+            return account;
+
+        var activeSkin = account.SkinLibrary.FirstOrDefault(skin =>
+                string.Equals(skin.Id, account.ActiveSkinId, StringComparison.Ordinal))
+            ?? account.SkinLibrary.FirstOrDefault(skin =>
+                account.SkinModel == skin.SkinModel
+                && string.Equals(skin.Source, account.SkinSource, StringComparison.Ordinal));
+
+        return WithSkinLibrary(
             account,
-            skinSource: skinSource,
-            skinModel: skinModel,
-            skinLibrary: skinLibrary,
-            activeSkinId: activeSkinId);
+            activeSkin is null ? [] : [activeSkin],
+            activeSkin?.Id,
+            activeSkin?.Source ?? account.SkinSource,
+            activeSkin?.SkinModel ?? account.SkinModel);
     }
 
     public static LauncherAccount WithDisplayName(LauncherAccount account, string displayName)

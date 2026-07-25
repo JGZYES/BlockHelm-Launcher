@@ -58,6 +58,60 @@ public sealed class AuthlibInjectorProvisioningServiceTests : TestTempDirectory
         Assert.Empty(Directory.EnumerateFiles(Path.Combine(TempRoot, "authlib"), "*.jar"));
     }
 
+    [Fact]
+    public async Task UsesVerifiedCachedArtifactWhenLatestMetadataIsUnavailable()
+    {
+        var bytes = Encoding.UTF8.GetBytes("verified-cached-jar");
+        var hash = Convert.ToHexString(SHA256.HashData(bytes)).ToLowerInvariant();
+        var cacheDirectory = Path.Combine(TempRoot, "authlib");
+        var online = new AuthlibInjectorProvisioningService(
+            new HttpClient(new StubHttpMessageHandler(request => Task.FromResult(
+                request.RequestUri!.AbsolutePath.EndsWith("latest.json", StringComparison.Ordinal)
+                    ? Json(Metadata(hash))
+                    : new HttpResponseMessage(HttpStatusCode.OK)
+                    {
+                        Content = new ByteArrayContent(bytes)
+                    }))),
+            cacheDirectory);
+        var expected = await online.EnsureAvailableAsync();
+        var offline = new AuthlibInjectorProvisioningService(
+            new HttpClient(new StubHttpMessageHandler(_ =>
+                Task.FromException<HttpResponseMessage>(
+                    new HttpRequestException("Simulated disconnected network.")))),
+            cacheDirectory);
+
+        var actual = await offline.EnsureAvailableAsync();
+
+        Assert.Equal(expected, actual);
+        Assert.Equal(bytes, await File.ReadAllBytesAsync(actual.FilePath));
+    }
+
+    [Fact]
+    public async Task RejectsCorruptedCachedArtifactWhenDisconnected()
+    {
+        var bytes = Encoding.UTF8.GetBytes("verified-cached-jar");
+        var hash = Convert.ToHexString(SHA256.HashData(bytes)).ToLowerInvariant();
+        var cacheDirectory = Path.Combine(TempRoot, "authlib");
+        var online = new AuthlibInjectorProvisioningService(
+            new HttpClient(new StubHttpMessageHandler(request => Task.FromResult(
+                request.RequestUri!.AbsolutePath.EndsWith("latest.json", StringComparison.Ordinal)
+                    ? Json(Metadata(hash))
+                    : new HttpResponseMessage(HttpStatusCode.OK)
+                    {
+                        Content = new ByteArrayContent(bytes)
+                    }))),
+            cacheDirectory);
+        var artifact = await online.EnsureAvailableAsync();
+        await File.WriteAllBytesAsync(artifact.FilePath, Encoding.UTF8.GetBytes("corrupted"));
+        var offline = new AuthlibInjectorProvisioningService(
+            new HttpClient(new StubHttpMessageHandler(_ =>
+                Task.FromException<HttpResponseMessage>(
+                    new HttpRequestException("Simulated disconnected network.")))),
+            cacheDirectory);
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() => offline.EnsureAvailableAsync());
+    }
+
     private static string Metadata(string hash) =>
         $"{{\"build_number\":55,\"version\":\"1.2.7\",\"download_url\":\"https://download.example.test/authlib-injector.jar\",\"checksums\":{{\"sha256\":\"{hash}\"}}}}";
 

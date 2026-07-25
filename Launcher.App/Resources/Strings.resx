@@ -584,6 +584,7 @@
   <data name="Status_InstallDownloadingJava" xml:space="preserve"><value>正在下载 Java 运行环境...</value></data>
   <data name="Status_LaunchRunningPreLaunchCommand" xml:space="preserve"><value>正在运行启动前命令...</value></data>
   <data name="Status_LaunchPreparingProcess" xml:space="preserve"><value>正在生成启动参数...</value></data>
+  <data name="Status_LaunchPreparingOfflineSkin" xml:space="preserve"><value>正在准备离线皮肤...</value></data>
   <data name="Status_LaunchStartingProcess" xml:space="preserve"><value>正在启动游戏进程...</value></data>
   <data name="Status_LaunchCheckingFiles" xml:space="preserve"><value>正在检查游戏文件...</value></data>
   <data name="Status_LaunchDownloadingFiles" xml:space="preserve"><value>正在下载游戏缺失文件...</value></data>
@@ -594,6 +595,7 @@
   <data name="Status_LaunchAbnormalExit" xml:space="preserve"><value>游戏启动异常退出，已记录诊断日志。</value></data>
   <data name="Status_LaunchRuntimeAbnormalExit" xml:space="preserve"><value>游戏运行时异常退出，已记录诊断日志。</value></data>
   <data name="Status_LaunchFailed" xml:space="preserve"><value>启动失败，请稍后重试。</value></data>
+  <data name="Status_LaunchOfflineSkinUnavailable" xml:space="preserve"><value>游戏已启动，但离线皮肤加载失败，本次将使用默认皮肤。</value></data>
   <data name="Status_LaunchInstanceRepairFailed" xml:space="preserve"><value>当前实例缺少关键文件，且无法在不新增版本的情况下自动补齐，请重新安装该实例或检查版本文件。</value></data>
   <data name="Status_LaunchInstanceSelectedFormat" xml:space="preserve"><value>当前游戏已切换为 {0}</value></data>
   <data name="Status_LaunchInstanceSelectionFailed" xml:space="preserve"><value>当前游戏切换失败，请刷新后重试。</value></data>
@@ -731,7 +733,7 @@
   <data name="Status_SkinDeleted" xml:space="preserve"><value>皮肤已删除</value></data>
   <data name="Status_SkinDeleteFailed" xml:space="preserve"><value>删除皮肤失败，请稍后重试。</value></data>
   <data name="Status_SkinUpdateFailed" xml:space="preserve"><value>更换皮肤失败，请稍后重试。</value></data>
-  <data name="Status_CapeOfflineUnsupported" xml:space="preserve"><value>只有正版账户可以更换披风</value></data>
+  <data name="Status_CapeOfflineUnsupported" xml:space="preserve"><value>离线账户暂不支持披风管理</value></data>
   <data name="Status_ChangingCape" xml:space="preserve"><value>正在更换披风...</value></data>
   <data name="Status_CapeRemoved" xml:space="preserve"><value>已移除当前披风</value></data>
   <data name="Status_CapeChangedFormat" xml:space="preserve"><value>已更换披风：{0}</value></data>

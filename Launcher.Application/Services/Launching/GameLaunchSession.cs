@@ -23,11 +23,16 @@ public sealed class GameLaunchSession
 {
     private int exitHandled;
 
-    public GameLaunchSession(string instanceId, string instanceName, Task<LaunchExitResult> exitTask)
+    public GameLaunchSession(
+        string instanceId,
+        string instanceName,
+        Task<LaunchExitResult> exitTask,
+        IReadOnlyList<LaunchWarningKind>? warnings = null)
     {
         InstanceId = instanceId;
         InstanceName = instanceName;
         ExitTask = exitTask;
+        Warnings = warnings ?? [];
     }
 
     public string InstanceId { get; }
@@ -35,6 +40,8 @@ public sealed class GameLaunchSession
     public string InstanceName { get; }
 
     public Task<LaunchExitResult> ExitTask { get; }
+
+    public IReadOnlyList<LaunchWarningKind> Warnings { get; }
 
     public bool TryMarkExitHandled()
     {

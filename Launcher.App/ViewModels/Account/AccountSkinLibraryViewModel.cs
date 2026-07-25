@@ -94,22 +94,23 @@ public sealed partial class AccountSkinLibraryViewModel : ObservableObject
 
     public bool CanShowThirdPartyRefresh => IsThirdParty;
 
-    public bool HasPreview => !IsOffline && SelectedSkin is not null;
+    public bool HasPreview => !IsThirdParty && SelectedSkin is not null;
 
-    public bool CanShowPreviewEmptyState => accountList.SelectedAccount is not null && !IsOffline && !HasPreview;
+    public bool CanShowPreviewEmptyState => accountList.SelectedAccount is not null && !IsThirdParty && !HasPreview;
 
-    public bool CanChangeSkin => accountList.SelectedAccount is { IsMicrosoft: true };
+    public bool CanChangeSkin => accountList.SelectedAccount is { IsThirdParty: false };
 
-    public bool CanManageSkins => accountList.SelectedAccount is { IsMicrosoft: true };
+    public bool CanManageSkins => accountList.SelectedAccount is { IsThirdParty: false };
 
-    public bool CanApplySkin => accountList.SelectedAccount is { IsMicrosoft: true } account
+    public bool CanApplySkin => accountList.SelectedAccount is { IsThirdParty: false } account
         && !profile.IsBusy
         && SelectedSkin is { } skin
-        && !IsAlreadyApplied(account, skin);
+        && (!IsAlreadyApplied(account, skin) || NeedsOfflineAvatarRefresh(account));
 
-    public bool CanEditSelectedSkin => accountList.SelectedAccount is { IsMicrosoft: true }
+    public bool CanEditSelectedSkin => accountList.SelectedAccount is { IsThirdParty: false }
         && !profile.IsBusy
-        && SelectedSkin is not null;
+        && SelectedSkin is { } skin
+        && !IsActiveForSharedAccount(skin);
 
     public bool CanDeleteSelectedSkin => CanEditSelectedSkin
         && accountList.SelectedAccount is { } account
@@ -200,9 +201,34 @@ public sealed partial class AccountSkinLibraryViewModel : ObservableObject
         var skin = SelectedSkin;
         if (account is null || skin is null || !CanApplySkin)
             return;
-        var operation = profile.BeginOperation(account, Strings.Status_UploadingSkin);
+        var operation = profile.BeginOperation(
+            account,
+            account.IsMicrosoft ? Strings.Status_UploadingSkin : string.Empty);
         try
         {
+            if (account.IsOffline)
+            {
+                var avatarSource = await skinLibraryService.CreateAvatarSourceAsync(
+                    account,
+                    skin,
+                    operation.Token);
+                if (!profile.IsCurrent(account, operation))
+                    return;
+                var updatedOfflineAccount = AccountMapper.WithAvatar(
+                    AccountMapper.WithSkinLibrary(
+                        account,
+                        [skin],
+                        skin.Id,
+                        skin.Source,
+                        skin.SkinModel),
+                    avatarSource);
+                accountList.ReplaceSelectedAccount(account, updatedOfflineAccount);
+                Populate(updatedOfflineAccount, skin.Id);
+                await accountList.PersistAccountOrderAsync();
+                profile.SetMessage(Strings.Status_SkinUpdated, showFloating: true);
+                return;
+            }
+
             var result = await microsoftOperationRetryHandler.ExecuteAsync(
                 account,
                 current => microsoftAccountService.UploadSkinAsync(
@@ -215,7 +241,7 @@ public sealed partial class AccountSkinLibraryViewModel : ObservableObject
             var updated = AccountMapper.WithCapeCache(
                 AccountMapper.WithSkinLibrary(
                     AccountMapper.WithAppearanceFallback(result.Value, result.Account),
-                    result.Account.SkinLibrary,
+                    [skin],
                     skin.Id,
                     skin.Source,
                     skin.SkinModel),
@@ -230,7 +256,12 @@ public sealed partial class AccountSkinLibraryViewModel : ObservableObject
         }
         catch (Exception exception)
         {
-            logger.LogWarning(exception, "Microsoft account skin apply failed. AccountId={AccountId} SkinId={SkinId}", account.Id, skin.Id);
+            logger.LogWarning(
+                exception,
+                "Account skin apply failed. AccountId={AccountId} AccountKind={AccountKind} SkinId={SkinId}",
+                account.Id,
+                account.Kind,
+                skin.Id);
             profile.SetError(exception, Strings.Status_SkinUpdateFailed, showFloating: true);
         }
         finally
@@ -258,7 +289,10 @@ public sealed partial class AccountSkinLibraryViewModel : ObservableObject
     }
 
     public bool CanChangeSkinModel(LauncherSkinRecord? skin) =>
-        accountList.SelectedAccount is { IsMicrosoft: true } && !profile.IsBusy && skin is not null;
+        accountList.SelectedAccount is { IsThirdParty: false }
+        && !profile.IsBusy
+        && skin is not null
+        && !IsActiveForSharedAccount(skin);
 
     [RelayCommand(CanExecute = nameof(CanDeleteSelectedSkin))]
     public async Task DeleteSelectedSkinAsync()
@@ -275,20 +309,17 @@ public sealed partial class AccountSkinLibraryViewModel : ObservableObject
             if (!profile.IsCurrent(account, operation))
                 return;
             var preferredId = GetPreferredSkinIdAfterDelete(skin);
-            var updated = AccountMapper.WithSkinLibrary(
-                account,
-                RemoveMatching(account.SkinLibrary, skin),
-                account.ActiveSkinId,
-                account.SkinSource,
-                account.SkinModel);
-            accountList.ReplaceSelectedAccount(account, updated);
-            Populate(updated, preferredId);
-            await accountList.PersistAccountOrderAsync();
+            Populate(account, preferredId);
             profile.SetMessage(Strings.Status_SkinDeleted);
         }
         catch (Exception exception)
         {
-            logger.LogWarning(exception, "Microsoft account skin delete failed. AccountId={AccountId} SkinId={SkinId}", account.Id, skin.Id);
+            logger.LogWarning(
+                exception,
+                "Account skin delete failed. AccountId={AccountId} AccountKind={AccountKind} SkinId={SkinId}",
+                account.Id,
+                account.Kind,
+                skin.Id);
             profile.SetError(exception, Strings.Status_SkinDeleteFailed);
         }
         finally
@@ -307,9 +338,9 @@ public sealed partial class AccountSkinLibraryViewModel : ObservableObject
     }
 
     public bool CanDeleteSkin(LauncherSkinRecord? skin) =>
-        accountList.SelectedAccount is { IsMicrosoft: true } account
+        accountList.SelectedAccount is { IsThirdParty: false }
         && !profile.IsBusy && skin is not null
-        && !string.Equals(account.ActiveSkinId, skin.Id, StringComparison.Ordinal);
+        && !IsActiveForSharedAccount(skin);
 
     [RelayCommand]
     public void RequestCancelModelDialog()
@@ -343,33 +374,24 @@ public sealed partial class AccountSkinLibraryViewModel : ObservableObject
     {
         // 服务返回规范化后的皮肤记录，本地路径、哈希或远端标识都以返回值为准。
         var account = accountList.SelectedAccount;
-        if (account is null)
+        if (account is not { IsThirdParty: false })
             return;
-        if (!account.IsMicrosoft)
-        {
-            profile.SetMessage(Strings.Status_SkinOfflineUnsupported);
-            return;
-        }
         var operation = profile.BeginOperation(account, Strings.Status_AddingSkin);
         try
         {
             var imported = await skinLibraryService.ImportSkinAsync(account, path, model);
             if (!profile.IsCurrent(account, operation))
                 return;
-            var updated = AccountMapper.WithSkinLibrary(
-                account,
-                AddOrReplace(account.SkinLibrary, imported),
-                account.ActiveSkinId,
-                account.SkinSource,
-                account.SkinModel);
-            accountList.ReplaceSelectedAccount(account, updated);
-            Populate(updated, imported.Id);
-            await accountList.PersistAccountOrderAsync();
+            Populate(account, imported.Id);
             profile.SetMessage(Strings.Status_SkinAdded);
         }
         catch (Exception exception)
         {
-            logger.LogWarning(exception, "Microsoft account skin import failed. AccountId={AccountId}", account.Id);
+            logger.LogWarning(
+                exception,
+                "Account skin import failed. AccountId={AccountId} AccountKind={AccountKind}",
+                account.Id,
+                account.Kind);
             profile.SetError(exception, Strings.Status_SkinUpdateFailed);
         }
         finally
@@ -381,27 +403,23 @@ public sealed partial class AccountSkinLibraryViewModel : ObservableObject
     private async Task ChangeSkinModelAsync(LauncherSkinRecord skin, MinecraftSkinModel model)
     {
         var account = accountList.SelectedAccount;
-        if (account is null)
+        if (account is null || skin.SkinModel == model || IsActiveForSharedAccount(skin))
             return;
-        var updatedSkin = CopyWithModel(skin, model);
-        var updated = AccountMapper.WithSkinLibrary(
+        var updatedSkin = await skinLibraryService.ImportSkinAsync(
             account,
-            ReplaceMatching(account.SkinLibrary, updatedSkin),
-            account.ActiveSkinId,
-            account.SkinSource,
-            account.SkinModel);
-        accountList.ReplaceSelectedAccount(account, updated);
-        Populate(updated, updatedSkin.Id);
-        await accountList.PersistAccountOrderAsync();
+            ResolveLocalPath(skin.Source),
+            model);
+        await skinLibraryService.DeleteSkinAsync(account, skin);
+        Populate(account, updatedSkin.Id);
         profile.SetMessage(Strings.Status_SkinModelChanged);
     }
 
     private void Populate(LauncherAccount account, string? preferredId)
     {
         // 去重后一次性重建，确保同一内容不会因本地缓存和账户资料两个来源显示两次。
-        Skins.Clear();
         if (account.IsThirdParty)
         {
+            Skins.Clear();
             var activeSkin = account.SkinLibrary.FirstOrDefault(skin =>
                     string.Equals(skin.Id, account.ActiveSkinId, StringComparison.Ordinal))
                 ?? account.SkinLibrary.FirstOrDefault(skin =>
@@ -413,8 +431,26 @@ public sealed partial class AccountSkinLibraryViewModel : ObservableObject
             return;
         }
 
-        foreach (var skin in DistinctSkins(skinLibraryService.GetAvailableSkins(account)))
-            Skins.Add(skin);
+        var sharedSkins = DistinctSkins(
+                skinLibraryService.GetSharedSkins())
+            .ToList();
+        foreach (var activeAccountSkin in accountList.Accounts
+                     .Select(item => item.Account)
+                     .Where(candidate => !candidate.IsThirdParty)
+                     .Select(FindActiveSkinReference)
+                     .Where(skin => skin is not null)
+                     .Select(skin => skin!))
+        {
+            if (sharedSkins.All(skin => !SameContent(skin, activeAccountSkin)))
+                sharedSkins.Add(activeAccountSkin);
+        }
+
+        if (!SkinSequencesEqual(Skins, sharedSkins))
+        {
+            Skins.Clear();
+            foreach (var skin in sharedSkins)
+                Skins.Add(skin);
+        }
         SelectedSkin = Skins.FirstOrDefault(skin => string.Equals(skin.Id, preferredId, StringComparison.Ordinal))
             ?? Skins.FirstOrDefault(skin => string.Equals(skin.Id, account.ActiveSkinId, StringComparison.Ordinal))
             ?? Skins.FirstOrDefault();
@@ -474,42 +510,21 @@ public sealed partial class AccountSkinLibraryViewModel : ObservableObject
         return index > 0 ? Skins[index - 1].Id : null;
     }
 
+    private bool IsActiveForSharedAccount(LauncherSkinRecord skin) =>
+        accountList.Accounts.Any(item =>
+            !item.Account.IsThirdParty
+            && IsAlreadyApplied(item.Account, skin));
+
+    private static bool NeedsOfflineAvatarRefresh(LauncherAccount account) =>
+        account.IsOffline
+        && (string.IsNullOrWhiteSpace(account.AvatarSource)
+            || string.Equals(
+                account.AvatarSource,
+                LauncherAccount.DefaultSteveAvatarUrl,
+                StringComparison.OrdinalIgnoreCase));
+
     private static string ResolveLocalPath(string source) =>
         Uri.TryCreate(source, UriKind.Absolute, out var uri) && uri.IsFile ? uri.LocalPath : source;
-
-    private static List<LauncherSkinRecord> AddOrReplace(IReadOnlyList<LauncherSkinRecord> skins, LauncherSkinRecord value)
-    {
-        var result = skins.ToList();
-        var index = result.FindIndex(skin => string.Equals(skin.Id, value.Id, StringComparison.Ordinal)
-            || !string.IsNullOrWhiteSpace(skin.ContentHash)
-            && string.Equals(skin.ContentHash, value.ContentHash, StringComparison.OrdinalIgnoreCase)
-            && skin.SkinModel == value.SkinModel);
-        if (index >= 0)
-            result[index] = value;
-        else
-            result.Add(value);
-        return result;
-    }
-
-    private static List<LauncherSkinRecord> ReplaceMatching(IReadOnlyList<LauncherSkinRecord> skins, LauncherSkinRecord value) => skins
-        .Select(skin => string.Equals(skin.Id, value.Id, StringComparison.Ordinal) ? value : skin)
-        .ToList();
-
-    private static List<LauncherSkinRecord> RemoveMatching(IReadOnlyList<LauncherSkinRecord> skins, LauncherSkinRecord removed) => skins
-        .Where(skin => !string.Equals(skin.Id, removed.Id, StringComparison.Ordinal)
-            && (string.IsNullOrWhiteSpace(skin.ContentHash)
-                || !string.Equals(skin.ContentHash, removed.ContentHash, StringComparison.OrdinalIgnoreCase)
-                || skin.SkinModel != removed.SkinModel))
-        .ToList();
-
-    private static LauncherSkinRecord CopyWithModel(LauncherSkinRecord skin, MinecraftSkinModel model) => new()
-    {
-        Id = skin.Id,
-        Source = skin.Source,
-        SkinModel = model,
-        ContentHash = skin.ContentHash,
-        AddedAtUtc = skin.AddedAtUtc
-    };
 
     private static bool IsAlreadyApplied(LauncherAccount account, LauncherSkinRecord skin)
     {
@@ -520,6 +535,13 @@ public sealed partial class AccountSkinLibraryViewModel : ObservableObject
             return true;
         return account.SkinModel == skin.SkinModel && string.Equals(account.SkinSource, skin.Source, StringComparison.Ordinal);
     }
+
+    private static LauncherSkinRecord? FindActiveSkinReference(LauncherAccount account) =>
+        account.SkinLibrary.FirstOrDefault(skin =>
+                string.Equals(skin.Id, account.ActiveSkinId, StringComparison.Ordinal))
+            ?? account.SkinLibrary.FirstOrDefault(skin =>
+                account.SkinModel == skin.SkinModel
+                && string.Equals(skin.Source, account.SkinSource, StringComparison.Ordinal));
 
     private static IEnumerable<LauncherSkinRecord> DistinctSkins(IEnumerable<LauncherSkinRecord> skins)
     {
@@ -540,4 +562,28 @@ public sealed partial class AccountSkinLibraryViewModel : ObservableObject
         && (!string.IsNullOrWhiteSpace(left.ContentHash) && !string.IsNullOrWhiteSpace(right.ContentHash)
             ? string.Equals(left.ContentHash, right.ContentHash, StringComparison.OrdinalIgnoreCase)
             : string.Equals(left.Source, right.Source, StringComparison.Ordinal));
+
+    private static bool SkinSequencesEqual(
+        IReadOnlyList<LauncherSkinRecord> left,
+        IReadOnlyList<LauncherSkinRecord> right)
+    {
+        if (left.Count != right.Count)
+            return false;
+
+        for (var index = 0; index < left.Count; index++)
+        {
+            if (!string.Equals(left[index].Id, right[index].Id, StringComparison.Ordinal)
+                || !string.Equals(left[index].Source, right[index].Source, StringComparison.Ordinal)
+                || left[index].SkinModel != right[index].SkinModel
+                || !string.Equals(
+                    left[index].ContentHash,
+                    right[index].ContentHash,
+                    StringComparison.OrdinalIgnoreCase))
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
 }

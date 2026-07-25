@@ -1682,6 +1682,9 @@
   <data name="Status_LaunchPreparingProcess" xml:space="preserve">
     <value>正在產生啟動參數...</value>
   </data>
+  <data name="Status_LaunchPreparingOfflineSkin" xml:space="preserve">
+    <value>正在準備離線皮膚...</value>
+  </data>
   <data name="Status_LaunchStartingProcess" xml:space="preserve">
     <value>正在啟動遊戲程式...</value>
   </data>
@@ -1711,6 +1714,9 @@
   </data>
   <data name="Status_LaunchFailed" xml:space="preserve">
     <value>啟動失敗，請稍後再試。</value>
+  </data>
+  <data name="Status_LaunchOfflineSkinUnavailable" xml:space="preserve">
+    <value>遊戲已啟動，但離線皮膚載入失敗，本次將使用預設皮膚。</value>
   </data>
   <data name="Status_LaunchInstanceRepairFailed" xml:space="preserve">
     <value>目前實例缺少關鍵檔案，且無法在不新增版本的情況下自動補齊，請重新安裝該實例或檢查版本檔案。</value>
@@ -2124,7 +2130,7 @@
     <value>更換皮膚失敗，請稍後再試。</value>
   </data>
   <data name="Status_CapeOfflineUnsupported" xml:space="preserve">
-    <value>只有正版帳戶可以更換披風</value>
+    <value>離線帳戶暫不支援披風管理</value>
   </data>
   <data name="Status_ChangingCape" xml:space="preserve">
     <value>正在更換披風...</value>

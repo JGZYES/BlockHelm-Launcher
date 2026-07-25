@@ -20,6 +20,79 @@ namespace Launcher.Tests.Infrastructure.Minecraft;
 public sealed class GameFileIntegrityServiceTests : TestTempDirectory
 {
     [Fact]
+    public async Task ManifestResolutionUsesMissingOfficialParentInMemoryWithoutWritingIt()
+    {
+        const string versionName = "26.2";
+        const string parentVersion = "1.21.8";
+        const string parentMetadataUrl = "https://piston-meta.mojang.com/v1/packages/test/1.21.8.json";
+        var minecraftDirectory = Path.Combine(TempRoot, ".minecraft");
+        var versionDirectory = Path.Combine(minecraftDirectory, "versions", versionName);
+        Directory.CreateDirectory(versionDirectory);
+        var childJson = """
+            {
+              "id": "26.2",
+              "inheritsFrom": "1.21.8",
+              "mainClass": "net.fabricmc.loader.impl.launch.knot.KnotClient",
+              "libraries": [
+                { "name": "net.fabricmc:fabric-loader:0.16.14" }
+              ]
+            }
+            """;
+        var childJsonPath = Path.Combine(versionDirectory, $"{versionName}.json");
+        await File.WriteAllTextAsync(childJsonPath, childJson);
+        var originalBytes = await File.ReadAllBytesAsync(childJsonPath);
+        var parentJson = """
+            {
+              "id": "1.21.8",
+              "mainClass": "net.minecraft.client.main.Main",
+              "libraries": [
+                { "name": "com.mojang:patchy:2.2.10" }
+              ]
+            }
+            """;
+        var manifestJson = $$"""
+            {
+              "versions": [
+                {
+                  "id": "{{parentVersion}}",
+                  "url": "{{parentMetadataUrl}}"
+                }
+              ]
+            }
+            """;
+        var handler = new ContentHandler(new Dictionary<string, string>
+        {
+            ["https://piston-meta.mojang.com/mc/game/version_manifest_v2.json"] = manifestJson,
+            [parentMetadataUrl] = parentJson
+        });
+        var httpClient = new HttpClient(handler);
+        var repairService = new ManagedVersionRepairService(httpClient);
+        var builder = new RequiredGameFileManifestBuilder(repairService);
+
+        var plan = await builder.ResolveFinalCommandAsync(
+            new GameFileIntegrityRequest(minecraftDirectory, versionName, versionDirectory),
+            CancellationToken.None);
+        _ = await builder.ResolveFinalCommandAsync(
+            new GameFileIntegrityRequest(minecraftDirectory, versionName, versionDirectory),
+            CancellationToken.None);
+
+        Assert.Equal("net.fabricmc.loader.impl.launch.knot.KnotClient", plan.VersionJson["mainClass"]!.GetValue<string>());
+        Assert.Contains(
+            plan.VersionJson["libraries"]!.AsArray(),
+            node => node?["name"]?.GetValue<string>() == "com.mojang:patchy:2.2.10");
+        Assert.Contains(
+            plan.VersionJson["libraries"]!.AsArray(),
+            node => node?["name"]?.GetValue<string>() == "net.fabricmc:fabric-loader:0.16.14");
+        Assert.Equal(originalBytes, await File.ReadAllBytesAsync(childJsonPath));
+        Assert.False(Directory.Exists(Path.Combine(minecraftDirectory, "versions", parentVersion)));
+        Assert.DoesNotContain(
+            plan.Manifest.Files,
+            file => file.Category == "VersionMetadata"
+                && file.TargetPath.Contains(parentVersion, StringComparison.OrdinalIgnoreCase));
+        Assert.Equal(2, handler.RequestCount);
+    }
+
+    [Fact]
     public async Task MissingLibraryIsRecoveredFromResolvedStandardMetadata()
     {
         const string versionName = "Loader-1.18.2";
@@ -50,6 +123,39 @@ public sealed class GameFileIntegrityServiceTests : TestTempDirectory
         Assert.Equal(
             progressReports.Where(report => report.Percent is not null).Select(report => report.Percent!.Value).Order(),
             progressReports.Where(report => report.Percent is not null).Select(report => report.Percent!.Value));
+    }
+
+    [Fact]
+    public async Task MalformedInstanceMetadataIsPreservedAndDoesNotStartLoaderRepair()
+    {
+        const string versionName = "26.2";
+        var minecraftDirectory = Path.Combine(TempRoot, ".minecraft");
+        var versionDirectory = Path.Combine(minecraftDirectory, "versions", versionName);
+        Directory.CreateDirectory(versionDirectory);
+        var jsonPath = Path.Combine(versionDirectory, $"{versionName}.json");
+        await File.WriteAllTextAsync(jsonPath, "{ not-json");
+        var originalBytes = await File.ReadAllBytesAsync(jsonPath);
+        var provider = new FailingLoaderProvider(
+            LoaderKind.Forge,
+            new InvalidOperationException("Loader repair must not start."));
+        var service = new GameFileIntegrityService(
+            new HttpClient(new ContentHandler(new Dictionary<string, string>())),
+            downloadSpeedLimitState: null,
+            logger: null,
+            loaderProviders: [provider],
+            gameInstallCoordinator: new GameInstallCoordinator());
+
+        var result = await service.ValidateAndRepairAsync(
+            new GameFileIntegrityRequest(minecraftDirectory, versionName, versionDirectory)
+            {
+                LoaderIdentity = new GameFileLoaderIdentity(LoaderKind.Forge, versionName, "test")
+            },
+            new GameFileRepairOptions(AllowRepair: true));
+
+        Assert.False(result.LaunchAllowed);
+        Assert.Equal(GameFileRepairFailureReason.Corrupted, Assert.Single(result.Failures).Reason);
+        Assert.Equal(0, provider.InstallCallCount);
+        Assert.Equal(originalBytes, await File.ReadAllBytesAsync(jsonPath));
     }
 
     [Fact]
@@ -223,8 +329,11 @@ public sealed class GameFileIntegrityServiceTests : TestTempDirectory
 
     private sealed class ContentHandler(IReadOnlyDictionary<string, string> responses) : HttpMessageHandler
     {
+        public int RequestCount { get; private set; }
+
         protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
         {
+            RequestCount++;
             if (request.RequestUri is not null && responses.TryGetValue(request.RequestUri.AbsoluteUri, out var content))
             {
                 return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent(content) });
@@ -242,6 +351,7 @@ public sealed class GameFileIntegrityServiceTests : TestTempDirectory
     {
         public LoaderKind Kind { get; } = kind;
         public bool IsImplemented => true;
+        public int InstallCallCount { get; private set; }
 
         public Task<IReadOnlyList<LoaderVersionInfo>> GetLoaderVersionsAsync(
             string minecraftVersion,
@@ -258,7 +368,10 @@ public sealed class GameFileIntegrityServiceTests : TestTempDirectory
             IProgress<LauncherProgress>? progress,
             DownloadSourcePreference downloadSourcePreference = LauncherDefaults.DefaultDownloadSourcePreference,
             CancellationToken cancellationToken = default,
-            int downloadSpeedLimitMbPerSecond = 0) =>
-            Task.FromException<string>(exception);
+            int downloadSpeedLimitMbPerSecond = 0)
+        {
+            InstallCallCount++;
+            return Task.FromException<string>(exception);
+        }
     }
 }

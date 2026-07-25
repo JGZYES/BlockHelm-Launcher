@@ -151,14 +151,19 @@ internal static class VanillaVersionIsolator
         if (!File.Exists(derivedJsonPath))
             throw new FileNotFoundException($"Derived version JSON not found: {derivedJsonPath}", derivedJsonPath);
 
-        if (Directory.Exists(destinationDirectory))
+        var destinationIsBaseDirectory = Path.GetFullPath(destinationDirectory).Equals(
+            Path.GetFullPath(baseDirectory),
+            OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal);
+        if (Directory.Exists(destinationDirectory) && !destinationIsBaseDirectory)
             throw new IOException($"Version directory already exists: {versionName}");
 
-        Directory.CreateDirectory(destinationDirectory);
+        if (!destinationIsBaseDirectory)
+            Directory.CreateDirectory(destinationDirectory);
 
         try
         {
-            File.Copy(baseJarPath, destinationJarPath, overwrite: false);
+            if (!destinationIsBaseDirectory)
+                File.Copy(baseJarPath, destinationJarPath, overwrite: false);
             CopySupplementaryFiles(
                 derivedDirectory,
                 destinationDirectory,
@@ -179,7 +184,7 @@ internal static class VanillaVersionIsolator
         }
         catch
         {
-            if (Directory.Exists(destinationDirectory))
+            if (!destinationIsBaseDirectory && Directory.Exists(destinationDirectory))
                 Directory.Delete(destinationDirectory, recursive: true);
 
             throw;

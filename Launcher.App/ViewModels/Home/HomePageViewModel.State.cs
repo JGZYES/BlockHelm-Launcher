@@ -142,6 +142,7 @@ private void LaunchGames_PropertyChanged(object? sender, PropertyChangedEventArg
             LaunchProgressStages.CheckingJava => Strings.Status_LaunchCheckingJava,
             LaunchProgressStages.DownloadingJava => Strings.Status_InstallDownloadingJava,
             LaunchProgressStages.RunningPreLaunchCommand => Strings.Status_LaunchRunningPreLaunchCommand,
+            LaunchProgressStages.PreparingOfflineSkin => Strings.Status_LaunchPreparingOfflineSkin,
             LaunchProgressStages.PreparingProcess => Strings.Status_LaunchPreparingProcess,
             LaunchProgressStages.StartingProcess => Strings.Status_LaunchStartingProcess,
             LaunchProgressStages.CheckingFiles => Strings.Status_LaunchCheckingFiles,

@@ -17,6 +17,7 @@
  * SPDX-License-Identifier: GPL-3.0-only
  */
 
+using System.Collections.Concurrent;
 using System.IO;
 using System.Net.Http;
 using System.Text.Json;
@@ -54,6 +55,8 @@ internal sealed partial class ManagedVersionRepairService : IManagedVersionRepai
     private readonly IDownloadSpeedLimitState? downloadSpeedLimitState;
     private readonly ILogger logger;
     private readonly LoaderArtifactRepairCoordinator loaderArtifactRepairCoordinator;
+    private readonly ConcurrentDictionary<(string VersionName, DownloadSourcePreference Source), JsonObject>
+        remoteVersionMetadataCache = new();
 
     public ManagedVersionRepairService(
         HttpClient? httpClient = null,
@@ -144,6 +147,15 @@ internal sealed partial class ManagedVersionRepairService : IManagedVersionRepai
         GameFileLoaderIdentity? loaderIdentity = null)
     {
         var versionDirectory = ResolveVersionDirectory(minecraftDirectory, versionName, instanceDirectory);
+        if (!Directory.Exists(versionDirectory))
+            throw new InstanceRepairException($"Version directory is missing for {versionName}.");
+
+        // Existing instance metadata is authoritative. Validate it before any
+        // loader sandbox is allowed to publish a replacement for an invalid
+        // target JSON.
+        _ = await ReadVersionJsonAsync(versionDirectory, versionName, cancellationToken)
+            .ConfigureAwait(false);
+
         if (loaderIdentity is not null
             && await loaderArtifactRepairCoordinator.RequiresRepairAsync(
                     minecraftDirectory,
@@ -169,8 +181,6 @@ internal sealed partial class ManagedVersionRepairService : IManagedVersionRepai
                     cancellationToken)
                 .ConfigureAwait(false);
         }
-        if (!Directory.Exists(versionDirectory))
-            throw new InstanceRepairException($"Version directory is missing for {versionName}.");
 
         var downloadBatch = new ManagedVersionRepairDownloadBatch(
             httpClient,

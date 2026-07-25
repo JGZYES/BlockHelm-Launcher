@@ -79,7 +79,10 @@ internal sealed class GameFileIntegrityService : IGameFileIntegrityService
             this.logger,
             loaderProviders: loaderProviders,
             gameInstallCoordinator: gameInstallCoordinator);
-        manifestBuilder = new RequiredGameFileManifestBuilder(this.logger, manifestContributors);
+        manifestBuilder = new RequiredGameFileManifestBuilder(
+            repairService,
+            this.logger,
+            manifestContributors);
     }
 
     internal GameFileIntegrityService(
@@ -543,13 +546,16 @@ internal sealed record GameFileRepairPlan(IReadOnlyList<RequiredGameFile> FilesT
 
 internal sealed class RequiredGameFileManifestBuilder
 {
+    private readonly ManagedVersionRepairService repairService;
     private readonly ILogger logger;
     private readonly IReadOnlyDictionary<LoaderKind, ILoaderFileManifestContributor> loaderContributors;
 
-    public RequiredGameFileManifestBuilder(
+    internal RequiredGameFileManifestBuilder(
+        ManagedVersionRepairService repairService,
         ILogger? logger = null,
         IEnumerable<ILoaderFileManifestContributor>? loaderContributors = null)
     {
+        this.repairService = repairService;
         this.logger = logger ?? NullLogger.Instance;
         this.loaderContributors = (loaderContributors ?? LoaderFileManifestContributors.CreateDefault())
             .GroupBy(contributor => contributor.Kind)
@@ -574,11 +580,18 @@ internal sealed class RequiredGameFileManifestBuilder
         CancellationToken cancellationToken)
     {
         var versionDirectory = Path.GetFullPath(request.InstanceDirectory);
-        var versionResolution = await ReadResolvedVersionJsonAsync(request.MinecraftDirectory, request.VersionName, versionDirectory, cancellationToken)
+        var versionResolution = await repairService.ResolveVersionForRepairAsync(
+                request.MinecraftDirectory,
+                request.VersionName,
+                versionDirectory,
+                request.DownloadSourcePreference,
+                cancellationToken,
+                allowRemoteParentResolution: true,
+                request.DownloadSpeedLimitMbPerSecond)
             .ConfigureAwait(false);
         var versionJson = versionResolution.VersionJson;
         var files = new Dictionary<string, RequiredGameFile>(OperatingSystem.IsWindows() ? StringComparer.OrdinalIgnoreCase : StringComparer.Ordinal);
-        foreach (var metadataPath in versionResolution.MetadataPaths)
+        foreach (var metadataPath in versionResolution.LocalMetadataPaths)
         {
             Add(files, new RequiredGameFile(
                 metadataPath,
@@ -688,48 +701,6 @@ internal sealed class RequiredGameFileManifestBuilder
                 ManagedRoot: request.MinecraftDirectory));
         }
     }
-
-    private static async Task<ResolvedVersionJson> ReadResolvedVersionJsonAsync(
-        string minecraftDirectory,
-        string versionName,
-        string versionDirectory,
-        CancellationToken cancellationToken)
-    {
-        var currentPath = Path.Combine(versionDirectory, $"{versionName}.json");
-        MinecraftPathGuard.EnsureSafeFileDestination(
-            currentPath,
-            versionDirectory,
-            "Managed version metadata");
-        var current = await ReadJsonAsync(currentPath, cancellationToken).ConfigureAwait(false);
-        var chain = new Stack<JsonObject>();
-        var metadataPaths = new List<string> { currentPath };
-        chain.Push(current);
-        var parentName = GetString(current["inheritsFrom"]);
-        var visited = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { versionName };
-        while (!string.IsNullOrWhiteSpace(parentName))
-        {
-            if (!visited.Add(parentName))
-                throw new InvalidDataException($"Version inheritance cycle detected at {parentName}.");
-            var parentPath = Path.Combine(minecraftDirectory, "versions", parentName, $"{parentName}.json");
-            MinecraftPathGuard.EnsureSafeFileDestination(
-                parentPath,
-                Path.Combine(minecraftDirectory, "versions"),
-                "Inherited version metadata");
-            if (!File.Exists(parentPath))
-                throw new InvalidDataException($"Inherited version metadata is missing: {parentName}.");
-            var parent = await ReadJsonAsync(parentPath, cancellationToken).ConfigureAwait(false);
-            metadataPaths.Add(parentPath);
-            chain.Push(parent);
-            parentName = GetString(parent["inheritsFrom"]);
-        }
-
-        var resolved = (JsonObject)chain.Pop().DeepClone();
-        while (chain.Count > 0)
-            resolved = VersionJsonMergeHelper.MergeFlattenedVersion(resolved, chain.Pop(), versionName);
-        return new ResolvedVersionJson(resolved, metadataPaths);
-    }
-
-    private sealed record ResolvedVersionJson(JsonObject VersionJson, IReadOnlyList<string> MetadataPaths);
 
     private static async Task<JsonObject> ReadJsonAsync(string path, CancellationToken cancellationToken)
     {

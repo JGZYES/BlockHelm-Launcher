@@ -30,23 +30,29 @@ public sealed class AccountStore : IAccountStore
     private readonly IAccountStateService accountStateService;
     private readonly IMicrosoftAccountService microsoftAccountService;
     private readonly IOfflineAccountUuidService offlineUuidService;
+    private readonly IAccountSkinLibraryService skinLibraryService;
     private readonly ILogger<AccountStore> logger;
 
     public AccountStore(
         IAccountStateService accountStateService,
         IMicrosoftAccountService microsoftAccountService,
         IOfflineAccountUuidService offlineUuidService,
+        IAccountSkinLibraryService skinLibraryService,
         ILogger<AccountStore>? logger = null)
     {
         this.accountStateService = accountStateService;
         this.microsoftAccountService = microsoftAccountService;
         this.offlineUuidService = offlineUuidService;
+        this.skinLibraryService = skinLibraryService;
         this.logger = logger ?? NullLogger<AccountStore>.Instance;
     }
 
     public async Task<AccountStoreSnapshot> LoadAsync(CancellationToken cancellationToken = default)
     {
         var state = await accountStateService.LoadAsync(cancellationToken);
+        var shouldPersistSkinLibraryMigration = await TryMigrateSharedSkinLibraryAsync(
+            state,
+            cancellationToken);
         var accounts = new List<LauncherAccount>();
         var microsoftAccounts = new Dictionary<string, LauncherAccount>(StringComparer.OrdinalIgnoreCase);
         foreach (var account in await microsoftAccountService.GetSavedAccountsAsync(cancellationToken))
@@ -99,13 +105,30 @@ public sealed class AccountStore : IAccountStore
             }
         }
 
-        if (shouldPersistOrder || shouldImportMicrosoftAccounts)
+        if (state.SharedSkinLibraryMigrationVersion
+            >= LauncherAccountState.CurrentSharedSkinLibraryMigrationVersion)
+        {
+            for (var index = 0; index < accounts.Count; index++)
+            {
+                var account = accounts[index];
+                var normalized = AccountMapper.WithCurrentSkinReferenceOnly(account);
+                if (!AccountSkinStateEqual(account, normalized))
+                    shouldPersistOrder = true;
+                accounts[index] = normalized;
+            }
+        }
+
+        shouldPersistOrder |= await TrySyncMicrosoftAccountSkinsAsync(
+            accounts,
+            cancellationToken);
+
+        if (shouldPersistOrder || shouldImportMicrosoftAccounts || shouldPersistSkinLibraryMigration)
         {
             logger.LogDebug(
                 "Persisting account order after load. AccountCount={AccountCount} ImportedMicrosoftAccounts={ImportedMicrosoftAccounts}",
                 accounts.Count,
                 shouldImportMicrosoftAccounts);
-            await SaveOrderAsync(state.SelectedAccountId, accounts, cancellationToken);
+            await SaveOrderCoreAsync(state, state.SelectedAccountId, accounts, cancellationToken);
             state = await accountStateService.LoadAsync(cancellationToken);
         }
 
@@ -122,6 +145,15 @@ public sealed class AccountStore : IAccountStore
         CancellationToken cancellationToken = default)
     {
         var state = await accountStateService.LoadAsync(cancellationToken);
+        await SaveOrderCoreAsync(state, selectedAccountId, accounts, cancellationToken);
+    }
+
+    private async Task SaveOrderCoreAsync(
+        LauncherAccountState state,
+        string? selectedAccountId,
+        IEnumerable<LauncherAccount> accounts,
+        CancellationToken cancellationToken)
+    {
         state.AccountsInitialized = true;
         state.MicrosoftAccountsImported = true;
         var records = accounts
@@ -148,6 +180,77 @@ public sealed class AccountStore : IAccountStore
             "Account order saved. AccountCount={AccountCount} SelectedAccountId={SelectedAccountId}",
             state.Accounts.Count,
             state.SelectedAccountId);
+    }
+
+    private async Task<bool> TryMigrateSharedSkinLibraryAsync(
+        LauncherAccountState state,
+        CancellationToken cancellationToken)
+    {
+        if (state.SharedSkinLibraryMigrationVersion
+            >= LauncherAccountState.CurrentSharedSkinLibraryMigrationVersion)
+        {
+            return false;
+        }
+
+        try
+        {
+            var legacyAccounts = state.Accounts
+                .Select(AccountMapper.FromRecord)
+                .Where(account => !account.IsThirdParty)
+                .ToList();
+            await skinLibraryService.MigrateLegacySkinsAsync(legacyAccounts, cancellationToken);
+            state.SharedSkinLibraryMigrationVersion =
+                LauncherAccountState.CurrentSharedSkinLibraryMigrationVersion;
+            logger.LogInformation(
+                "Legacy account skin libraries migrated to the shared library. AccountCount={AccountCount}",
+                legacyAccounts.Count);
+            return true;
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException)
+        {
+            logger.LogWarning(
+                exception,
+                "Legacy account skin library migration failed and will be retried on the next startup.");
+            return false;
+        }
+    }
+
+    private async Task<bool> TrySyncMicrosoftAccountSkinsAsync(
+        List<LauncherAccount> accounts,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            var synchronized = await skinLibraryService.SyncMicrosoftAccountSkinsAsync(
+                accounts,
+                cancellationToken);
+            var changed = false;
+            for (var index = 0; index < accounts.Count; index++)
+            {
+                var account = accounts[index];
+                if (!synchronized.TryGetValue(account.Id, out var sharedSkin))
+                    continue;
+
+                var updated = AccountMapper.WithSkinLibrary(
+                    account,
+                    [sharedSkin],
+                    sharedSkin.Id,
+                    sharedSkin.Source,
+                    sharedSkin.SkinModel);
+                if (!AccountSkinStateEqual(account, updated))
+                    changed = true;
+                accounts[index] = updated;
+            }
+
+            return changed;
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException)
+        {
+            logger.LogWarning(
+                exception,
+                "Current Microsoft account skins could not be synchronized to the shared library.");
+            return false;
+        }
     }
 
     private bool EnsureOfflineUuid(LauncherAccountRecord account)
@@ -193,6 +296,14 @@ public sealed class AccountStore : IAccountStore
                 && pair.First.SkinModel == pair.Second.SkinModel
                 && string.Equals(pair.First.ContentHash, pair.Second.ContentHash, StringComparison.Ordinal)
                 && pair.First.AddedAtUtc == pair.Second.AddedAtUtc);
+    }
+
+    private static bool AccountSkinStateEqual(LauncherAccount left, LauncherAccount right)
+    {
+        return string.Equals(left.SkinSource, right.SkinSource, StringComparison.Ordinal)
+            && left.SkinModel == right.SkinModel
+            && string.Equals(left.ActiveSkinId, right.ActiveSkinId, StringComparison.Ordinal)
+            && SkinRecordsEqual(left.SkinLibrary, right.SkinLibrary);
     }
 
     private static bool CapeRecordsEqual(

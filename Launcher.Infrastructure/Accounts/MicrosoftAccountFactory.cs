@@ -20,6 +20,8 @@
 using CmlLib.Core.Auth.Microsoft.Sessions;
 using Launcher.Application.Accounts;
 using Launcher.Domain.Models;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Launcher.Infrastructure.Accounts;
 
@@ -27,13 +29,19 @@ internal sealed class MicrosoftAccountFactory
 {
     private readonly AccountAvatarService avatarService;
     private readonly AccountSkinCacheService skinCacheService;
+    private readonly IAccountSkinLibraryService skinLibraryService;
+    private readonly ILogger logger;
 
     public MicrosoftAccountFactory(
         AccountAvatarService avatarService,
-        AccountSkinCacheService skinCacheService)
+        AccountSkinCacheService skinCacheService,
+        IAccountSkinLibraryService skinLibraryService,
+        ILogger? logger = null)
     {
         this.avatarService = avatarService;
         this.skinCacheService = skinCacheService;
+        this.skinLibraryService = skinLibraryService;
+        this.logger = logger ?? NullLogger.Instance;
     }
 
     public async Task<LauncherAccount> CreateAccountFromProfileAsync(
@@ -44,33 +52,38 @@ internal sealed class MicrosoftAccountFactory
     {
         var uuid = MinecraftAccountHelpers.NormalizeUuid(profile.UUID);
         var skinUrl = MinecraftAccountHelpers.GetActiveSkinUrl(profile);
+        var skinModel = MinecraftAccountHelpers.GetActiveSkinModel(profile);
         var avatarSource = await avatarService.GetOrCreateAvatarSourceAsync(
             uuid,
             skinUrl,
             forceRefreshAvatar,
             cancellationToken);
-        var skin = await skinCacheService.GetOrCreateSkinRecordFromUrlAsync(
-            uuid,
-            skinUrl,
-            MinecraftSkinModel.Classic,
-            existingSkins ?? [],
-            forceRefreshAvatar,
-            cancellationToken);
+        var skin = skinModel is { } confirmedSkinModel
+            ? await skinCacheService.GetOrCreateSkinRecordFromUrlAsync(
+                uuid,
+                skinUrl,
+                confirmedSkinModel,
+                existingSkins ?? [],
+                forceRefreshAvatar,
+                useSharedLibrary: true,
+                cancellationToken)
+            : null;
         var skins = MergeSkinLibrary(existingSkins ?? [], skin);
-        var skinSource = skin?.Source;
 
-        return new LauncherAccount
+        var account = new LauncherAccount
         {
             Id = $"microsoft-{uuid}",
             DisplayName = profile.Username ?? string.Empty,
             Uuid = uuid,
             AvatarSource = avatarSource,
-            SkinSource = skinSource,
+            // Variant 缺失时保持未知，账户存储合并会补回上次已确认的当前皮肤状态。
+            SkinSource = skin?.Source,
             SkinModel = skin?.SkinModel,
             SkinLibrary = skins,
             ActiveSkinId = skin?.Id,
             Kind = LauncherAccountKind.Microsoft
         };
+        return await TrySyncCurrentSkinAsync(account, cancellationToken);
     }
 
     public async Task<LauncherAccount> CreateAccountFromProfileAsync(
@@ -81,23 +94,26 @@ internal sealed class MicrosoftAccountFactory
     {
         var uuid = MinecraftAccountHelpers.NormalizeUuid(profile.Id);
         var skinUrl = MinecraftAccountHelpers.GetActiveSkinUrl(profile);
-        var skinModel = MinecraftAccountHelpers.GetActiveSkinModel(profile) ?? MinecraftSkinModel.Classic;
+        var skinModel = MinecraftAccountHelpers.GetActiveSkinModel(profile);
         var avatarSource = await avatarService.GetOrCreateAvatarSourceAsync(
             uuid,
             skinUrl,
             forceRefreshAvatar,
             cancellationToken);
-        var skin = await skinCacheService.GetOrCreateSkinRecordFromUrlAsync(
-            uuid,
-            skinUrl,
-            skinModel,
-            existingSkins ?? [],
-            forceRefreshAvatar,
-            cancellationToken);
+        var skin = skinModel is { } confirmedSkinModel
+            ? await skinCacheService.GetOrCreateSkinRecordFromUrlAsync(
+                uuid,
+                skinUrl,
+                confirmedSkinModel,
+                existingSkins ?? [],
+                forceRefreshAvatar,
+                useSharedLibrary: true,
+                cancellationToken)
+            : null;
         var skins = MergeSkinLibrary(existingSkins ?? [], skin);
         var skinSource = skin?.Source;
 
-        return new LauncherAccount
+        var account = new LauncherAccount
         {
             Id = $"microsoft-{uuid}",
             DisplayName = profile.Name ?? string.Empty,
@@ -110,6 +126,35 @@ internal sealed class MicrosoftAccountFactory
             Kind = LauncherAccountKind.Microsoft,
             HasFreshProfile = true
         };
+        return await TrySyncCurrentSkinAsync(account, cancellationToken);
+    }
+
+    private async Task<LauncherAccount> TrySyncCurrentSkinAsync(
+        LauncherAccount account,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            var synchronized = await skinLibraryService.SyncMicrosoftAccountSkinsAsync(
+                [account],
+                cancellationToken);
+            return synchronized.TryGetValue(account.Id, out var sharedSkin)
+                ? AccountMapper.WithSkinLibrary(
+                    account,
+                    [sharedSkin],
+                    sharedSkin.Id,
+                    sharedSkin.Source,
+                    sharedSkin.SkinModel)
+                : account;
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException)
+        {
+            logger.LogWarning(
+                exception,
+                "Current Microsoft skin could not be synchronized to the shared library. AccountId={AccountId}",
+                account.Id);
+            return account;
+        }
     }
 
     private static List<LauncherSkinRecord> MergeSkinLibrary(

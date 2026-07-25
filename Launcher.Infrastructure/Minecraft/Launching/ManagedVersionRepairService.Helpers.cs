@@ -43,10 +43,29 @@ private static async Task<JsonObject> ReadVersionJsonAsync(
         if (!File.Exists(jsonPath))
             throw new InstanceRepairException($"Version metadata is missing for {versionName}.");
 
-        await using var stream = File.OpenRead(jsonPath);
-        var jsonNode = await JsonNode.ParseAsync(stream, cancellationToken: cancellationToken)
-            ?? throw new InstanceRepairException($"Version metadata is empty for {versionName}.");
-        return jsonNode.AsObject();
+        try
+        {
+            await using var stream = File.OpenRead(jsonPath);
+            var jsonNode = await JsonNode.ParseAsync(stream, cancellationToken: cancellationToken)
+                ?? throw new InstanceRepairException($"Version metadata is empty for {versionName}.");
+            return jsonNode as JsonObject
+                ?? throw new InstanceRepairException($"Version metadata is not a JSON object for {versionName}.");
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (InstanceRepairException)
+        {
+            throw;
+        }
+        catch (Exception exception) when (
+            exception is IOException or UnauthorizedAccessException or JsonException)
+        {
+            throw new InstanceRepairException(
+                $"Version metadata is invalid or unreadable for {versionName}.",
+                exception);
+        }
     }
 
     private static Task WriteVersionJsonAsync(
@@ -107,6 +126,7 @@ private static async Task<JsonObject> ReadVersionJsonAsync(
         string? LocalJarPath,
         string? ClientJarUrl,
         bool WasModified,
+        IReadOnlyList<string> LocalMetadataPaths,
         string? ClientJarSha1 = null,
         long? ClientJarSize = null);
 }

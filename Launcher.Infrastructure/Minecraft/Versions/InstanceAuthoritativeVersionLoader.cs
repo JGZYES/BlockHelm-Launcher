@@ -5,6 +5,7 @@
  * SPDX-License-Identifier: GPL-3.0-only
  */
 
+using System.Collections.Concurrent;
 using System.IO;
 using System.Text.Json;
 using System.Text.Json.Nodes;
@@ -25,6 +26,8 @@ internal sealed class InstanceAuthoritativeVersionLoader(
     : IVersionLoader
 {
     private const int MaximumInheritanceDepth = 10;
+    private readonly ConcurrentDictionary<string, JsonObject> remoteParentCache =
+        new(StringComparer.Ordinal);
 
     public async ValueTask<VersionMetadataCollection> GetVersionMetadatasAsync(
         CancellationToken cancellationToken = default)
@@ -56,13 +59,30 @@ internal sealed class InstanceAuthoritativeVersionLoader(
         {
             if (!knownNames.Add(parentName))
                 continue;
-            metadata.Add(new ReadOnlyRemoteVersionMetadata(parentName, resolveMissingParentAsync));
+            metadata.Add(new ReadOnlyRemoteVersionMetadata(parentName, ResolveMissingParentAsync));
         }
 
         return new VersionMetadataCollection(metadata, latestRelease: null, latestSnapshot: null)
         {
             MaxDepth = MaximumInheritanceDepth
         };
+    }
+
+    private async Task<JsonObject> ResolveMissingParentAsync(
+        string versionName,
+        CancellationToken cancellationToken)
+    {
+        if (remoteParentCache.TryGetValue(versionName, out var cached))
+            return (JsonObject)cached.DeepClone();
+
+        var resolved = await resolveMissingParentAsync(versionName, cancellationToken).ConfigureAwait(false);
+        if (!string.Equals(GetString(resolved["id"]), versionName, StringComparison.Ordinal))
+        {
+            throw new InvalidDataException(
+                $"Resolved parent version id does not match the requested version: {versionName}.");
+        }
+        remoteParentCache.TryAdd(versionName, (JsonObject)resolved.DeepClone());
+        return resolved;
     }
 
     private static async Task<string?> TryReadParentNameAsync(

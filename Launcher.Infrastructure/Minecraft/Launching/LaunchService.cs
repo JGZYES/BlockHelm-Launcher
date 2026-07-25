@@ -46,6 +46,7 @@ public sealed partial class LaunchService : ILaunchService
     private readonly IJavaRuntimeProvisioningService? javaRuntimeProvisioningService;
     private readonly IGameLanguageService? gameLanguageService;
     private readonly IAuthlibInjectorProvisioningService? authlibInjectorProvisioningService;
+    private readonly IOfflineSkinLaunchService? offlineSkinLaunchService;
     private readonly LaunchSettingsResolver launchSettingsResolver;
     private readonly ILogger<LaunchService> logger;
 
@@ -58,7 +59,8 @@ public sealed partial class LaunchService : ILaunchService
         IModService? modService = null,
         IGameLanguageService? gameLanguageService = null,
         ILogger<LaunchService>? logger = null,
-        IAuthlibInjectorProvisioningService? authlibInjectorProvisioningService = null)
+        IAuthlibInjectorProvisioningService? authlibInjectorProvisioningService = null,
+        IOfflineSkinLaunchService? offlineSkinLaunchService = null)
         : this(
             accountSessionService,
             new GameFileIntegrityService(downloadSpeedLimitState),
@@ -71,7 +73,8 @@ public sealed partial class LaunchService : ILaunchService
             modService,
             gameLanguageService,
             logger,
-            authlibInjectorProvisioningService)
+            authlibInjectorProvisioningService,
+            offlineSkinLaunchService)
     {
     }
 
@@ -85,7 +88,8 @@ public sealed partial class LaunchService : ILaunchService
         IModService? modService = null,
         IGameLanguageService? gameLanguageService = null,
         ILogger<LaunchService>? logger = null,
-        IAuthlibInjectorProvisioningService? authlibInjectorProvisioningService = null)
+        IAuthlibInjectorProvisioningService? authlibInjectorProvisioningService = null,
+        IOfflineSkinLaunchService? offlineSkinLaunchService = null)
         : this(
             accountSessionService,
             gameFileIntegrityService,
@@ -98,7 +102,8 @@ public sealed partial class LaunchService : ILaunchService
             modService,
             gameLanguageService,
             logger,
-            authlibInjectorProvisioningService)
+            authlibInjectorProvisioningService,
+            offlineSkinLaunchService)
     {
     }
 
@@ -115,6 +120,7 @@ public sealed partial class LaunchService : ILaunchService
         IGameLanguageService? gameLanguageService = null,
         ILogger<LaunchService>? logger = null,
         IAuthlibInjectorProvisioningService? authlibInjectorProvisioningService = null,
+        IOfflineSkinLaunchService? offlineSkinLaunchService = null,
         IGameWindowReadinessWaiter? gameWindowReadinessWaiter = null,
         ILaunchProcessTerminator? launchProcessTerminator = null)
         : this(
@@ -130,6 +136,7 @@ public sealed partial class LaunchService : ILaunchService
             gameLanguageService,
             logger,
             authlibInjectorProvisioningService,
+            offlineSkinLaunchService,
             gameWindowReadinessWaiter,
             launchProcessTerminator)
     {
@@ -148,6 +155,7 @@ public sealed partial class LaunchService : ILaunchService
         IGameLanguageService? gameLanguageService = null,
         ILogger<LaunchService>? logger = null,
         IAuthlibInjectorProvisioningService? authlibInjectorProvisioningService = null,
+        IOfflineSkinLaunchService? offlineSkinLaunchService = null,
         IGameWindowReadinessWaiter? gameWindowReadinessWaiter = null,
         ILaunchProcessTerminator? launchProcessTerminator = null)
     {
@@ -162,6 +170,7 @@ public sealed partial class LaunchService : ILaunchService
         this.javaRuntimeProvisioningService = javaRuntimeProvisioningService;
         this.gameLanguageService = gameLanguageService;
         this.authlibInjectorProvisioningService = authlibInjectorProvisioningService;
+        this.offlineSkinLaunchService = offlineSkinLaunchService;
         this.logger = logger ?? NullLogger<LaunchService>.Instance;
         launchSettingsResolver = new LaunchSettingsResolver(systemMemoryService, modService, this.logger);
     }
@@ -292,7 +301,8 @@ public sealed partial class LaunchService : ILaunchService
             return new GameLaunchSession(
                 session.InstanceId,
                 session.InstanceName,
-                LogGameExitAsync(session.ExitTask, diagnosticContext));
+                LogGameExitAsync(session.ExitTask, diagnosticContext),
+                preparedRuntime.Warnings);
         }
         catch (LaunchProcessExitedException)
         {

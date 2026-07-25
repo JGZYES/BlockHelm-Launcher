@@ -29,7 +29,7 @@ namespace Launcher.Infrastructure.Accounts;
 
 internal sealed partial class AccountSkinCacheService
 {
-private string CreateSkinPath(string uuid, string contentHash)
+    private string CreateSkinPath(string uuid, string contentHash)
     {
         var accountSkinDirectory = GetAccountSkinDirectory(uuid);
         Directory.CreateDirectory(accountSkinDirectory);
@@ -37,37 +37,55 @@ private string CreateSkinPath(string uuid, string contentHash)
         return Path.Combine(accountSkinDirectory, $"{SkinCacheVersion}-{safeHash}.png");
     }
 
-    private string? GetLatestCachedSkinPath(string uuid)
+    private string CreateLibrarySkinPath(
+        LauncherAccount account,
+        string contentHash,
+        MinecraftSkinModel skinModel)
     {
-        if (string.IsNullOrWhiteSpace(uuid))
-            return null;
+        var libraryDirectory = account.IsThirdParty
+            ? GetLibrarySkinDirectory(account)
+            : GetSharedLibrarySkinDirectory();
+        return CreateLibrarySkinPath(libraryDirectory, contentHash, skinModel);
+    }
 
-        var accountSkinDirectory = GetAccountSkinDirectory(uuid);
-        if (Directory.Exists(accountSkinDirectory))
-        {
-            var accountSkinPath = Directory.EnumerateFiles(accountSkinDirectory, "*.png")
-                .Select(path => new FileInfo(path))
-                .OrderByDescending(file => file.LastWriteTimeUtc)
-                .FirstOrDefault()
-                ?.FullName;
-            if (accountSkinPath is not null)
-                return accountSkinPath;
-        }
+    private string CreateSharedLibrarySkinPath(
+        string contentHash,
+        MinecraftSkinModel skinModel)
+    {
+        return CreateLibrarySkinPath(
+            GetSharedLibrarySkinDirectory(),
+            contentHash,
+            skinModel);
+    }
 
-        if (!Directory.Exists(skinDirectory))
-            return null;
-
-        return Directory.EnumerateFiles(skinDirectory, $"{uuid}-{SkinCacheVersion}-*.png")
-            .Select(path => new FileInfo(path))
-            .OrderByDescending(file => file.LastWriteTimeUtc)
-            .FirstOrDefault()
-            ?.FullName;
+    private static string CreateLibrarySkinPath(
+        string libraryDirectory,
+        string contentHash,
+        MinecraftSkinModel skinModel)
+    {
+        Directory.CreateDirectory(libraryDirectory);
+        var safeHash = contentHash.Length > 24 ? contentHash[..24] : contentHash;
+        return Path.Combine(
+            libraryDirectory,
+            $"{SkinCacheVersion}-{safeHash}-{skinModel.ToString().ToLowerInvariant()}.png");
     }
 
     private string GetAccountSkinDirectory(string uuid)
     {
         return Path.Combine(skinDirectory, SanitizePathSegment(uuid));
     }
+
+    private string GetLibrarySkinDirectory(LauncherAccount account)
+    {
+        if (!account.IsThirdParty)
+            return GetSharedLibrarySkinDirectory();
+
+        var accountKey = account.Uuid ?? account.Id;
+        return GetAccountSkinDirectory(accountKey);
+    }
+
+    private string GetSharedLibrarySkinDirectory() =>
+        Path.Combine(skinDirectory, SharedLibraryDirectoryName);
 
     private static LauncherSkinRecord? FindExisting(
         IReadOnlyList<LauncherSkinRecord> skins,

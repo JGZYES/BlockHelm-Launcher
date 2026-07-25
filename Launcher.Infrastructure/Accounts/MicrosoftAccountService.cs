@@ -46,13 +46,18 @@ public sealed class MicrosoftAccountService : IMicrosoftAccountService
     private readonly ILogger<MicrosoftAccountService> logger;
 
     public MicrosoftAccountService(ILogger<MicrosoftAccountService>? logger = null)
-        : this(new MicrosoftAuthProvider(new LauncherPathProvider()), new LauncherPathProvider(), logger)
+        : this(
+            new MicrosoftAuthProvider(new LauncherPathProvider()),
+            new LauncherPathProvider(),
+            new AccountSkinLibraryService(),
+            logger)
     {
     }
 
     internal MicrosoftAccountService(
         MicrosoftAuthProvider authProvider,
         LauncherPathProvider pathProvider,
+        IAccountSkinLibraryService skinLibraryService,
         ILogger<MicrosoftAccountService>? logger = null)
     {
         this.logger = logger ?? NullLogger<MicrosoftAccountService>.Instance;
@@ -61,7 +66,11 @@ public sealed class MicrosoftAccountService : IMicrosoftAccountService
         skinCacheService = new AccountSkinCacheService(HttpClient, pathProvider);
         capeCacheService = new AccountCapeCacheService(HttpClient, pathProvider);
         profileClient = new MinecraftProfileClient(HttpClient);
-        accountFactory = new MicrosoftAccountFactory(avatarService, skinCacheService);
+        accountFactory = new MicrosoftAccountFactory(
+            avatarService,
+            skinCacheService,
+            skinLibraryService,
+            this.logger);
         skinService = new MinecraftSkinService(authProvider, profileClient, accountFactory, skinCacheService);
         capeService = new MinecraftCapeService(authProvider, profileClient, capeCacheService);
     }

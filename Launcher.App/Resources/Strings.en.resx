@@ -1682,6 +1682,9 @@ Longer content wraps automatically.</value>
   <data name="Status_LaunchPreparingProcess" xml:space="preserve">
     <value>Preparing launch arguments...</value>
   </data>
+  <data name="Status_LaunchPreparingOfflineSkin" xml:space="preserve">
+    <value>Preparing offline skin...</value>
+  </data>
   <data name="Status_LaunchStartingProcess" xml:space="preserve">
     <value>Starting game process...</value>
   </data>
@@ -1711,6 +1714,9 @@ Longer content wraps automatically.</value>
   </data>
   <data name="Status_LaunchFailed" xml:space="preserve">
     <value>Launch failed. Please try again later.</value>
+  </data>
+  <data name="Status_LaunchOfflineSkinUnavailable" xml:space="preserve">
+    <value>The game started, but the offline skin could not be loaded. The default skin will be used this time.</value>
   </data>
   <data name="Status_LaunchInstanceRepairFailed" xml:space="preserve">
     <value>The current instance is missing critical files and cannot be repaired without adding a new version. Reinstall this instance or check the version files.</value>
@@ -2124,7 +2130,7 @@ Longer content wraps automatically.</value>
     <value>Failed to change skin. Please try again later.</value>
   </data>
   <data name="Status_CapeOfflineUnsupported" xml:space="preserve">
-    <value>Only Microsoft accounts can change capes</value>
+    <value>Cape management is not currently supported for offline accounts</value>
   </data>
   <data name="Status_ChangingCape" xml:space="preserve">
     <value>Changing cape...</value>

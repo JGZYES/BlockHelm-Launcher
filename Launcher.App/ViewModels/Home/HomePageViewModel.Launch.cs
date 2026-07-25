@@ -65,6 +65,7 @@ public sealed partial class HomePageViewModel
                 return;
 
             ObserveGameExit(session);
+            ReportLaunchWarnings(session);
 
             if (ShouldMinimizeLauncherAfterLaunch(launchInstance))
                 windowService.Minimize();

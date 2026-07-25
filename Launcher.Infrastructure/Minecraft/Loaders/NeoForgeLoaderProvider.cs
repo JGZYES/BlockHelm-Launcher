@@ -272,12 +272,17 @@ public sealed class NeoForgeLoaderProvider : ILoaderProvider, IStagedLoaderProvi
             var installerPlan = await installerArtifactService.ReadPlanAsync(installerJarPath, cancellationToken)
                 .ConfigureAwait(false);
 
-            var prerequisiteSeeder = new LoaderInstallerPrerequisiteSeeder(logger);
+            var prerequisiteSeeder = new LoaderInstallerPrerequisiteSeeder(
+                httpClient,
+                downloadSpeedLimitState,
+                logger);
             var workspaceSnapshot = await prerequisiteSeeder.SeedAsync(
                 sharedMinecraftDirectory,
                 installerMinecraftDirectory,
                 minecraftVersion,
                 installerJarPath,
+                downloadSourcePreference,
+                downloadSpeedLimitMbPerSecond,
                 cancellationToken).ConfigureAwait(false);
             await installerArtifactService.MaterializePrerequisitesAsync(
                 installerJarPath,

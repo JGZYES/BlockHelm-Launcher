@@ -29,7 +29,7 @@ namespace Launcher.Infrastructure.Accounts;
 
 internal sealed partial class AccountSkinCacheService
 {
-private static LauncherSkinRecord CreateRecord(
+    private static LauncherSkinRecord CreateRecord(
         string contentHash,
         MinecraftSkinModel skinModel,
         string source)
@@ -40,8 +40,17 @@ private static LauncherSkinRecord CreateRecord(
             Source = source,
             SkinModel = skinModel,
             ContentHash = contentHash,
-            AddedAtUtc = DateTimeOffset.UtcNow
+            AddedAtUtc = GetStableAddedAtUtc(source)
         };
+    }
+
+    private static DateTimeOffset GetStableAddedAtUtc(string source)
+    {
+        var sourcePath = ResolveSkinSourcePath(source);
+        if (sourcePath is null || !File.Exists(sourcePath))
+            return DateTimeOffset.UtcNow;
+
+        return new DateTimeOffset(File.GetCreationTimeUtc(sourcePath), TimeSpan.Zero);
     }
 
     private static LauncherSkinRecord CopyRecordWithSource(

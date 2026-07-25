@@ -29,12 +29,13 @@ namespace Launcher.Infrastructure.Accounts;
 
 internal sealed partial class AccountSkinCacheService
 {
-public async Task<LauncherSkinRecord?> GetOrCreateSkinRecordFromUrlAsync(
+    public async Task<LauncherSkinRecord?> GetOrCreateSkinRecordFromUrlAsync(
         string uuid,
         string? skinUrl,
         MinecraftSkinModel skinModel,
         IReadOnlyList<LauncherSkinRecord> existingSkins,
         bool forceRefresh,
+        bool useSharedLibrary,
         CancellationToken cancellationToken)
     {
         // URL 可能变化但内容相同，使用像素内容哈希匹配已有记录而不是只比较地址。
@@ -45,9 +46,14 @@ public async Task<LauncherSkinRecord?> GetOrCreateSkinRecordFromUrlAsync(
         {
             var skinBytes = await httpClient.GetByteArrayAsync(skinUrl, cancellationToken);
             var hash = ComputeSkinContentHash(skinBytes);
-            var skinPath = CreateSkinPath(uuid, hash);
+            var skinPath = useSharedLibrary
+                ? CreateSharedLibrarySkinPath(hash, skinModel)
+                : CreateSkinPath(uuid, hash);
             if (!File.Exists(skinPath) || forceRefresh)
                 await File.WriteAllBytesAsync(skinPath, skinBytes, cancellationToken);
+
+            if (useSharedLibrary)
+                return CreateRecord(hash, skinModel, new Uri(skinPath).AbsoluteUri);
 
             var existing = FindExisting(existingSkins, hash, skinModel);
             return existing is null
@@ -66,15 +72,18 @@ public async Task<LauncherSkinRecord?> GetOrCreateSkinRecordFromUrlAsync(
         MinecraftSkinModel skinModel,
         CancellationToken cancellationToken)
     {
-        // 导入先完整读取和解码，再写账户目录，源文件始终由用户保留。
-        var uuid = account.Uuid ?? account.Id;
+        // 导入先完整读取，再写入共享库；源文件始终由用户保留。
         var skinBytes = await File.ReadAllBytesAsync(skinFilePath, cancellationToken);
         var hash = ComputeSkinContentHash(skinBytes);
-        var skinPath = CreateSkinPath(uuid, hash);
+        var skinPath = CreateLibrarySkinPath(account, hash, skinModel);
         if (!File.Exists(skinPath))
             await File.WriteAllBytesAsync(skinPath, skinBytes, cancellationToken);
 
-        var existing = FindExisting(account.SkinLibrary, hash, skinModel);
+        // 全局素材拥有稳定的内容身份，不复用某个账户的历史 Id；第三方账户仍保留
+        // 其独立皮肤记录身份。
+        var existing = account.IsThirdParty
+            ? FindExisting(account.SkinLibrary, hash, skinModel)
+            : null;
         return existing is null
             ? CreateRecord(hash, skinModel, new Uri(skinPath).AbsoluteUri)
             : CopyRecordWithSource(existing, new Uri(skinPath).AbsoluteUri, hash);
@@ -85,13 +94,9 @@ public async Task<LauncherSkinRecord?> GetOrCreateSkinRecordFromUrlAsync(
         LauncherSkinRecord skin,
         CancellationToken cancellationToken)
     {
-        // 仅删除确认位于账户缓存目录内的文件，外部来源路径绝不能随记录删除。
-        var uuid = account.Uuid ?? account.Id;
-        if (string.IsNullOrWhiteSpace(uuid))
-            return Task.CompletedTask;
-
-        var accountSkinDirectory = Path.GetFullPath(GetAccountSkinDirectory(uuid));
-        if (!Directory.Exists(accountSkinDirectory))
+        // 仅删除确认位于对应皮肤库目录内的文件，外部来源路径绝不删除。
+        var libraryDirectory = Path.GetFullPath(GetLibrarySkinDirectory(account));
+        if (!Directory.Exists(libraryDirectory))
             return Task.CompletedTask;
 
         var candidates = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
@@ -99,13 +104,13 @@ public async Task<LauncherSkinRecord?> GetOrCreateSkinRecordFromUrlAsync(
         if (sourcePath is not null)
         {
             var fullSourcePath = Path.GetFullPath(sourcePath);
-            if (IsPathInDirectory(fullSourcePath, accountSkinDirectory) && File.Exists(fullSourcePath))
+            if (IsPathInDirectory(fullSourcePath, libraryDirectory) && File.Exists(fullSourcePath))
                 candidates.Add(fullSourcePath);
         }
 
         if (!string.IsNullOrWhiteSpace(skin.ContentHash))
         {
-            foreach (var skinPath in Directory.EnumerateFiles(accountSkinDirectory, "*.png"))
+            foreach (var skinPath in Directory.EnumerateFiles(libraryDirectory, "*.png"))
             {
                 cancellationToken.ThrowIfCancellationRequested();
                 try
@@ -113,7 +118,8 @@ public async Task<LauncherSkinRecord?> GetOrCreateSkinRecordFromUrlAsync(
                     if (string.Equals(
                         ComputeSkinContentHash(File.ReadAllBytes(skinPath)),
                         skin.ContentHash,
-                        StringComparison.OrdinalIgnoreCase))
+                        StringComparison.OrdinalIgnoreCase)
+                        && (TryParseSkinModel(skinPath) ?? MinecraftSkinModel.Classic) == skin.SkinModel)
                     {
                         candidates.Add(Path.GetFullPath(skinPath));
                     }

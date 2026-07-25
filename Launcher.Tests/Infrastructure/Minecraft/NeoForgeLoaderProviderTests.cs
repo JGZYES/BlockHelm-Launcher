@@ -19,6 +19,8 @@
 
 using System.IO.Compression;
 using System.Net;
+using System.Security.Cryptography;
+using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using CmlLib.Core;
@@ -83,6 +85,35 @@ public sealed class NeoForgeLoaderProviderTests : TestTempDirectory
             minecraftDirectory,
             "versions",
             "1.20.4-neoforge-20.4.237")));
+    }
+
+    [Fact]
+    public async Task NeoForgeLoaderCanInstallWithOfficialVersionNameWithoutPublishingVanillaJson()
+    {
+        const string versionName = "1.20.4";
+        var minecraftDirectory = Path.Combine(TempRoot, ".minecraft");
+        var provider = CreateProvider(new ScriptedForgeInstallerRunner((gameDirectory, _, _) =>
+            CreateSandboxNeoForgeInstallAsync(
+                gameDirectory,
+                "neoforge-20.4.237",
+                versionName,
+                "20.4.237")));
+
+        var installedName = await provider.InstallAsync(
+            versionName,
+            minecraftDirectory,
+            versionName,
+            "20.4.237",
+            progress: null);
+
+        var jsonPath = Path.Combine(minecraftDirectory, "versions", versionName, $"{versionName}.json");
+        var versionJson = JsonNode.Parse(await File.ReadAllTextAsync(jsonPath))!.AsObject();
+        Assert.Equal(versionName, installedName);
+        Assert.Equal("cpw.mods.modlauncher.Launcher", versionJson["mainClass"]!.GetValue<string>());
+        Assert.Contains(
+            versionJson["libraries"]!.AsArray(),
+            node => node?["name"]?.GetValue<string>() == "net.neoforged:neoforge:20.4.237");
+        Assert.False(versionJson.ContainsKey("inheritsFrom"));
     }
 
     [Fact]
@@ -294,6 +325,8 @@ public sealed class NeoForgeLoaderProviderTests : TestTempDirectory
 
     private sealed class NeoForgeHttpHandler : HttpMessageHandler
     {
+        private const string OfficialVersionJson = """{"id":"1.20.4","type":"release","mainClass":"net.minecraft.client.main.Main"}""";
+
         public List<Uri> RequestUris { get; } = [];
 
         protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
@@ -301,6 +334,18 @@ public sealed class NeoForgeLoaderProviderTests : TestTempDirectory
             RequestUris.Add(request.RequestUri!);
             var uri = request.RequestUri!.AbsoluteUri
                 .Replace("https://bmclapi2.bangbang93.com/maven/", "https://maven.neoforged.net/releases/", StringComparison.OrdinalIgnoreCase);
+            if (uri == "https://piston-meta.mojang.com/mc/game/version_manifest_v2.json")
+            {
+                var sha1 = Convert.ToHexString(SHA1.HashData(Encoding.UTF8.GetBytes(OfficialVersionJson)))
+                    .ToLowerInvariant();
+                return Task.FromResult(CreateTextResponse(
+                    request,
+                    $$"""{"versions":[{"id":"1.20.4","url":"https://piston-meta.mojang.com/v1/packages/test/1.20.4.json","sha1":"{{sha1}}"}]}"""));
+            }
+
+            if (uri == "https://piston-meta.mojang.com/v1/packages/test/1.20.4.json")
+                return Task.FromResult(CreateTextResponse(request, OfficialVersionJson));
+
             if (uri == "https://maven.neoforged.net/releases/net/neoforged/neoforge/maven-metadata.xml")
             {
                 return Task.FromResult(CreateTextResponse(request, """

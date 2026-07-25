@@ -35,6 +35,7 @@ public static class LaunchProgressStages
     public const string CheckingJava = "Launch.CheckingJava";
     public const string DownloadingJava = "Launch.DownloadingJava";
     public const string RunningPreLaunchCommand = "Launch.RunningPreLaunchCommand";
+    public const string PreparingOfflineSkin = "Launch.PreparingOfflineSkin";
     public const string PreparingProcess = "Launch.PreparingProcess";
     public const string StartingProcess = "Launch.StartingProcess";
     public const string CheckingFiles = "Files";

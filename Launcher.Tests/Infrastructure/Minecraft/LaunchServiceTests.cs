@@ -255,6 +255,167 @@ public sealed class LaunchServiceTests : TestTempDirectory
             "logs")));
     }
 
+    [Fact]
+    public async Task OfflineAccountWithoutActiveSkinDoesNotPrepareInjector()
+    {
+        var offlineSkin = new FakeOfflineSkinLaunchService();
+        var authlib = new FakeAuthlibInjectorProvisioningService();
+        var launcher = new FakeLauncherFactory();
+        var service = CreateService(
+            launcher: launcher,
+            authlibInjector: authlib,
+            offlineSkin: offlineSkin);
+
+        var session = await service.LaunchAsync(
+            CreateInstance(CreateSettings().MinecraftDirectory, "No Offline Skin"),
+            CreateAccount(),
+            CreateSettings(),
+            progress: null);
+
+        Assert.Equal(0, offlineSkin.CallCount);
+        Assert.Equal(0, authlib.CallCount);
+        Assert.DoesNotContain(
+            GetJvmArgumentValues(launcher.Launcher.LastOption!),
+            value => value.StartsWith("-javaagent:", StringComparison.Ordinal));
+        Assert.Empty(session.Warnings);
+    }
+
+    [Fact]
+    public async Task OfflineAccountSkinAddsManagedInjectorArgumentsAndTrustedJar()
+    {
+        var injectorPath = Path.Combine(TempRoot, "authlib-injector.jar");
+        var offlineSkin = new FakeOfflineSkinLaunchService
+        {
+            Context = new OfflineSkinLaunchContext(
+                "http://127.0.0.1:32123/",
+                "prefetched-metadata")
+        };
+        var authlib = new FakeAuthlibInjectorProvisioningService
+        {
+            Artifact = new AuthlibInjectorArtifact(injectorPath, "1.2.7", 55)
+        };
+        var launcher = new FakeLauncherFactory();
+        var integrity = new RecordingIntegrityService();
+        var service = CreateService(
+            integrity: integrity,
+            launcher: launcher,
+            authlibInjector: authlib,
+            offlineSkin: offlineSkin);
+        var settings = CreateSettings();
+        var reports = new List<LauncherProgress>();
+
+        var session = await service.LaunchAsync(
+            CreateInstance(settings.MinecraftDirectory, "Offline Skin"),
+            CreateAccountWithSkin(),
+            settings,
+            new InlineProgress(reports));
+
+        Assert.Equal(1, offlineSkin.CallCount);
+        Assert.Equal(1, authlib.CallCount);
+        var arguments = launcher.Launcher.LastOption!.ExtraJvmArguments!
+            .SelectMany(argument => argument.Values)
+            .ToArray();
+        Assert.Contains($"-javaagent:{injectorPath}=http://127.0.0.1:32123/", arguments);
+        Assert.Contains("-Dauthlibinjector.side=client", arguments);
+        Assert.Contains("-Dauthlibinjector.yggdrasil.prefetched=prefetched-metadata", arguments);
+        Assert.Equal("{}", launcher.Launcher.LastOption.UserProperties);
+        Assert.Equal("mojang", launcher.Launcher.LastOption.ArgumentDictionary!["user_type"]);
+        Assert.Contains(
+            Path.GetFullPath(injectorPath),
+            integrity.FinalRequest!.AllowedAdditionalCommandFilePaths);
+        Assert.Contains(reports, report =>
+            report.Stage == LaunchProgressStages.PreparingOfflineSkin);
+        Assert.Empty(session.Warnings);
+    }
+
+    [Fact]
+    public async Task OfflineInjectorFailureContinuesWithoutPartialArguments()
+    {
+        var offlineSkin = new FakeOfflineSkinLaunchService
+        {
+            Context = new OfflineSkinLaunchContext(
+                "http://127.0.0.1:32123/",
+                "prefetched-metadata")
+        };
+        var authlib = new FakeAuthlibInjectorProvisioningService
+        {
+            Exception = new InvalidOperationException("No verified injector.")
+        };
+        var launcher = new FakeLauncherFactory();
+        var service = CreateService(
+            launcher: launcher,
+            authlibInjector: authlib,
+            offlineSkin: offlineSkin);
+        var settings = CreateSettings();
+
+        var session = await service.LaunchAsync(
+            CreateInstance(settings.MinecraftDirectory, "Offline Injector Fallback"),
+            CreateAccountWithSkin(),
+            settings,
+            progress: null);
+
+        Assert.Equal(1, offlineSkin.CallCount);
+        Assert.Equal(1, authlib.CallCount);
+        Assert.DoesNotContain(
+            GetJvmArgumentValues(launcher.Launcher.LastOption!),
+            value => value.StartsWith("-javaagent:", StringComparison.Ordinal)
+                || value.StartsWith("-Dauthlibinjector.", StringComparison.Ordinal));
+        Assert.Equal(
+            LaunchWarningKind.OfflineSkinUnavailable,
+            Assert.Single(session.Warnings));
+    }
+
+    [Fact]
+    public async Task ThirdPartyLaunchKeepsExistingInjectorFlow()
+    {
+        var offlineSkin = new FakeOfflineSkinLaunchService();
+        var authlib = new FakeAuthlibInjectorProvisioningService
+        {
+            Artifact = new AuthlibInjectorArtifact("third-party-authlib.jar", "1.2.7", 55)
+        };
+        var launcher = new FakeLauncherFactory();
+        var thirdPartySession = new LaunchAccountSession(
+            "ThirdPartyPlayer",
+            "third-party-token",
+            "00112233445566778899aabbccddeeff",
+            IsOffline: false,
+            Kind: LauncherAccountKind.ThirdParty,
+            ThirdParty: new ThirdPartyLaunchContext(
+                "https://auth.example.test/api/yggdrasil/",
+                "third-party-prefetched"));
+        var service = CreateService(
+            launcher: launcher,
+            accountSession: new FakeAccountSession(thirdPartySession),
+            authlibInjector: authlib,
+            offlineSkin: offlineSkin);
+        var settings = CreateSettings();
+        var account = new LauncherAccount
+        {
+            Id = "third-party",
+            DisplayName = "ThirdPartyPlayer",
+            Uuid = "00112233-4455-6677-8899-aabbccddeeff",
+            Kind = LauncherAccountKind.ThirdParty
+        };
+
+        var session = await service.LaunchAsync(
+            CreateInstance(settings.MinecraftDirectory, "Third Party"),
+            account,
+            settings,
+            progress: null);
+
+        Assert.Equal(0, offlineSkin.CallCount);
+        Assert.Equal(1, authlib.CallCount);
+        var arguments = GetJvmArgumentValues(launcher.Launcher.LastOption!);
+        Assert.Contains(
+            "-javaagent:third-party-authlib.jar=https://auth.example.test/api/yggdrasil/",
+            arguments);
+        Assert.Contains(
+            "-Dauthlibinjector.yggdrasil.prefetched=third-party-prefetched",
+            arguments);
+        Assert.DoesNotContain("-Dauthlibinjector.side=client", arguments);
+        Assert.Empty(session.Warnings);
+    }
+
     private static LaunchService CreateService(
         FakeRepairService? repair = null,
         FakeLauncherFactory? launcher = null,
@@ -264,6 +425,7 @@ public sealed class LaunchServiceTests : TestTempDirectory
         IJavaRuntimeProvisioningService? javaProvisioning = null,
         ILaunchAccountSessionService? accountSession = null,
         IAuthlibInjectorProvisioningService? authlibInjector = null,
+        IOfflineSkinLaunchService? offlineSkin = null,
         IGameWindowReadinessWaiter? windowReadinessWaiter = null,
         ILaunchProcessTerminator? processTerminator = null)
     {
@@ -280,6 +442,7 @@ public sealed class LaunchServiceTests : TestTempDirectory
                 javaRuntimeSelectionService: javaSelection,
                 javaRuntimeProvisioningService: javaProvisioning,
                 authlibInjectorProvisioningService: authlibInjector,
+                offlineSkinLaunchService: offlineSkin,
                 gameWindowReadinessWaiter: resolvedWindowWaiter,
                 launchProcessTerminator: processTerminator)
             : new LaunchService(
@@ -290,6 +453,7 @@ public sealed class LaunchServiceTests : TestTempDirectory
                 javaRuntimeSelectionService: javaSelection,
                 javaRuntimeProvisioningService: javaProvisioning,
                 authlibInjectorProvisioningService: authlibInjector,
+                offlineSkinLaunchService: offlineSkin,
                 gameWindowReadinessWaiter: resolvedWindowWaiter,
                 launchProcessTerminator: processTerminator);
     }
@@ -317,6 +481,34 @@ public sealed class LaunchServiceTests : TestTempDirectory
         Uuid = "00000000-0000-0000-0000-000000000001",
         Kind = LauncherAccountKind.Offline
     };
+
+    private static LauncherAccount CreateAccountWithSkin()
+    {
+        var skin = new LauncherSkinRecord
+        {
+            Id = "shared-skin",
+            Source = "file:///shared-skin.png",
+            SkinModel = MinecraftSkinModel.Slim,
+            ContentHash = "shared-hash"
+        };
+        return new LauncherAccount
+        {
+            Id = "offline",
+            DisplayName = "Player",
+            Uuid = "00000000-0000-0000-0000-000000000001",
+            Kind = LauncherAccountKind.Offline,
+            SkinSource = skin.Source,
+            SkinModel = skin.SkinModel,
+            SkinLibrary = [skin],
+            ActiveSkinId = skin.Id
+        };
+    }
+
+    private static string[] GetJvmArgumentValues(MLaunchOption option) =>
+        option.ExtraJvmArguments?
+            .SelectMany(argument => argument.Values)
+            .ToArray()
+        ?? [];
 
     private static Process CreateCommandProcess(string arguments) => new()
     {
@@ -438,6 +630,41 @@ public sealed class LaunchServiceTests : TestTempDirectory
             LauncherAccount account,
             CancellationToken cancellationToken = default) =>
             Task.FromException<LaunchAccountSession>(exception);
+    }
+
+    private sealed class FakeOfflineSkinLaunchService : IOfflineSkinLaunchService
+    {
+        public int CallCount { get; private set; }
+        public OfflineSkinLaunchContext? Context { get; init; }
+        public Exception? Exception { get; init; }
+
+        public Task<OfflineSkinLaunchContext?> PrepareAsync(
+            LauncherAccount account,
+            string sessionUuid,
+            CancellationToken cancellationToken = default)
+        {
+            CallCount++;
+            return Exception is null
+                ? Task.FromResult(Context)
+                : Task.FromException<OfflineSkinLaunchContext?>(Exception);
+        }
+    }
+
+    private sealed class FakeAuthlibInjectorProvisioningService : IAuthlibInjectorProvisioningService
+    {
+        public int CallCount { get; private set; }
+        public AuthlibInjectorArtifact Artifact { get; init; } =
+            new("authlib-injector.jar", "1.2.7", 55);
+        public Exception? Exception { get; init; }
+
+        public Task<AuthlibInjectorArtifact> EnsureAvailableAsync(
+            CancellationToken cancellationToken = default)
+        {
+            CallCount++;
+            return Exception is null
+                ? Task.FromResult(Artifact)
+                : Task.FromException<AuthlibInjectorArtifact>(Exception);
+        }
     }
 
     private sealed class InlineProgress(List<LauncherProgress> reports) : IProgress<LauncherProgress>

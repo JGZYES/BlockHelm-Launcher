@@ -21,9 +21,12 @@ namespace Launcher.Domain.Models;
 
 public sealed class LauncherAccountState
 {
+    public const int CurrentSharedSkinLibraryMigrationVersion = 1;
+
     public string OfflineUsername { get; set; } = LauncherDefaults.DefaultOfflineUsername;
     public string? SelectedAccountId { get; set; }
     public bool AccountsInitialized { get; set; }
     public bool MicrosoftAccountsImported { get; set; }
+    public int SharedSkinLibraryMigrationVersion { get; set; }
     public List<LauncherAccountRecord> Accounts { get; set; } = [];
 }

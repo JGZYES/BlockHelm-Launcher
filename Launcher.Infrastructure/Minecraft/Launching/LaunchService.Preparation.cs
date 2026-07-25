@@ -94,6 +94,8 @@ public sealed partial class LaunchService
         var accountSession = await accountSessionService.CreateSessionAsync(account, cancellationToken)
             .ConfigureAwait(false);
         AuthlibInjectorArtifact? authlibInjector = null;
+        OfflineSkinLaunchContext? offlineSkin = null;
+        var warnings = new List<LaunchWarningKind>();
         if (accountSession.ThirdParty is not null)
         {
             if (authlibInjectorProvisioningService is null)
@@ -101,6 +103,45 @@ public sealed partial class LaunchService
             authlibInjector = authlibInjectorProvisioningService is AuthlibInjectorProvisioningService concreteProvisioner
                 ? await concreteProvisioner.EnsureAvailableAsync(progress, cancellationToken).ConfigureAwait(false)
                 : await authlibInjectorProvisioningService.EnsureAvailableAsync(cancellationToken).ConfigureAwait(false);
+        }
+        else if (accountSession.IsOffline
+            && (!string.IsNullOrWhiteSpace(account.SkinSource)
+                || !string.IsNullOrWhiteSpace(account.ActiveSkinId)))
+        {
+            progress?.Report(new LauncherProgress(
+                LaunchProgressStages.PreparingOfflineSkin,
+                string.Empty,
+                88));
+            try
+            {
+                if (offlineSkinLaunchService is null)
+                    throw new InvalidOperationException("The offline skin launch service is unavailable.");
+                offlineSkin = await offlineSkinLaunchService.PrepareAsync(
+                    account,
+                    accountSession.Uuid,
+                    cancellationToken).ConfigureAwait(false)
+                    ?? throw new InvalidOperationException("The active offline skin could not be prepared.");
+                if (authlibInjectorProvisioningService is null)
+                    throw new InvalidOperationException("The authlib-injector provisioning service is unavailable.");
+                authlibInjector = authlibInjectorProvisioningService is AuthlibInjectorProvisioningService concreteProvisioner
+                    ? await concreteProvisioner.EnsureAvailableAsync(progress, cancellationToken).ConfigureAwait(false)
+                    : await authlibInjectorProvisioningService.EnsureAvailableAsync(cancellationToken).ConfigureAwait(false);
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                throw;
+            }
+            catch (Exception exception)
+            {
+                offlineSkin = null;
+                authlibInjector = null;
+                warnings.Add(LaunchWarningKind.OfflineSkinUnavailable);
+                logger.LogWarning(
+                    exception,
+                    "Offline skin preparation failed; continuing with the default game skin. AccountId={AccountId} InstanceId={InstanceId}",
+                    account.Id,
+                    instance.Id);
+            }
         }
         await ApplyGameLanguageAsync(instance, settings, cancellationToken).ConfigureAwait(false);
         var javaRuntime = await ResolveJavaRuntimeForLaunchAsync(
@@ -132,7 +173,13 @@ public sealed partial class LaunchService
             LaunchProgressStages.PreparingProcess,
             "Preparing launch process",
             94));
-        return new PreparedLaunchRuntime(accountSession, authlibInjector, javaRuntime, diagnosticContext);
+        return new PreparedLaunchRuntime(
+            accountSession,
+            authlibInjector,
+            offlineSkin,
+            javaRuntime,
+            diagnosticContext,
+            warnings);
     }
 
     /// <summary>
@@ -173,6 +220,20 @@ public sealed partial class LaunchService
                 $"-javaagent:{injector.FilePath}={thirdParty.AuthenticationServerUrl}"));
             extraJvmArguments.Add(new MArgument(
                 $"-Dauthlibinjector.yggdrasil.prefetched={thirdParty.PrefetchedMetadata}"));
+            launchOption.UserProperties = "{}";
+            launchOption.ArgumentDictionary = new Dictionary<string, string>(StringComparer.Ordinal)
+            {
+                ["user_type"] = "mojang"
+            };
+        }
+        else if (preparedRuntime.OfflineSkin is { } offlineSkin
+            && preparedRuntime.AuthlibInjector is { } offlineInjector)
+        {
+            extraJvmArguments.Add(new MArgument(
+                $"-javaagent:{offlineInjector.FilePath}={offlineSkin.AuthenticationServerUrl}"));
+            extraJvmArguments.Add(new MArgument("-Dauthlibinjector.side=client"));
+            extraJvmArguments.Add(new MArgument(
+                $"-Dauthlibinjector.yggdrasil.prefetched={offlineSkin.PrefetchedMetadata}"));
             launchOption.UserProperties = "{}";
             launchOption.ArgumentDictionary = new Dictionary<string, string>(StringComparer.Ordinal)
             {

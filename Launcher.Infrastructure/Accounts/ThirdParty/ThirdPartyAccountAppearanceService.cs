@@ -107,6 +107,7 @@ internal sealed class ThirdPartyAccountAppearanceService : IThirdPartyAccountApp
                     skinTexture.Model,
                     [],
                     forceRefresh: true,
+                    useSharedLibrary: false,
                     cancellationToken).ConfigureAwait(false);
                 avatarSource = await avatarService.GetOrCreateAvatarSourceAsync(
                     accountId,

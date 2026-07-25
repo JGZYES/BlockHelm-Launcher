@@ -82,7 +82,7 @@ internal sealed class AccountAvatarService
         try
         {
             var avatarPath = CreateAvatarPath(uuid);
-            var skinBytes = await httpClient.GetByteArrayAsync(skinUrl, cancellationToken);
+            var skinBytes = await ReadSkinBytesAsync(skinUrl, cancellationToken);
             var skin = LoadBitmap(skinBytes);
             var avatar = CreateAvatarBitmap(skin);
             SavePng(avatar, avatarPath);
@@ -96,6 +96,19 @@ internal sealed class AccountAvatarService
 
             return useRemoteFallback ? GetFallbackAvatarSource(uuid, forceRefresh) : null;
         }
+    }
+
+    private async Task<byte[]> ReadSkinBytesAsync(
+        string skinSource,
+        CancellationToken cancellationToken)
+    {
+        if (Uri.TryCreate(skinSource, UriKind.Absolute, out var uri) && uri.IsFile)
+            return await File.ReadAllBytesAsync(uri.LocalPath, cancellationToken);
+
+        if (File.Exists(skinSource))
+            return await File.ReadAllBytesAsync(skinSource, cancellationToken);
+
+        return await httpClient.GetByteArrayAsync(skinSource, cancellationToken);
     }
 
     public void DeleteAvatar(string uuid)
