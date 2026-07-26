@@ -30,6 +30,8 @@ public static class Strings
     private static string Get(string name, CultureInfo culture) => ResourceManager.GetString(name, culture) ?? name;
 
     public static string App_Title => Get(nameof(App_Title));
+    public static string MicrosoftLogin_BrowserCompletionHeading => Get(nameof(MicrosoftLogin_BrowserCompletionHeading));
+    public static string MicrosoftLogin_BrowserCompletionMessageFormat => Get(nameof(MicrosoftLogin_BrowserCompletionMessageFormat));
     public static string Menu_Button => Get(nameof(Menu_Button));
     public static string Search_Placeholder => Get(nameof(Search_Placeholder));
     public static string Back_Button => Get(nameof(Back_Button));

@@ -40,6 +40,7 @@ internal sealed class MicrosoftAuthProvider
 {
     private readonly DpapiMicrosoftJsonStorage credentialStorage;
     private readonly MicrosoftClientIdProvider clientIdProvider;
+    private readonly IMicrosoftLoginBrowserPageProvider? browserPageProvider;
     private readonly SemaphoreSlim loginHandlerGate = new(1, 1);
     private readonly Lazy<Task<IPublicClientApplication>> msalApplication;
     private JsonXboxGameAccountManager accountManager;
@@ -52,10 +53,12 @@ internal sealed class MicrosoftAuthProvider
 
     internal MicrosoftAuthProvider(
         LauncherPathProvider pathProvider,
-        MicrosoftClientIdProvider clientIdProvider)
+        MicrosoftClientIdProvider clientIdProvider,
+        IMicrosoftLoginBrowserPageProvider? browserPageProvider = null)
     {
         credentialStorage = new DpapiMicrosoftJsonStorage(pathProvider);
         this.clientIdProvider = clientIdProvider;
+        this.browserPageProvider = browserPageProvider;
         accountManager = CreatePersistentAccountManager();
         msalApplication = new Lazy<Task<IPublicClientApplication>>(
             async () =>
@@ -256,7 +259,7 @@ internal sealed class MicrosoftAuthProvider
                 return loginHandler;
 
             var app = await msalApplication.Value.WaitAsync(cancellationToken);
-            loginHandler = CreateLoginHandler(accountManager, app);
+            loginHandler = CreateLoginHandler(accountManager, app, browserPageProvider);
             return loginHandler;
         }
         finally
@@ -270,7 +273,7 @@ internal sealed class MicrosoftAuthProvider
     {
         var app = await msalApplication.Value.WaitAsync(cancellationToken);
         var accountManager = new InMemoryXboxGameAccountManager(JEGameAccount.FromSessionStorage);
-        var handler = CreateLoginHandler(accountManager, app);
+        var handler = CreateLoginHandler(accountManager, app, browserPageProvider);
         var account = (JEGameAccount)accountManager.NewAccount();
         var session = await handler.AuthenticateInteractively(account, cancellationToken);
         return (account, session);
@@ -336,14 +339,19 @@ internal sealed class MicrosoftAuthProvider
 
     internal static JELoginHandler CreateLoginHandler(
         IXboxGameAccountManager accountManager,
-        IPublicClientApplication msalApplication)
+        IPublicClientApplication msalApplication,
+        IMicrosoftLoginBrowserPageProvider? browserPageProvider = null)
     {
         ArgumentNullException.ThrowIfNull(accountManager);
         ArgumentNullException.ThrowIfNull(msalApplication);
 
+        XboxAuthNet.Game.IAuthenticationProvider oauthProvider = browserPageProvider is null
+            ? new MsalCodeFlowProvider(msalApplication)
+            : new BrowserCompletionMsalCodeFlowProvider(msalApplication, browserPageProvider);
+
         return new JELoginHandlerBuilder()
             .WithAccountManager(accountManager)
-            .WithOAuthProvider(new MsalCodeFlowProvider(msalApplication))
+            .WithOAuthProvider(oauthProvider)
             .Build();
     }
 

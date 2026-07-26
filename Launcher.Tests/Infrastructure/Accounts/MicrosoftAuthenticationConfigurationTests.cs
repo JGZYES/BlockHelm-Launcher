@@ -64,6 +64,28 @@ public sealed class MicrosoftAuthenticationConfigurationTests
     }
 
     [Fact]
+    public void LoginHandlerUsesLocalizedBrowserCompletionProviderWhenAvailable()
+    {
+        var accountManager = new InMemoryXboxGameAccountManager(JEGameAccount.FromSessionStorage);
+        var msalApplication = PublicClientApplicationBuilder.Create(ClientId).Build();
+        var pageProvider = new StubBrowserPageProvider("<html><body>Complete</body></html>");
+
+        var handler = MicrosoftAuthProvider.CreateLoginHandler(
+            accountManager,
+            msalApplication,
+            pageProvider);
+
+        var providerField = typeof(JELoginHandler).GetField(
+            "_defaultOAuthProvider",
+            BindingFlags.Instance | BindingFlags.NonPublic);
+        var provider = Assert.IsType<BrowserCompletionMsalCodeFlowProvider>(
+            providerField?.GetValue(handler));
+        Assert.Equal(
+            "<html><body>Complete</body></html>",
+            provider.CreateSystemWebViewOptions().HtmlMessageSuccess);
+    }
+
+    [Fact]
     public void ClientIdentityMigrationRemovesLegacyTokensButPreservesAccountProfile()
     {
         var directory = Path.Combine(
@@ -157,5 +179,10 @@ public sealed class MicrosoftAuthenticationConfigurationTests
         Assert.Equal(
             LaunchAccountSessionFailureReason.ReauthenticationRequired,
             result.Reason);
+    }
+
+    private sealed class StubBrowserPageProvider(string html) : IMicrosoftLoginBrowserPageProvider
+    {
+        public string GetAuthorizationCompletedHtml() => html;
     }
 }

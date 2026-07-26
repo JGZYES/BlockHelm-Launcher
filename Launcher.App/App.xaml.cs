@@ -19,6 +19,7 @@
 
 using System.Globalization;
 using System.Windows;
+using Launcher.Application.Accounts;
 using Launcher.Application.DependencyInjection;
 using Launcher.Application.Services;
 using Launcher.App.Logging;
@@ -113,6 +114,7 @@ public partial class App : System.Windows.Application
             services.AddSingleton<IExternalLinkService, ExternalLinkService>();
             services.AddSingleton<IApplicationExitService, ApplicationExitService>();
             services.AddSingleton<IInfoReferenceProjectCatalog, EmbeddedInfoReferenceProjectCatalog>();
+            services.AddSingleton<IMicrosoftLoginBrowserPageProvider, MicrosoftLoginBrowserPageProvider>();
             services.AddSingleton<IAccountDialogService, AccountDialogService>();
             services.AddSingleton<IUiDispatcher, WpfUiDispatcher>();
             services.AddSingleton<IThemeService, ThemeService>();
