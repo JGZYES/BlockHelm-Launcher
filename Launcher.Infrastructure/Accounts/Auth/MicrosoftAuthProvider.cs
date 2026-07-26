@@ -23,6 +23,8 @@ using Launcher.Infrastructure.Accounts.Credentials;
 using Launcher.Application.Accounts;
 using Launcher.Infrastructure;
 using Microsoft.Identity.Client;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 using System.IO;
 using System.Net;
 using System.Net.Http;
@@ -38,9 +40,23 @@ namespace Launcher.Infrastructure.Accounts;
 
 internal sealed class MicrosoftAuthProvider
 {
+    private const string MsalHomeAccountIdSessionKey = "BlockHelmMsalHomeAccountId";
+    private const string MsalLoginHintSessionKey = "MicrosoftOAuthLoginHint";
+    private static readonly TimeSpan MsalRollbackTimeout = TimeSpan.FromSeconds(5);
+    internal static readonly TimeSpan DefaultInteractiveAuthenticationTimeout =
+        TimeSpan.FromMinutes(10);
+
+    private static readonly HttpClient EntitlementHttpClient = new()
+    {
+        Timeout = TimeSpan.FromSeconds(30)
+    };
+
     private readonly DpapiMicrosoftJsonStorage credentialStorage;
     private readonly MicrosoftClientIdProvider clientIdProvider;
     private readonly IMicrosoftLoginBrowserPageProvider? browserPageProvider;
+    private readonly IMinecraftJavaEntitlementVerifier entitlementVerifier;
+    private readonly ILogger<MicrosoftAuthProvider> logger;
+    private readonly TimeSpan interactiveAuthenticationTimeout;
     private readonly SemaphoreSlim loginHandlerGate = new(1, 1);
     private readonly Lazy<Task<IPublicClientApplication>> msalApplication;
     private JsonXboxGameAccountManager accountManager;
@@ -54,11 +70,21 @@ internal sealed class MicrosoftAuthProvider
     internal MicrosoftAuthProvider(
         LauncherPathProvider pathProvider,
         MicrosoftClientIdProvider clientIdProvider,
-        IMicrosoftLoginBrowserPageProvider? browserPageProvider = null)
+        IMicrosoftLoginBrowserPageProvider? browserPageProvider = null,
+        IMinecraftJavaEntitlementVerifier? entitlementVerifier = null,
+        ILogger<MicrosoftAuthProvider>? logger = null,
+        TimeSpan? interactiveAuthenticationTimeout = null)
     {
         credentialStorage = new DpapiMicrosoftJsonStorage(pathProvider);
         this.clientIdProvider = clientIdProvider;
         this.browserPageProvider = browserPageProvider;
+        this.entitlementVerifier = entitlementVerifier
+            ?? new MinecraftJavaEntitlementVerifier(EntitlementHttpClient);
+        this.logger = logger ?? NullLogger<MicrosoftAuthProvider>.Instance;
+        this.interactiveAuthenticationTimeout =
+            interactiveAuthenticationTimeout ?? DefaultInteractiveAuthenticationTimeout;
+        if (this.interactiveAuthenticationTimeout <= TimeSpan.Zero)
+            throw new ArgumentOutOfRangeException(nameof(interactiveAuthenticationTimeout));
         accountManager = CreatePersistentAccountManager();
         msalApplication = new Lazy<Task<IPublicClientApplication>>(
             async () =>
@@ -82,14 +108,26 @@ internal sealed class MicrosoftAuthProvider
 
     public async Task<MicrosoftLoginResult> LoginInteractivelyAsync(CancellationToken cancellationToken)
     {
+        InteractiveAuthentication? authentication = null;
+        var committed = false;
         try
         {
-            var (account, session) = await AuthenticateInMemoryAsync(cancellationToken);
-            CommitSession(account.SessionStorage);
-            var refreshedAccount = JEGameAccount.FromSessionStorage(account.SessionStorage);
+            authentication = await AuthenticateInMemoryAsync(cancellationToken);
+            var refreshedAccount = JEGameAccount.FromSessionStorage(
+                authentication.Account.SessionStorage);
             var profile = refreshedAccount.Profile;
             var accessToken = refreshedAccount.Token?.AccessToken;
-            return new MicrosoftLoginResult(profile, session.Username, session.UUID, accessToken);
+            await entitlementVerifier.EnsureOwnedAsync(
+                accessToken ?? string.Empty,
+                cancellationToken);
+            await CaptureMsalAccountIdentityAsync(authentication, cancellationToken);
+            CommitSession(authentication.Account.SessionStorage);
+            committed = true;
+            return new MicrosoftLoginResult(
+                profile,
+                authentication.Session.Username,
+                authentication.Session.UUID,
+                accessToken);
         }
         catch (OperationCanceledException)
         {
@@ -103,18 +141,30 @@ internal sealed class MicrosoftAuthProvider
         {
             throw TranslateAuthenticationException(exception);
         }
+        finally
+        {
+            if (!committed && authentication is not null)
+                await TryRemoveNewMsalAccountsAsync(authentication);
+        }
     }
 
     public async Task<MicrosoftLoginResult> ReauthenticateInteractivelyAsync(
         LauncherAccount existingAccount,
         CancellationToken cancellationToken)
     {
+        InteractiveAuthentication? authentication = null;
+        var committed = false;
         try
         {
-            var (account, session) = await AuthenticateInMemoryAsync(cancellationToken);
-            var refreshedAccount = JEGameAccount.FromSessionStorage(account.SessionStorage);
+            authentication = await AuthenticateInMemoryAsync(cancellationToken);
+            var refreshedAccount = JEGameAccount.FromSessionStorage(
+                authentication.Account.SessionStorage);
+            var accessToken = refreshedAccount.Token?.AccessToken;
+            await entitlementVerifier.EnsureOwnedAsync(
+                accessToken ?? string.Empty,
+                cancellationToken);
             var refreshedUuid = MinecraftAccountHelpers.NormalizeUuid(
-                refreshedAccount.Profile?.UUID ?? session.UUID);
+                refreshedAccount.Profile?.UUID ?? authentication.Session.UUID);
             if (string.IsNullOrWhiteSpace(existingAccount.Uuid)
                 || !string.Equals(refreshedUuid, existingAccount.Uuid, StringComparison.OrdinalIgnoreCase))
             {
@@ -123,12 +173,14 @@ internal sealed class MicrosoftAuthProvider
                     "The signed-in Microsoft account does not match the selected launcher account.");
             }
 
-            CommitSession(account.SessionStorage);
+            await CaptureMsalAccountIdentityAsync(authentication, cancellationToken);
+            CommitSession(authentication.Account.SessionStorage);
+            committed = true;
             return new MicrosoftLoginResult(
                 refreshedAccount.Profile,
-                session.Username,
-                session.UUID,
-                refreshedAccount.Token?.AccessToken);
+                authentication.Session.Username,
+                authentication.Session.UUID,
+                accessToken);
         }
         catch (OperationCanceledException)
         {
@@ -141,6 +193,11 @@ internal sealed class MicrosoftAuthProvider
         catch (Exception exception)
         {
             throw TranslateAuthenticationException(exception);
+        }
+        finally
+        {
+            if (!committed && authentication is not null)
+                await TryRemoveNewMsalAccountsAsync(authentication);
         }
     }
 
@@ -156,6 +213,18 @@ internal sealed class MicrosoftAuthProvider
             if (!string.Equals(savedUuid, account.Uuid, StringComparison.OrdinalIgnoreCase))
                 continue;
 
+            var homeAccountId = TryGetSessionString(
+                savedAccount.SessionStorage,
+                MsalHomeAccountIdSessionKey);
+            var loginHint = TryGetSessionString(
+                savedAccount.SessionStorage,
+                MsalLoginHintSessionKey);
+            var app = await msalApplication.Value.WaitAsync(cancellationToken);
+            await RemoveMatchingMsalAccountsAsync(
+                app,
+                homeAccountId,
+                loginHint,
+                cancellationToken);
             await handler.Signout(savedAccount, cancellationToken);
             handler.AccountManager.SaveAccounts();
             return true;
@@ -181,7 +250,6 @@ internal sealed class MicrosoftAuthProvider
             }
 
             await handler.AuthenticateSilently(savedAccount, cancellationToken);
-            handler.AccountManager.SaveAccounts();
 
             var refreshedAccount = JEGameAccount.FromSessionStorage(savedAccount.SessionStorage);
             var accessToken = refreshedAccount.Token?.AccessToken ?? savedAccount.Token?.AccessToken;
@@ -192,6 +260,8 @@ internal sealed class MicrosoftAuthProvider
                     "Microsoft account access token is missing.");
             }
 
+            await entitlementVerifier.EnsureOwnedAsync(accessToken, cancellationToken);
+            handler.AccountManager.SaveAccounts();
             return accessToken;
         }
         catch (OperationCanceledException)
@@ -268,15 +338,158 @@ internal sealed class MicrosoftAuthProvider
         }
     }
 
-    private async Task<(JEGameAccount Account, CmlLib.Core.Auth.MSession Session)> AuthenticateInMemoryAsync(
+    private async Task<InteractiveAuthentication> AuthenticateInMemoryAsync(
         CancellationToken cancellationToken)
     {
-        var app = await msalApplication.Value.WaitAsync(cancellationToken);
-        var accountManager = new InMemoryXboxGameAccountManager(JEGameAccount.FromSessionStorage);
-        var handler = CreateLoginHandler(accountManager, app, browserPageProvider);
-        var account = (JEGameAccount)accountManager.NewAccount();
-        var session = await handler.AuthenticateInteractively(account, cancellationToken);
-        return (account, session);
+        using var timeoutSource = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        timeoutSource.CancelAfter(interactiveAuthenticationTimeout);
+        var authenticationToken = timeoutSource.Token;
+        IPublicClientApplication? app = null;
+        IReadOnlySet<string> initialAccountKeys = new HashSet<string>(StringComparer.Ordinal);
+        try
+        {
+            app = await msalApplication.Value.WaitAsync(authenticationToken);
+            initialAccountKeys = (await app.GetAccountsAsync().WaitAsync(authenticationToken))
+                .Select(GetMsalAccountKey)
+                .Where(key => !string.IsNullOrWhiteSpace(key))
+                .ToHashSet(StringComparer.Ordinal);
+            var accountManager = new InMemoryXboxGameAccountManager(JEGameAccount.FromSessionStorage);
+            var handler = CreateLoginHandler(accountManager, app, browserPageProvider);
+            var account = (JEGameAccount)accountManager.NewAccount();
+            var session = await handler.AuthenticateInteractively(account, authenticationToken);
+            return new InteractiveAuthentication(account, session, app, initialAccountKeys);
+        }
+        catch (Exception exception)
+        {
+            if (app is not null)
+                await TryRemoveNewMsalAccountsAsync(app, initialAccountKeys);
+            if (exception is OperationCanceledException
+                && !cancellationToken.IsCancellationRequested
+                && timeoutSource.IsCancellationRequested)
+            {
+                throw new MicrosoftInteractiveAuthenticationTimeoutException(
+                    "Interactive Microsoft authentication timed out.",
+                    exception);
+            }
+
+            throw;
+        }
+    }
+
+    private async Task CaptureMsalAccountIdentityAsync(
+        InteractiveAuthentication authentication,
+        CancellationToken cancellationToken)
+    {
+        var accounts = (await authentication.MsalApplication
+                .GetAccountsAsync()
+                .WaitAsync(cancellationToken))
+            .ToArray();
+        var loginHint = TryGetSessionString(
+            authentication.Account.SessionStorage,
+            MsalLoginHintSessionKey);
+        var matchingAccount = accounts.FirstOrDefault(account =>
+                !string.IsNullOrWhiteSpace(loginHint)
+                && string.Equals(account.Username, loginHint, StringComparison.OrdinalIgnoreCase))
+            ?? accounts.FirstOrDefault(account =>
+                !authentication.InitialMsalAccountKeys.Contains(GetMsalAccountKey(account)));
+        var homeAccountId = matchingAccount?.HomeAccountId?.Identifier;
+        if (!string.IsNullOrWhiteSpace(homeAccountId))
+            authentication.Account.SessionStorage.Set(MsalHomeAccountIdSessionKey, homeAccountId);
+    }
+
+    private async Task RemoveMatchingMsalAccountsAsync(
+        IPublicClientApplication app,
+        string? homeAccountId,
+        string? loginHint,
+        CancellationToken cancellationToken)
+    {
+        var accounts = (await app.GetAccountsAsync().WaitAsync(cancellationToken))
+            .Where(account => IsMatchingMsalAccount(
+                account.HomeAccountId?.Identifier,
+                account.Username,
+                homeAccountId,
+                loginHint))
+            .ToArray();
+
+        foreach (var account in accounts)
+            await app.RemoveAsync(account).WaitAsync(cancellationToken);
+
+        if (accounts.Length == 0
+            && (!string.IsNullOrWhiteSpace(homeAccountId)
+                || !string.IsNullOrWhiteSpace(loginHint)))
+        {
+            logger.LogDebug("No matching MSAL token-cache account remained during account deletion.");
+        }
+    }
+
+    private Task TryRemoveNewMsalAccountsAsync(InteractiveAuthentication authentication)
+    {
+        return TryRemoveNewMsalAccountsAsync(
+            authentication.MsalApplication,
+            authentication.InitialMsalAccountKeys);
+    }
+
+    private async Task TryRemoveNewMsalAccountsAsync(
+        IPublicClientApplication app,
+        IReadOnlySet<string> initialAccountKeys)
+    {
+        try
+        {
+            using var rollbackTimeout = new CancellationTokenSource(MsalRollbackTimeout);
+            var accounts = await app.GetAccountsAsync().WaitAsync(rollbackTimeout.Token);
+            foreach (var account in accounts)
+            {
+                var key = GetMsalAccountKey(account);
+                if (!string.IsNullOrWhiteSpace(key) && !initialAccountKeys.Contains(key))
+                    await app.RemoveAsync(account).WaitAsync(rollbackTimeout.Token);
+            }
+        }
+        catch (Exception exception)
+        {
+            logger.LogWarning(
+                exception,
+                "Could not roll back the MSAL token-cache account created by a failed interactive login.");
+        }
+    }
+
+    private static string GetMsalAccountKey(IAccount account)
+    {
+        return account.HomeAccountId?.Identifier
+            ?? account.Username
+            ?? string.Empty;
+    }
+
+    internal static bool IsMatchingMsalAccount(
+        string? candidateHomeAccountId,
+        string? candidateUsername,
+        string? storedHomeAccountId,
+        string? storedLoginHint)
+    {
+        if (!string.IsNullOrWhiteSpace(storedHomeAccountId))
+        {
+            return string.Equals(
+                candidateHomeAccountId,
+                storedHomeAccountId,
+                StringComparison.Ordinal);
+        }
+
+        return !string.IsNullOrWhiteSpace(storedLoginHint)
+            && string.Equals(
+                candidateUsername,
+                storedLoginHint,
+                StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static string? TryGetSessionString(ISessionStorage storage, string key)
+    {
+        try
+        {
+            return storage.Get<string>(key);
+        }
+        catch
+        {
+            return null;
+        }
     }
 
     private void CommitSession(ISessionStorage source)
@@ -367,6 +580,10 @@ internal sealed class MicrosoftAuthProvider
                 LaunchAccountSessionFailureReason.CredentialStorageFailed,
                 "Microsoft account credentials could not be accessed.",
                 exception),
+            MicrosoftInteractiveAuthenticationTimeoutException => new MicrosoftAccountAuthenticationException(
+                LaunchAccountSessionFailureReason.AuthenticationTimedOut,
+                "Interactive Microsoft authentication timed out.",
+                exception),
             MsalUiRequiredException => new MicrosoftAccountAuthenticationException(
                 LaunchAccountSessionFailureReason.ReauthenticationRequired,
                 "Interactive Microsoft authentication is required.",
@@ -432,4 +649,10 @@ internal sealed class MicrosoftAuthProvider
                 exception)
         };
     }
+
+    private sealed record InteractiveAuthentication(
+        JEGameAccount Account,
+        CmlLib.Core.Auth.MSession Session,
+        IPublicClientApplication MsalApplication,
+        IReadOnlySet<string> InitialMsalAccountKeys);
 }

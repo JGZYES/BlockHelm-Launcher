@@ -88,6 +88,8 @@ public sealed partial class HomePageViewModel
                     => Strings.Status_MicrosoftLoginNotConfigured,
                 LaunchAccountSessionFailureReason.AuthenticationApplicationNotAuthorized
                     => Strings.Status_MicrosoftApplicationNotAuthorized,
+                LaunchAccountSessionFailureReason.GameOwnershipRequired
+                    => Strings.Status_MinecraftJavaOwnershipRequired,
                 LaunchAccountSessionFailureReason.AuthenticationServerUnavailable
                     => Strings.Status_MicrosoftAuthenticationServerUnavailable,
                 LaunchAccountSessionFailureReason.CredentialStorageFailed

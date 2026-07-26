@@ -38,9 +38,14 @@ public sealed partial class AccountDialogViewModel
             return false;
 
         BeginMicrosoftAccountReauthentication();
+        var authenticationCancellation =
+            microsoftAuthenticationCancellationTokenSource
+            ?? BeginMicrosoftAuthenticationCancellation();
         try
         {
-            var refreshed = await microsoftAccountService.ReauthenticateInteractivelyAsync(account);
+            var refreshed = await microsoftAccountService.ReauthenticateInteractivelyAsync(
+                account,
+                authenticationCancellation.Token);
             await accountList.ReplaceSelectedAccountAndPersistAsync(account, refreshed);
             AccountPendingMicrosoftReauthentication = refreshed;
             ReportStatus(Strings.Status_MicrosoftReauthenticationSuccessful);
@@ -63,6 +68,9 @@ public sealed partial class AccountDialogViewModel
             {
                 MicrosoftAccountReauthenticationFailureReason.NotConfigured => Strings.Status_MicrosoftLoginNotConfigured,
                 MicrosoftAccountReauthenticationFailureReason.ApplicationNotAuthorized => Strings.Status_MicrosoftApplicationNotAuthorized,
+                MicrosoftAccountReauthenticationFailureReason.TimedOut => Strings.Status_MicrosoftAuthenticationTimedOut,
+                MicrosoftAccountReauthenticationFailureReason.GameOwnershipRequired => Strings.Status_MinecraftJavaOwnershipRequired,
+                MicrosoftAccountReauthenticationFailureReason.AuthenticationServerUnavailable => Strings.Status_MicrosoftAuthenticationServerUnavailable,
                 MicrosoftAccountReauthenticationFailureReason.AccountMismatch => Strings.Status_MicrosoftReauthenticationAccountMismatch,
                 MicrosoftAccountReauthenticationFailureReason.CredentialStorageFailed => Strings.Status_MicrosoftCredentialStorageFailed,
                 _ => Strings.Status_LoginFailed
@@ -81,6 +89,7 @@ public sealed partial class AccountDialogViewModel
         }
         finally
         {
+            CompleteMicrosoftAuthenticationCancellation(authenticationCancellation);
             IsAddAccountDialogBusy = false;
         }
     }

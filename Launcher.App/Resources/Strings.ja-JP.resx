@@ -3490,6 +3490,8 @@
   <data name="Status_MicrosoftLoginNotConfigured" xml:space="preserve"><value>このビルドには BlockHelm Launcher の Microsoft アプリ ID が設定されていないため、Microsoft ログインを利用できません。</value></data>
   <data name="Status_MicrosoftApplicationNotAuthorized" xml:space="preserve"><value>BlockHelm Launcher はまだ Minecraft のログインサービスで承認されていません。しばらくしてから再試行してください。</value></data>
   <data name="Status_MicrosoftAuthenticationServerUnavailable" xml:space="preserve"><value>Microsoft ログインサービスは一時的に利用できません。しばらくしてから再試行してください。</value></data>
+  <data name="Status_MicrosoftAuthenticationTimedOut" xml:space="preserve"><value>Microsoft ログインがタイムアウトしました。もう一度お試しください。</value></data>
+  <data name="Status_MinecraftJavaOwnershipRequired" xml:space="preserve"><value>この Microsoft アカウントは Minecraft: Java Edition を所有していないため、正規アカウントとして追加できません。</value></data>
   <data name="SelectAll_Button" xml:space="preserve"><value>すべて選択</value></data><data name="Retry_Button" xml:space="preserve"><value>再試行</value></data>
   <data name="Dialog_ThirdPartyProfileSelectionTitle" xml:space="preserve"><value>プロフィールを選択</value></data><data name="Dialog_ThirdPartyProfileSelectionSubtitle" xml:space="preserve"><value>インポートするプロフィールを1つ以上選択してください。</value></data>
   <data name="Dialog_ThirdPartyImportProgressTitle" xml:space="preserve"><value>プロフィールをインポート中</value></data><data name="Dialog_ThirdPartyImportProgressSubtitle" xml:space="preserve"><value>プロフィールとログイン情報を保存しています。</value></data>

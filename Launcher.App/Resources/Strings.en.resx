@@ -3490,6 +3490,8 @@ The current game folder will be backed up first.</value>
   <data name="Status_MicrosoftLoginNotConfigured" xml:space="preserve"><value>This build does not include the BlockHelm Launcher Microsoft application identity, so Microsoft sign-in is unavailable.</value></data>
   <data name="Status_MicrosoftApplicationNotAuthorized" xml:space="preserve"><value>BlockHelm Launcher has not been authorized by Minecraft sign-in services yet. Please try again later.</value></data>
   <data name="Status_MicrosoftAuthenticationServerUnavailable" xml:space="preserve"><value>Microsoft sign-in services are temporarily unavailable. Please try again later.</value></data>
+  <data name="Status_MicrosoftAuthenticationTimedOut" xml:space="preserve"><value>Microsoft sign-in timed out. Please try again.</value></data>
+  <data name="Status_MinecraftJavaOwnershipRequired" xml:space="preserve"><value>This Microsoft account does not own Minecraft: Java Edition and cannot be added as a licensed account.</value></data>
   <data name="SelectAll_Button" xml:space="preserve"><value>Select all</value></data><data name="Retry_Button" xml:space="preserve"><value>Retry</value></data>
   <data name="Dialog_ThirdPartyProfileSelectionTitle" xml:space="preserve"><value>Select profiles</value></data><data name="Dialog_ThirdPartyProfileSelectionSubtitle" xml:space="preserve"><value>Select one or more profiles to import.</value></data>
   <data name="Dialog_ThirdPartyImportProgressTitle" xml:space="preserve"><value>Importing profiles</value></data><data name="Dialog_ThirdPartyImportProgressSubtitle" xml:space="preserve"><value>Saving profile data and sign-in information.</value></data>

@@ -293,6 +293,13 @@
             </StackPanel>
 
             <StackPanel Style="{StaticResource DialogFooterStyle}"
+                        Visibility="{Binding Dialog.CanShowMicrosoftAuthenticationCancelButton, Converter={StaticResource BooleanToMenuTextVisibilityConverter}}">
+                <Button Style="{StaticResource LauncherDialogButtonStyle}"
+                        Content="{x:Static res:Strings.Cancel_Button}"
+                        Command="{Binding RequestCancelAddAccountDialogCommand}" />
+            </StackPanel>
+
+            <StackPanel Style="{StaticResource DialogFooterStyle}"
                         Visibility="{Binding Dialog.IsThirdPartyImportResultStep, Converter={StaticResource BooleanToMenuTextVisibilityConverter}}">
                 <Button Style="{StaticResource LauncherDialogButtonStyle}"
                         Content="{x:Static res:Strings.Confirm_Button}"

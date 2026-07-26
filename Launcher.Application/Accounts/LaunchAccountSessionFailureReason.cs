@@ -11,6 +11,8 @@ public enum LaunchAccountSessionFailureReason
     Unknown,
     AuthenticationNotConfigured,
     AuthenticationApplicationNotAuthorized,
+    AuthenticationTimedOut,
+    GameOwnershipRequired,
     ReauthenticationRequired,
     AuthenticationServerUnavailable,
     InvalidAuthenticationResponse,

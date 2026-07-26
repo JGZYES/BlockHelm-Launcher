@@ -3490,6 +3490,8 @@
   <data name="Status_MicrosoftLoginNotConfigured" xml:space="preserve"><value>此版本未設定 BlockHelm Launcher 的 Microsoft 應用程式身分，無法進行正版登入。</value></data>
   <data name="Status_MicrosoftApplicationNotAuthorized" xml:space="preserve"><value>BlockHelm Launcher 尚未獲得 Minecraft 登入服務授權，請稍後再試。</value></data>
   <data name="Status_MicrosoftAuthenticationServerUnavailable" xml:space="preserve"><value>Microsoft 登入服務暫時無法使用，請稍後再試。</value></data>
+  <data name="Status_MicrosoftAuthenticationTimedOut" xml:space="preserve"><value>Microsoft 登入等待逾時，請重試。</value></data>
+  <data name="Status_MinecraftJavaOwnershipRequired" xml:space="preserve"><value>此 Microsoft 帳戶未擁有 Minecraft Java 版，無法新增為正版帳戶。</value></data>
   <data name="SelectAll_Button" xml:space="preserve"><value>全選</value></data><data name="Retry_Button" xml:space="preserve"><value>重試</value></data>
   <data name="Dialog_ThirdPartyProfileSelectionTitle" xml:space="preserve"><value>選擇角色</value></data><data name="Dialog_ThirdPartyProfileSelectionSubtitle" xml:space="preserve"><value>選擇要匯入的一個或多個角色。</value></data>
   <data name="Dialog_ThirdPartyImportProgressTitle" xml:space="preserve"><value>正在匯入角色</value></data><data name="Dialog_ThirdPartyImportProgressSubtitle" xml:space="preserve"><value>正在儲存角色資料和登入資訊。</value></data>

@@ -62,6 +62,8 @@ public sealed partial class AccountDialogViewModel
     {
         OnPropertyChanged(nameof(CanShowAddAccountBackButton));
         OnPropertyChanged(nameof(CanShowAddAccountCancelButton));
+        OnPropertyChanged(nameof(CanShowMicrosoftAuthenticationCancelButton));
+        OnPropertyChanged(nameof(CanShowStandardAddAccountFooter));
         OnPropertyChanged(nameof(IsAddAccountFooterEnabled));
         OnPropertyChanged(nameof(CanConfirmAddAccountDialog));
     }
@@ -86,6 +88,7 @@ public sealed partial class AccountDialogViewModel
 
     private void ResetAddAccountDialogState(bool clearOfflineName)
     {
+        CancelAndDisposeMicrosoftAuthentication();
         thirdPartyImportCancellationTokenSource?.Cancel();
         thirdPartyImportCancellationTokenSource = null;
         thirdPartyFailedProfiles.Clear();
@@ -107,6 +110,34 @@ public sealed partial class AccountDialogViewModel
         IsAddAccountDialogBusy = false;
         ResetMicrosoftLoginResultState();
         SelectedAccountTypeOption = null;
+    }
+
+    private CancellationTokenSource BeginMicrosoftAuthenticationCancellation()
+    {
+        CancelAndDisposeMicrosoftAuthentication();
+        microsoftAuthenticationCancellationTokenSource = new CancellationTokenSource();
+        return microsoftAuthenticationCancellationTokenSource;
+    }
+
+    private void CompleteMicrosoftAuthenticationCancellation(
+        CancellationTokenSource cancellationTokenSource)
+    {
+        if (!ReferenceEquals(
+                microsoftAuthenticationCancellationTokenSource,
+                cancellationTokenSource))
+        {
+            return;
+        }
+
+        microsoftAuthenticationCancellationTokenSource.Dispose();
+        microsoftAuthenticationCancellationTokenSource = null;
+    }
+
+    private void CancelAndDisposeMicrosoftAuthentication()
+    {
+        microsoftAuthenticationCancellationTokenSource?.Cancel();
+        microsoftAuthenticationCancellationTokenSource?.Dispose();
+        microsoftAuthenticationCancellationTokenSource = null;
     }
 
     private void ResetMicrosoftLoginResultState(string? message = null)

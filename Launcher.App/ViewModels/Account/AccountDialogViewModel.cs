@@ -96,6 +96,7 @@ public sealed partial class AccountDialogViewModel : ObservableObject
     private readonly List<ThirdPartyProfileOptionViewModel> thirdPartyFailedProfiles = [];
     private readonly List<LauncherAccount> thirdPartySuccessfulAccounts = [];
     private CancellationTokenSource? thirdPartyImportCancellationTokenSource;
+    private CancellationTokenSource? microsoftAuthenticationCancellationTokenSource;
 
     // 删除对话框只保留待删除对象；确认后会立即清空引用，避免重复确认触发两次删除。
     [ObservableProperty]
@@ -185,6 +186,9 @@ public sealed partial class AccountDialogViewModel : ObservableObject
         && (IsOfflineNameStep || IsThirdPartyCredentialsStep || IsMicrosoftLoginStep);
     public bool CanShowAddAccountCancelButton => !IsAddAccountDialogBusy
         && (!IsMicrosoftLoginResultStep || IsMicrosoftReauthenticationMode);
+    public bool CanShowMicrosoftAuthenticationCancelButton =>
+        IsAddAccountDialogBusy
+        && (IsMicrosoftLoginStep || IsMicrosoftReauthenticationStep);
     public bool IsAddAccountFooterEnabled => !IsAddAccountDialogBusy;
     public bool CanConfirmAddAccountDialog => !IsAddAccountDialogBusy
         && (IsMicrosoftLoginResultStep
@@ -255,7 +259,10 @@ public sealed partial class AccountDialogViewModel : ObservableObject
 
     public bool IsThirdPartyIdentityReadOnly => IsThirdPartyReauthenticationStep;
     public bool CanSelectAllThirdPartyProfiles => IsThirdPartyProfileSelectionStep && ThirdParty.CanSelectAllProfiles;
-    public bool CanShowStandardAddAccountFooter => !IsThirdPartyImportProgressStep && !IsThirdPartyImportResultStep;
+    public bool CanShowStandardAddAccountFooter =>
+        !IsThirdPartyImportProgressStep
+        && !IsThirdPartyImportResultStep
+        && !CanShowMicrosoftAuthenticationCancelButton;
     public string AddAccountConfirmButtonText => IsMicrosoftReauthenticationResultStep
         ? Strings.Retry_Button
         : Strings.Confirm_Button;

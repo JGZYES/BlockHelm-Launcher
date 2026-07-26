@@ -1200,6 +1200,8 @@
   <data name="Status_MicrosoftLoginNotConfigured" xml:space="preserve"><value>此版本未配置 BlockHelm Launcher 的 Microsoft 应用身份，无法进行正版登录。</value></data>
   <data name="Status_MicrosoftApplicationNotAuthorized" xml:space="preserve"><value>BlockHelm Launcher 尚未获得 Minecraft 登录服务授权，请稍后重试。</value></data>
   <data name="Status_MicrosoftAuthenticationServerUnavailable" xml:space="preserve"><value>Microsoft 登录服务暂时不可用，请稍后重试。</value></data>
+  <data name="Status_MicrosoftAuthenticationTimedOut" xml:space="preserve"><value>Microsoft 登录等待超时，请重试。</value></data>
+  <data name="Status_MinecraftJavaOwnershipRequired" xml:space="preserve"><value>此 Microsoft 账户未拥有 Minecraft Java 版，无法添加为正版账户。</value></data>
   <data name="SelectAll_Button" xml:space="preserve"><value>全选</value></data>
   <data name="Retry_Button" xml:space="preserve"><value>重试</value></data>
   <data name="Dialog_ThirdPartyProfileSelectionTitle" xml:space="preserve"><value>选择角色</value></data>

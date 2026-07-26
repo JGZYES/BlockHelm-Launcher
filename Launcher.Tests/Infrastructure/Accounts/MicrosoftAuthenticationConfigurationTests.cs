@@ -15,6 +15,7 @@ using Launcher.Infrastructure.Accounts.Credentials;
 using Microsoft.Identity.Client;
 using XboxAuthNet.Game.Accounts;
 using XboxAuthNet.Game.Msal.OAuth;
+using XboxAuthNet.Game.SessionStorages;
 
 namespace Launcher.Tests.Infrastructure.Accounts;
 
@@ -179,6 +180,63 @@ public sealed class MicrosoftAuthenticationConfigurationTests
         Assert.Equal(
             LaunchAccountSessionFailureReason.ReauthenticationRequired,
             result.Reason);
+    }
+
+    [Fact]
+    public void InteractiveTimeoutHasDedicatedFailureReason()
+    {
+        var source = new MicrosoftInteractiveAuthenticationTimeoutException(
+            "Timed out.",
+            new OperationCanceledException());
+
+        var result = MicrosoftAuthProvider.TranslateAuthenticationException(source);
+
+        Assert.Equal(
+            LaunchAccountSessionFailureReason.AuthenticationTimedOut,
+            result.Reason);
+    }
+
+    [Fact]
+    public void StoredHomeAccountIdSelectsOnlyTheTargetMsalIdentity()
+    {
+        Assert.True(MicrosoftAuthProvider.IsMatchingMsalAccount(
+            "target-home-id",
+            "player@example.com",
+            "target-home-id",
+            "player@example.com"));
+        Assert.False(MicrosoftAuthProvider.IsMatchingMsalAccount(
+            "different-home-id",
+            "player@example.com",
+            "target-home-id",
+            "player@example.com"));
+    }
+
+    [Fact]
+    public void StoredMsalHomeAccountIdSurvivesSessionPersistence()
+    {
+        var storage = JsonSessionStorage.CreateEmpty(
+            JsonXboxGameAccountManager.DefaultSerializerOption);
+
+        storage.Set("BlockHelmMsalHomeAccountId", "target-home-id");
+
+        Assert.Equal(
+            "target-home-id",
+            storage.ToJsonObjectForStoring()["BlockHelmMsalHomeAccountId"]?.GetValue<string>());
+    }
+
+    [Fact]
+    public void LegacyLoginHintSelectsTargetCaseInsensitively()
+    {
+        Assert.True(MicrosoftAuthProvider.IsMatchingMsalAccount(
+            "home-id",
+            "Player@Example.com",
+            null,
+            "player@example.com"));
+        Assert.False(MicrosoftAuthProvider.IsMatchingMsalAccount(
+            "other-home-id",
+            "other@example.com",
+            null,
+            "player@example.com"));
     }
 
     private sealed class StubBrowserPageProvider(string html) : IMicrosoftLoginBrowserPageProvider

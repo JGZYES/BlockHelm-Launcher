@@ -164,7 +164,9 @@ public static class ServiceCollectionExtensions
         services.AddSingleton(serviceProvider => new MicrosoftAuthProvider(
             serviceProvider.GetRequiredService<LauncherPathProvider>(),
             serviceProvider.GetRequiredService<MicrosoftClientIdProvider>(),
-            serviceProvider.GetService<IMicrosoftLoginBrowserPageProvider>()));
+            serviceProvider.GetService<IMicrosoftLoginBrowserPageProvider>(),
+            logger: serviceProvider.GetService<
+                Microsoft.Extensions.Logging.ILogger<MicrosoftAuthProvider>>()));
         services.AddSingleton<ILaunchAccountSessionService, LaunchAccountSessionService>();
         return services;
     }

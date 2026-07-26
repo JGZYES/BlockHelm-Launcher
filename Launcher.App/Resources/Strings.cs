@@ -974,6 +974,8 @@ public static class Strings
     public static string Status_MicrosoftLoginNotConfigured => Get(nameof(Status_MicrosoftLoginNotConfigured));
     public static string Status_MicrosoftApplicationNotAuthorized => Get(nameof(Status_MicrosoftApplicationNotAuthorized));
     public static string Status_MicrosoftAuthenticationServerUnavailable => Get(nameof(Status_MicrosoftAuthenticationServerUnavailable));
+    public static string Status_MicrosoftAuthenticationTimedOut => Get(nameof(Status_MicrosoftAuthenticationTimedOut));
+    public static string Status_MinecraftJavaOwnershipRequired => Get(nameof(Status_MinecraftJavaOwnershipRequired));
     public static string SelectAll_Button => Get(nameof(SelectAll_Button));
     public static string Retry_Button => Get(nameof(Retry_Button));
     public static string Dialog_ThirdPartyProfileSelectionTitle => Get(nameof(Dialog_ThirdPartyProfileSelectionTitle));

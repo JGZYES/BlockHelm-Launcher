@@ -11,6 +11,8 @@ public enum MicrosoftAccountLoginFailureReason
     Unknown,
     NotConfigured,
     ApplicationNotAuthorized,
+    TimedOut,
+    GameOwnershipRequired,
     AuthenticationServerUnavailable,
     CredentialStorageFailed
 }

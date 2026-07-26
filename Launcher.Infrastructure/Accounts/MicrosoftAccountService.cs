@@ -164,6 +164,10 @@ public sealed class MicrosoftAccountService : IMicrosoftAccountService
                     => MicrosoftAccountLoginFailureReason.NotConfigured,
                 LaunchAccountSessionFailureReason.AuthenticationApplicationNotAuthorized
                     => MicrosoftAccountLoginFailureReason.ApplicationNotAuthorized,
+                LaunchAccountSessionFailureReason.AuthenticationTimedOut
+                    => MicrosoftAccountLoginFailureReason.TimedOut,
+                LaunchAccountSessionFailureReason.GameOwnershipRequired
+                    => MicrosoftAccountLoginFailureReason.GameOwnershipRequired,
                 LaunchAccountSessionFailureReason.AuthenticationServerUnavailable
                     => MicrosoftAccountLoginFailureReason.AuthenticationServerUnavailable,
                 LaunchAccountSessionFailureReason.CredentialStorageFailed
@@ -252,6 +256,12 @@ public sealed class MicrosoftAccountService : IMicrosoftAccountService
                     => MicrosoftAccountReauthenticationFailureReason.NotConfigured,
                 LaunchAccountSessionFailureReason.AuthenticationApplicationNotAuthorized
                     => MicrosoftAccountReauthenticationFailureReason.ApplicationNotAuthorized,
+                LaunchAccountSessionFailureReason.AuthenticationTimedOut
+                    => MicrosoftAccountReauthenticationFailureReason.TimedOut,
+                LaunchAccountSessionFailureReason.GameOwnershipRequired
+                    => MicrosoftAccountReauthenticationFailureReason.GameOwnershipRequired,
+                LaunchAccountSessionFailureReason.AuthenticationServerUnavailable
+                    => MicrosoftAccountReauthenticationFailureReason.AuthenticationServerUnavailable,
                 LaunchAccountSessionFailureReason.CredentialStorageFailed
                     => MicrosoftAccountReauthenticationFailureReason.CredentialStorageFailed,
                 LaunchAccountSessionFailureReason.ReauthenticationRequired
@@ -477,6 +487,10 @@ public sealed class MicrosoftAccountService : IMicrosoftAccountService
         try
         {
             return await profileClient.GetProfileAsync(login.AccessToken, cancellationToken);
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
         }
         catch
         {

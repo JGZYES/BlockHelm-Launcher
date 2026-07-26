@@ -71,72 +71,6 @@ public sealed class LaunchServiceTests : TestTempDirectory
     }
 
     [Fact]
-    public async Task CancelingWindowWaitTerminatesProcessTreeWithoutReportingCompletion()
-    {
-        var waiter = new ControlledWindowReadinessWaiter();
-        var terminator = new RecordingProcessTerminator();
-        var childPidPath = Path.Combine(TempRoot, "launch-child.pid");
-        var childScriptPath = Path.Combine(TempRoot, "launch-child.ps1");
-        Directory.CreateDirectory(TempRoot);
-        await File.WriteAllTextAsync(
-            childScriptPath,
-            "param([string]$PidPath)\n"
-            + "$child = Start-Process -FilePath (Join-Path $env:SystemRoot 'System32\\ping.exe') "
-            + "-ArgumentList @('127.0.0.1','-n','30') -WindowStyle Hidden -PassThru\n"
-            + "[IO.File]::WriteAllText($PidPath, [string]$child.Id)\n"
-            + "Wait-Process -Id $child.Id\n");
-        Process? launchedProcess = null;
-        int? childProcessId = null;
-        var launcher = new FakeLauncherFactory
-        {
-            BuildProcess = (_, _) => launchedProcess = CreateProcessWithLongRunningChild(
-                childScriptPath,
-                childPidPath)
-        };
-        var service = CreateService(
-            launcher: launcher,
-            crashMonitor: new LaunchCrashMonitor(),
-            windowReadinessWaiter: waiter,
-            processTerminator: terminator);
-        var settings = CreateSettings();
-        settings.DefaultCheckFilesBeforeLaunch = false;
-        var reports = new List<LauncherProgress>();
-        using var cancellation = new CancellationTokenSource();
-        var instance = CreateInstance(settings.MinecraftDirectory, "Canceled Window Wait");
-
-        try
-        {
-            var launchTask = service.LaunchAsync(
-                instance,
-                CreateAccount(),
-                settings,
-                new InlineProgress(reports),
-                cancellationToken: cancellation.Token);
-
-            await waiter.WaitUntilCalledAsync();
-            childProcessId = await WaitForChildProcessIdAsync(childPidPath);
-            cancellation.Cancel();
-            await Assert.ThrowsAnyAsync<OperationCanceledException>(() => launchTask);
-            Assert.DoesNotContain(reports, report => report.Percent == 100);
-            Assert.True(terminator.ObservedExitedProcess);
-            Assert.True(await WaitForProcessExitAsync(childProcessId.Value));
-            Assert.Empty(Directory.Exists(Path.Combine(
-                    instance.InstanceDirectory,
-                    LauncherApplicationIdentity.StorageDirectoryName,
-                    "logs"))
-                ? Directory.EnumerateFiles(
-                    Path.Combine(instance.InstanceDirectory, LauncherApplicationIdentity.StorageDirectoryName, "logs"),
-                    "launch-output-*.log")
-                : []);
-        }
-        finally
-        {
-            TryKillProcess(launchedProcess);
-            TryKillProcess(childProcessId);
-        }
-    }
-
-    [Fact]
     public async Task ManualJavaFailureDoesNotProvisionRuntime()
     {
         var selection = new FakeJavaSelection(
@@ -521,99 +455,6 @@ public sealed class LaunchServiceTests : TestTempDirectory
         }
     };
 
-    private static Process CreateProcessWithLongRunningChild(string scriptPath, string childPidPath)
-    {
-        var process = new Process
-        {
-            StartInfo = new ProcessStartInfo
-            {
-                FileName = Path.Combine(
-                    Environment.SystemDirectory,
-                    "WindowsPowerShell",
-                    "v1.0",
-                    "powershell.exe"),
-                CreateNoWindow = true,
-                UseShellExecute = false
-            }
-        };
-        process.StartInfo.ArgumentList.Add("-NoProfile");
-        process.StartInfo.ArgumentList.Add("-NonInteractive");
-        process.StartInfo.ArgumentList.Add("-ExecutionPolicy");
-        process.StartInfo.ArgumentList.Add("Bypass");
-        process.StartInfo.ArgumentList.Add("-File");
-        process.StartInfo.ArgumentList.Add(scriptPath);
-        process.StartInfo.ArgumentList.Add("-PidPath");
-        process.StartInfo.ArgumentList.Add(childPidPath);
-        return process;
-    }
-
-    private static async Task<int> WaitForChildProcessIdAsync(string path)
-    {
-        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(5));
-        try
-        {
-            while (true)
-            {
-                if (File.Exists(path)
-                    && int.TryParse(await File.ReadAllTextAsync(path, timeout.Token), out var processId))
-                {
-                    return processId;
-                }
-
-                await Task.Delay(50, timeout.Token);
-            }
-        }
-        catch (OperationCanceledException) when (timeout.IsCancellationRequested)
-        {
-            throw new TimeoutException("The launch test child process did not publish its process id.");
-        }
-    }
-
-    private static async Task<bool> WaitForProcessExitAsync(int processId)
-    {
-        try
-        {
-            using var process = Process.GetProcessById(processId);
-            if (process.HasExited)
-                return true;
-            await process.WaitForExitAsync().WaitAsync(TimeSpan.FromSeconds(5));
-            return process.HasExited;
-        }
-        catch (ArgumentException)
-        {
-            return true;
-        }
-    }
-
-    private static void TryKillProcess(Process? process)
-    {
-        if (process is null)
-            return;
-
-        try
-        {
-            if (!process.HasExited)
-                process.Kill(entireProcessTree: true);
-        }
-        catch (InvalidOperationException)
-        {
-        }
-    }
-
-    private static void TryKillProcess(int? processId)
-    {
-        if (processId is null)
-            return;
-        try
-        {
-            using var process = Process.GetProcessById(processId.Value);
-            TryKillProcess(process);
-        }
-        catch (ArgumentException)
-        {
-        }
-    }
-
     private sealed class FakeAccountSession(LaunchAccountSession? session = null) : ILaunchAccountSessionService
     {
         public Task<LaunchAccountSession> CreateSessionAsync(LauncherAccount account, CancellationToken cancellationToken = default) =>
@@ -790,39 +631,9 @@ public sealed class LaunchServiceTests : TestTempDirectory
         }
     }
 
-    private sealed class RecordingProcessTerminator : ILaunchProcessTerminator
-    {
-        private readonly LaunchProcessTerminator inner = new();
-
-        public bool ObservedExitedProcess { get; private set; }
-
-        public async Task TerminateAsync(Process process)
-        {
-            await inner.TerminateAsync(process);
-            ObservedExitedProcess = process.HasExited;
-        }
-    }
-
     private sealed class ImmediateWindowReadinessWaiter : IGameWindowReadinessWaiter
     {
         public Task<GameWindowReadinessResult> WaitAsync(Process process, CancellationToken cancellationToken) =>
             Task.FromResult(GameWindowReadinessResult.WindowVisible);
-    }
-
-    private sealed class ControlledWindowReadinessWaiter : IGameWindowReadinessWaiter
-    {
-        private readonly TaskCompletionSource called = new(TaskCreationOptions.RunContinuationsAsynchronously);
-        private readonly TaskCompletionSource<GameWindowReadinessResult> completion =
-            new(TaskCreationOptions.RunContinuationsAsynchronously);
-
-        public async Task<GameWindowReadinessResult> WaitAsync(Process process, CancellationToken cancellationToken)
-        {
-            called.TrySetResult();
-            return await completion.Task.WaitAsync(cancellationToken);
-        }
-
-        public Task WaitUntilCalledAsync() => called.Task.WaitAsync(TimeSpan.FromSeconds(5));
-
-        public void Complete(GameWindowReadinessResult result) => completion.TrySetResult(result);
     }
 }

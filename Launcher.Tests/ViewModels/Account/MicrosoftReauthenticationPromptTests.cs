@@ -53,7 +53,47 @@ public sealed class MicrosoftReauthenticationPromptTests
         Assert.True(viewModel.IsMicrosoftReauthenticationStep);
         Assert.True(viewModel.IsAddAccountDialogBusy);
         Assert.False(viewModel.CanShowAddAccountCancelButton);
+        Assert.True(viewModel.CanShowMicrosoftAuthenticationCancelButton);
         Assert.False(viewModel.CanConfirmAddAccountDialog);
+    }
+
+    [Fact]
+    public async Task BusyReauthenticationCancelButtonCancelsAuthentication()
+    {
+        var account = new LauncherAccount
+        {
+            Id = "microsoft-account",
+            DisplayName = "Player",
+            Uuid = "00000000-0000-0000-0000-000000000001",
+            Kind = LauncherAccountKind.Microsoft
+        };
+        var accountList = new AccountListViewModel(
+            new FakeAccountStore(new AccountStoreSnapshot([account], account.Id)));
+        await accountList.InitializeAsync(new LauncherSettings());
+        var microsoftService = DispatchProxy.Create<
+            IMicrosoftAccountService,
+            CancellableMicrosoftAccountServiceProxy>();
+        var proxy = (CancellableMicrosoftAccountServiceProxy)(object)microsoftService;
+        var viewModel = new AccountDialogViewModel(
+            accountList,
+            microsoftService,
+            Stub<IThirdPartyAccountService>(),
+            Stub<IOfflineAccountUuidService>(),
+            Stub<IStatusService>());
+        viewModel.OpenMicrosoftReauthenticationDialog(account);
+
+        var completion = viewModel.CompleteMicrosoftAccountReauthenticationAsync();
+        await proxy.Started.Task.WaitAsync(TimeSpan.FromSeconds(2));
+
+        Assert.True(viewModel.IsAddAccountDialogBusy);
+        Assert.True(viewModel.CanShowMicrosoftAuthenticationCancelButton);
+        viewModel.CancelAddAccountDialog();
+
+        Assert.False(await completion.WaitAsync(TimeSpan.FromSeconds(2)));
+        Assert.True(proxy.WasCanceled);
+        Assert.False(viewModel.IsAddAccountDialogBusy);
+        Assert.False(viewModel.CanShowMicrosoftAuthenticationCancelButton);
+        Assert.Equal(Strings.Status_LoginCanceled, viewModel.MicrosoftLoginMessage);
     }
 
     [Fact]
@@ -106,6 +146,43 @@ public sealed class MicrosoftReauthenticationPromptTests
             }
 
             return returnType.IsValueType ? Activator.CreateInstance(returnType) : null;
+        }
+    }
+
+    public class CancellableMicrosoftAccountServiceProxy : DispatchProxy
+    {
+        public TaskCompletionSource Started { get; } =
+            new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public bool WasCanceled { get; private set; }
+
+        protected override object? Invoke(MethodInfo? targetMethod, object?[]? args)
+        {
+            if (targetMethod?.Name == nameof(IMicrosoftAccountService.ReauthenticateInteractivelyAsync))
+            {
+                return WaitForCancellationAsync(
+                    (LauncherAccount)args![0]!,
+                    (CancellationToken)args[1]!);
+            }
+
+            throw new NotSupportedException(targetMethod?.Name);
+        }
+
+        private async Task<LauncherAccount> WaitForCancellationAsync(
+            LauncherAccount account,
+            CancellationToken cancellationToken)
+        {
+            Started.TrySetResult();
+            try
+            {
+                await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken);
+                return account;
+            }
+            catch (OperationCanceledException)
+            {
+                WasCanceled = true;
+                throw;
+            }
         }
     }
 

@@ -66,6 +66,7 @@ public sealed partial class AccountDialogViewModel
 
         AddAccountDialogStep = AccountDialogSteps.AddAccountMicrosoftReauthentication;
         IsAddAccountDialogBusy = true;
+        BeginMicrosoftAuthenticationCancellation();
         ResetMicrosoftLoginResultState(MicrosoftLoginActiveMessage);
         ReportStatus(Strings.Status_OpeningMicrosoftLogin);
     }
@@ -75,6 +76,11 @@ public sealed partial class AccountDialogViewModel
         if (IsThirdPartyImportProgressStep)
         {
             thirdPartyImportCancellationTokenSource?.Cancel();
+            return;
+        }
+        if (CanShowMicrosoftAuthenticationCancelButton)
+        {
+            microsoftAuthenticationCancellationTokenSource?.Cancel();
             return;
         }
         if (IsAddAccountDialogBusy)
@@ -102,16 +108,21 @@ public sealed partial class AccountDialogViewModel
         // 先进入 Busy 状态再启动外部浏览器登录，保证按钮状态和状态文案在异步边界前完成切换。
         AddAccountDialogStep = AccountDialogSteps.AddAccountMicrosoftLogin;
         IsAddAccountDialogBusy = true;
+        BeginMicrosoftAuthenticationCancellation();
         ResetMicrosoftLoginResultState(MicrosoftLoginActiveMessage);
         ReportStatus(Strings.Status_OpeningMicrosoftLogin);
     }
 
     public async Task CompleteMicrosoftAccountLoginAsync()
     {
+        var authenticationCancellation =
+            microsoftAuthenticationCancellationTokenSource
+            ?? BeginMicrosoftAuthenticationCancellation();
         try
         {
             // 服务返回的资料仍需在 UI 边界校验；缺少名称或 UUID 的响应不能进入账户集合。
-            var account = await microsoftAccountService.LoginInteractivelyAsync();
+            var account = await microsoftAccountService.LoginInteractivelyAsync(
+                authenticationCancellation.Token);
             if (string.IsNullOrWhiteSpace(account.DisplayName) || string.IsNullOrWhiteSpace(account.Uuid))
             {
                 var message = Strings.Status_LoginMissingProfile;
@@ -157,6 +168,10 @@ public sealed partial class AccountDialogViewModel
                     => Strings.Status_MicrosoftLoginNotConfigured,
                 MicrosoftAccountLoginFailureReason.ApplicationNotAuthorized
                     => Strings.Status_MicrosoftApplicationNotAuthorized,
+                MicrosoftAccountLoginFailureReason.TimedOut
+                    => Strings.Status_MicrosoftAuthenticationTimedOut,
+                MicrosoftAccountLoginFailureReason.GameOwnershipRequired
+                    => Strings.Status_MinecraftJavaOwnershipRequired,
                 MicrosoftAccountLoginFailureReason.AuthenticationServerUnavailable
                     => Strings.Status_MicrosoftAuthenticationServerUnavailable,
                 MicrosoftAccountLoginFailureReason.CredentialStorageFailed
@@ -178,6 +193,7 @@ public sealed partial class AccountDialogViewModel
         finally
         {
             // 所有成功、取消和异常路径都必须解除 Busy，否则对话框会永久失去关闭能力。
+            CompleteMicrosoftAuthenticationCancellation(authenticationCancellation);
             IsAddAccountDialogBusy = false;
         }
     }
