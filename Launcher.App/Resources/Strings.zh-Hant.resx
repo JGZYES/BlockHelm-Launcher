@@ -2609,10 +2609,10 @@
     <value>刪除備份</value>
   </data>
   <data name="Dialog_DeleteBackupMessageFormat" xml:space="preserve">
-    <value>確認刪除備份“{0}”嗎？此操作無法復原。</value>
+    <value>確認刪除備份“{0}”嗎？將優先移至系統資源回收筒；資源回收筒無法使用時將直接刪除。</value>
   </data>
   <data name="Dialog_DeleteMultipleBackupsMessageFormat" xml:space="preserve">
-    <value>確認刪除這 {0} 個備份嗎？此操作無法復原。</value>
+    <value>確認刪除這 {0} 個備份嗎？將優先移至系統資源回收筒；資源回收筒無法使用時將直接刪除。</value>
   </data>
   <data name="Dialog_RestoreBackupTitle" xml:space="preserve">
     <value>還原備份</value>
@@ -3019,10 +3019,10 @@
     <value>刪除模組</value>
   </data>
   <data name="Dialog_DeleteSingleModMessageFormat" xml:space="preserve">
-    <value>確認刪除模組“{0}”嗎？此操作無法復原。</value>
+    <value>確認刪除模組“{0}”嗎？將優先移至系統資源回收筒；資源回收筒無法使用時將直接刪除。</value>
   </data>
   <data name="Dialog_DeleteMultipleModsMessageFormat" xml:space="preserve">
-    <value>確認刪除這 {0} 個模組嗎？此操作無法復原。</value>
+    <value>確認刪除這 {0} 個模組嗎？將優先移至系統資源回收筒；資源回收筒無法使用時將直接刪除。</value>
   </data>
   <data name="Status_SelectedModsEnabledFormat" xml:space="preserve">
     <value>已啟用 {0} 個模組</value>
@@ -3133,10 +3133,10 @@
     <value>刪除存檔</value>
   </data>
   <data name="Dialog_DeleteSingleSaveMessageFormat" xml:space="preserve">
-    <value>確認刪除存檔“{0}”嗎？此操作無法復原。</value>
+    <value>確認刪除存檔“{0}”嗎？將優先移至系統資源回收筒；資源回收筒無法使用時將直接刪除。</value>
   </data>
   <data name="Dialog_DeleteMultipleSavesMessageFormat" xml:space="preserve">
-    <value>確認刪除這 {0} 個存檔嗎？此操作無法復原。</value>
+    <value>確認刪除這 {0} 個存檔嗎？將優先移至系統資源回收筒；資源回收筒無法使用時將直接刪除。</value>
   </data>
   <data name="Dialog_InvalidSaveImportTitle" xml:space="preserve">
     <value>無法匯入存檔</value>
@@ -3190,13 +3190,13 @@
     <value>已匯入 {0} 個存檔</value>
   </data>
   <data name="Dialog_DeleteMultipleResourcePacksMessageFormat" xml:space="preserve">
-    <value>確認刪除這 {0} 個資源包嗎？此操作無法復原。</value>
+    <value>確認刪除這 {0} 個資源包嗎？將優先移至系統資源回收筒；資源回收筒無法使用時將直接刪除。</value>
   </data>
   <data name="Dialog_DeleteResourcePacksTitle" xml:space="preserve">
     <value>刪除資源包</value>
   </data>
   <data name="Dialog_DeleteSingleResourcePackMessageFormat" xml:space="preserve">
-    <value>確認刪除資源包“{0}”嗎？此操作無法復原。</value>
+    <value>確認刪除資源包“{0}”嗎？將優先移至系統資源回收筒；資源回收筒無法使用時將直接刪除。</value>
   </data>
   <data name="Dialog_InvalidResourcePackImportTitle" xml:space="preserve">
     <value>無法匯入資源包</value>
@@ -3295,13 +3295,13 @@
     <value>已刪除 {0} 個資源包</value>
   </data>
   <data name="Dialog_DeleteMultipleShaderPacksMessageFormat" xml:space="preserve">
-    <value>確認刪除這 {0} 個光影包嗎？此操作無法復原。</value>
+    <value>確認刪除這 {0} 個光影包嗎？將優先移至系統資源回收筒；資源回收筒無法使用時將直接刪除。</value>
   </data>
   <data name="Dialog_DeleteShaderPacksTitle" xml:space="preserve">
     <value>刪除光影包</value>
   </data>
   <data name="Dialog_DeleteSingleShaderPackMessageFormat" xml:space="preserve">
-    <value>確認刪除光影包“{0}”嗎？此操作無法復原。</value>
+    <value>確認刪除光影包“{0}”嗎？將優先移至系統資源回收筒；資源回收筒無法使用時將直接刪除。</value>
   </data>
   <data name="Dialog_InvalidShaderPackImportTitle" xml:space="preserve">
     <value>無法匯入光影包</value>

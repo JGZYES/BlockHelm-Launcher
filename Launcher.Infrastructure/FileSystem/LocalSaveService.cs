@@ -30,13 +30,18 @@ namespace Launcher.Infrastructure.FileSystem;
 public sealed class LocalSaveService : ILocalSaveService
 {
     private readonly ILogger<LocalSaveService> logger;
+    private readonly IUserFileDeletionService userFileDeletionService;
     private readonly LocalSaveArchiveImporter archiveImporter;
     private readonly string iconCacheDirectory;
 
-    public LocalSaveService(LauncherPathProvider? pathProvider = null, ILogger<LocalSaveService>? logger = null)
+    public LocalSaveService(
+        LauncherPathProvider? pathProvider = null,
+        ILogger<LocalSaveService>? logger = null,
+        IUserFileDeletionService? userFileDeletionService = null)
     {
         var effectivePathProvider = pathProvider ?? new LauncherPathProvider();
         this.logger = logger ?? NullLogger<LocalSaveService>.Instance;
+        this.userFileDeletionService = userFileDeletionService ?? new UserFileDeletionService();
         archiveImporter = new LocalSaveArchiveImporter(this.logger);
         iconCacheDirectory = Path.Combine(effectivePathProvider.DefaultDataDirectory, "cache", "saves", "icons");
     }
@@ -113,7 +118,7 @@ public sealed class LocalSaveService : ILocalSaveService
             return;
         }
 
-        Directory.Delete(save.FullPath, recursive: true);
+        userFileDeletionService.DeleteDirectory(save.FullPath);
         logger.LogInformation("Local save deleted. Name={Name}", save.Name);
         logger.LogDebug("Deleted local save path. Path={Path}", save.FullPath);
     }

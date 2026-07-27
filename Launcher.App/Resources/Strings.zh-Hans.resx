@@ -894,8 +894,8 @@
 
 异常摘要：{1}</value></data>
   <data name="Dialog_DeleteBackupTitle" xml:space="preserve"><value>删除备份</value></data>
-  <data name="Dialog_DeleteBackupMessageFormat" xml:space="preserve"><value>确认删除备份“{0}”吗？此操作不可撤销。</value></data>
-  <data name="Dialog_DeleteMultipleBackupsMessageFormat" xml:space="preserve"><value>确认删除这 {0} 个备份吗？此操作不可撤销。</value></data>
+  <data name="Dialog_DeleteBackupMessageFormat" xml:space="preserve"><value>确认删除备份“{0}”吗？将优先移入系统回收站；回收站不可用时将直接删除。</value></data>
+  <data name="Dialog_DeleteMultipleBackupsMessageFormat" xml:space="preserve"><value>确认删除这 {0} 个备份吗？将优先移入系统回收站；回收站不可用时将直接删除。</value></data>
   <data name="Dialog_RestoreBackupTitle" xml:space="preserve"><value>恢复备份</value></data>
   <data name="Dialog_RestoreBackupMessageFormat" xml:space="preserve"><value>确认恢复备份“{0}”吗？
 
@@ -1032,8 +1032,8 @@
   <data name="GameSettings_ModManagementDisableButton" xml:space="preserve"><value>禁用</value></data>
   <data name="GameSettings_ModManagementDeleteButton" xml:space="preserve"><value>删除</value></data>
   <data name="Dialog_DeleteModsTitle" xml:space="preserve"><value>删除模组</value></data>
-  <data name="Dialog_DeleteSingleModMessageFormat" xml:space="preserve"><value>确认删除模组“{0}”吗？此操作不可撤销。</value></data>
-  <data name="Dialog_DeleteMultipleModsMessageFormat" xml:space="preserve"><value>确认删除这 {0} 个模组吗？此操作不可撤销。</value></data>
+  <data name="Dialog_DeleteSingleModMessageFormat" xml:space="preserve"><value>确认删除模组“{0}”吗？将优先移入系统回收站；回收站不可用时将直接删除。</value></data>
+  <data name="Dialog_DeleteMultipleModsMessageFormat" xml:space="preserve"><value>确认删除这 {0} 个模组吗？将优先移入系统回收站；回收站不可用时将直接删除。</value></data>
   <data name="Status_SelectedModsEnabledFormat" xml:space="preserve"><value>已启用 {0} 个模组</value></data>
   <data name="Status_SelectedModsEnablePartialFailedFormat" xml:space="preserve"><value>已启用 {0} 个模组，{1} 个失败</value></data>
   <data name="Status_SelectedModsEnableFailed" xml:space="preserve"><value>启用所选模组失败，请稍后重试。</value></data>
@@ -1070,8 +1070,8 @@
   <data name="GameSettings_SaveManagementLoading" xml:space="preserve"><value>正在加载存档...</value></data>
   <data name="GameSettings_SaveManagementSearchEmptyMessage" xml:space="preserve"><value>没有匹配的存档</value></data>
   <data name="Dialog_DeleteSavesTitle" xml:space="preserve"><value>删除存档</value></data>
-  <data name="Dialog_DeleteSingleSaveMessageFormat" xml:space="preserve"><value>确认删除存档“{0}”吗？此操作不可撤销。</value></data>
-  <data name="Dialog_DeleteMultipleSavesMessageFormat" xml:space="preserve"><value>确认删除这 {0} 个存档吗？此操作不可撤销。</value></data>
+  <data name="Dialog_DeleteSingleSaveMessageFormat" xml:space="preserve"><value>确认删除存档“{0}”吗？将优先移入系统回收站；回收站不可用时将直接删除。</value></data>
+  <data name="Dialog_DeleteMultipleSavesMessageFormat" xml:space="preserve"><value>确认删除这 {0} 个存档吗？将优先移入系统回收站；回收站不可用时将直接删除。</value></data>
   <data name="Dialog_InvalidSaveImportTitle" xml:space="preserve"><value>无法导入存档</value></data>
   <data name="Dialog_InvalidSaveArchiveMessage" xml:space="preserve"><value>选择的压缩包不是有效的 Minecraft 存档。</value></data>
   <data name="Dialog_UnsupportedSaveArchiveMessage" xml:space="preserve"><value>暂不支持导入该压缩格式。</value></data>
@@ -1089,9 +1089,9 @@
   <data name="GameSettings_DropFoldersUnsupportedMessage" xml:space="preserve"><value>暂不支持拖入文件夹。</value></data>
   <data name="Status_LocalModsImportedFormat" xml:space="preserve"><value>已导入 {0} 个模组</value></data>
   <data name="Status_LocalSavesImportedFormat" xml:space="preserve"><value>已导入 {0} 个存档</value></data>
-  <data name="Dialog_DeleteMultipleResourcePacksMessageFormat" xml:space="preserve"><value>确认删除这 {0} 个资源包吗？此操作不可撤销。</value></data>
+  <data name="Dialog_DeleteMultipleResourcePacksMessageFormat" xml:space="preserve"><value>确认删除这 {0} 个资源包吗？将优先移入系统回收站；回收站不可用时将直接删除。</value></data>
   <data name="Dialog_DeleteResourcePacksTitle" xml:space="preserve"><value>删除资源包</value></data>
-  <data name="Dialog_DeleteSingleResourcePackMessageFormat" xml:space="preserve"><value>确认删除资源包“{0}”吗？此操作不可撤销。</value></data>
+  <data name="Dialog_DeleteSingleResourcePackMessageFormat" xml:space="preserve"><value>确认删除资源包“{0}”吗？将优先移入系统回收站；回收站不可用时将直接删除。</value></data>
   <data name="Dialog_InvalidResourcePackImportTitle" xml:space="preserve"><value>无法导入资源包</value></data>
   <data name="Dialog_UnsupportedResourcePackArchiveMessage" xml:space="preserve"><value>当前仅支持导入 .zip 资源包。</value></data>
   <data name="FilePicker_ResourcePackArchiveFilter" xml:space="preserve"><value>资源包压缩包|*.zip|所有文件|*.*</value></data>
@@ -1124,9 +1124,9 @@
   <data name="Status_SelectedResourcePacksDeleteFailed" xml:space="preserve"><value>删除所选资源包失败，请稍后重试。</value></data>
   <data name="Status_SelectedResourcePacksDeletePartialFailedFormat" xml:space="preserve"><value>已删除 {0} 个资源包，{1} 个失败</value></data>
   <data name="Status_SelectedResourcePacksDeletedFormat" xml:space="preserve"><value>已删除 {0} 个资源包</value></data>
-  <data name="Dialog_DeleteMultipleShaderPacksMessageFormat" xml:space="preserve"><value>确认删除这 {0} 个光影包吗？此操作不可撤销。</value></data>
+  <data name="Dialog_DeleteMultipleShaderPacksMessageFormat" xml:space="preserve"><value>确认删除这 {0} 个光影包吗？将优先移入系统回收站；回收站不可用时将直接删除。</value></data>
   <data name="Dialog_DeleteShaderPacksTitle" xml:space="preserve"><value>删除光影包</value></data>
-  <data name="Dialog_DeleteSingleShaderPackMessageFormat" xml:space="preserve"><value>确认删除光影包“{0}”吗？此操作不可撤销。</value></data>
+  <data name="Dialog_DeleteSingleShaderPackMessageFormat" xml:space="preserve"><value>确认删除光影包“{0}”吗？将优先移入系统回收站；回收站不可用时将直接删除。</value></data>
   <data name="Dialog_InvalidShaderPackImportTitle" xml:space="preserve"><value>无法导入光影包</value></data>
   <data name="Dialog_UnsupportedShaderPackArchiveMessage" xml:space="preserve"><value>当前仅支持导入 .zip 光影包。</value></data>
   <data name="FilePicker_ShaderPackArchiveFilter" xml:space="preserve"><value>光影包压缩包|*.zip|所有文件|*.*</value></data>

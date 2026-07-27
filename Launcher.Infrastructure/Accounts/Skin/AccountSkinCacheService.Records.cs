@@ -127,17 +127,6 @@ internal sealed partial class AccountSkinCacheService
         return path.StartsWith(normalizedDirectory, StringComparison.OrdinalIgnoreCase);
     }
 
-    private static void TryDeleteFile(string path)
-    {
-        try
-        {
-            File.Delete(path);
-        }
-        catch
-        {
-        }
-    }
-
     private static string ComputeSkinContentHash(byte[] bytes)
     {
         try

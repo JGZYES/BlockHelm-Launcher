@@ -54,10 +54,14 @@ public sealed partial class InstanceBackupService : IInstanceBackupService
     private static readonly ConcurrentDictionary<string, SemaphoreSlim> DirectoryLocks =
         new(StringComparer.OrdinalIgnoreCase);
     private readonly ILogger<InstanceBackupService> logger;
+    private readonly IUserFileDeletionService userFileDeletionService;
 
-    public InstanceBackupService(ILogger<InstanceBackupService>? logger = null)
+    public InstanceBackupService(
+        ILogger<InstanceBackupService>? logger = null,
+        IUserFileDeletionService? userFileDeletionService = null)
     {
         this.logger = logger ?? NullLogger<InstanceBackupService>.Instance;
+        this.userFileDeletionService = userFileDeletionService ?? new UserFileDeletionService();
     }
 
     public Task<string> EnsureBackupDirectoryAsync(string backupDirectory, CancellationToken cancellationToken = default)
@@ -316,7 +320,7 @@ public sealed partial class InstanceBackupService : IInstanceBackupService
                             .ConfigureAwait(false);
                         var manifestPath = GetManifestPath(normalizedBackupDirectory);
                         if (File.Exists(normalizedBackupFullPath))
-                            File.Delete(normalizedBackupFullPath);
+                            userFileDeletionService.DeleteFile(normalizedBackupFullPath);
 
                         var records = await ReadManifestAsync(manifestPath, cancellationToken).ConfigureAwait(false);
                         var remainingRecords = NormalizeAndFilterRecords(normalizedBackupDirectory, records)

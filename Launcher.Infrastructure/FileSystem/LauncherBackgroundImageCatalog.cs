@@ -27,10 +27,15 @@ public sealed class LauncherBackgroundImageCatalog : ILauncherBackgroundImageCat
         ".tiff"
     };
 
-    public LauncherBackgroundImageCatalog(LauncherPathProvider pathProvider)
+    private readonly IUserFileDeletionService userFileDeletionService;
+
+    public LauncherBackgroundImageCatalog(
+        LauncherPathProvider pathProvider,
+        IUserFileDeletionService? userFileDeletionService = null)
     {
         ArgumentNullException.ThrowIfNull(pathProvider);
         DirectoryPath = Path.Combine(pathProvider.DefaultDataDirectory, "images");
+        this.userFileDeletionService = userFileDeletionService ?? new UserFileDeletionService();
     }
 
     public string DirectoryPath { get; }
@@ -54,6 +59,6 @@ public sealed class LauncherBackgroundImageCatalog : ILauncherBackgroundImageCat
     public void ClearImages()
     {
         foreach (var imagePath in GetCandidatePaths())
-            File.Delete(imagePath);
+            userFileDeletionService.DeleteFile(imagePath);
     }
 }

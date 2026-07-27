@@ -23,7 +23,9 @@ using System.Security.Cryptography;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using Launcher.Application.Accounts;
+using Launcher.Application.Services;
 using Launcher.Domain.Models;
+using Launcher.Infrastructure.FileSystem;
 
 namespace Launcher.Infrastructure.Accounts;
 
@@ -38,18 +40,29 @@ internal sealed partial class AccountSkinCacheService
 
     private readonly HttpClient httpClient;
     private readonly string skinDirectory;
+    private readonly IUserFileDeletionService userFileDeletionService;
 
     public AccountSkinCacheService(HttpClient httpClient, LauncherPathProvider pathProvider)
         : this(
             httpClient,
-            Path.Combine(pathProvider.DefaultAccountDataDirectory, "microsoft", "skins"))
+            Path.Combine(pathProvider.DefaultAccountDataDirectory, "microsoft", "skins"),
+            new UserFileDeletionService())
     {
     }
 
     internal AccountSkinCacheService(HttpClient httpClient, string skinDirectory)
+        : this(httpClient, skinDirectory, new UserFileDeletionService())
+    {
+    }
+
+    internal AccountSkinCacheService(
+        HttpClient httpClient,
+        string skinDirectory,
+        IUserFileDeletionService userFileDeletionService)
     {
         this.httpClient = httpClient;
         this.skinDirectory = skinDirectory;
+        this.userFileDeletionService = userFileDeletionService;
         Directory.CreateDirectory(this.skinDirectory);
     }
 

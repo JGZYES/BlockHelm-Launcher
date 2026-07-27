@@ -17,9 +17,12 @@
  * SPDX-License-Identifier: GPL-3.0-only
  */
 
+using System.IO;
 using System.Net.Http;
 using Launcher.Application.Accounts;
+using Launcher.Application.Services;
 using Launcher.Domain.Models;
+using Launcher.Infrastructure.FileSystem;
 
 namespace Launcher.Infrastructure.Accounts;
 
@@ -31,16 +34,32 @@ public sealed class AccountSkinLibraryService : IAccountSkinLibraryService
     private readonly object sharedLibraryGate = new();
     private IReadOnlyList<LauncherSkinRecord>? sharedSnapshot;
 
-    public AccountSkinLibraryService()
-        : this(HttpClient, new LauncherPathProvider())
+    public AccountSkinLibraryService(
+        LauncherPathProvider? pathProvider = null,
+        IUserFileDeletionService? userFileDeletionService = null)
+        : this(
+            HttpClient,
+            pathProvider ?? new LauncherPathProvider(),
+            userFileDeletionService ?? new UserFileDeletionService())
     {
     }
 
     internal AccountSkinLibraryService(
         HttpClient httpClient,
         LauncherPathProvider pathProvider)
+        : this(httpClient, pathProvider, new UserFileDeletionService())
     {
-        skinCacheService = new AccountSkinCacheService(httpClient, pathProvider);
+    }
+
+    internal AccountSkinLibraryService(
+        HttpClient httpClient,
+        LauncherPathProvider pathProvider,
+        IUserFileDeletionService userFileDeletionService)
+    {
+        skinCacheService = new AccountSkinCacheService(
+            httpClient,
+            Path.Combine(pathProvider.DefaultAccountDataDirectory, "microsoft", "skins"),
+            userFileDeletionService);
         avatarService = new AccountAvatarService(httpClient, pathProvider);
     }
 

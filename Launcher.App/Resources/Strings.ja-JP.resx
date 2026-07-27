@@ -2609,10 +2609,10 @@
     <value>バックアップを削除</value>
   </data>
   <data name="Dialog_DeleteBackupMessageFormat" xml:space="preserve">
-    <value>バックアップ「{0}」を削除してもよろしいですか？この操作は元に戻せません。</value>
+    <value>バックアップ「{0}」を削除しますか？可能な場合はごみ箱に移動し、ごみ箱を利用できない場合は完全に削除します。</value>
   </data>
   <data name="Dialog_DeleteMultipleBackupsMessageFormat" xml:space="preserve">
-    <value>この {0} 個のバックアップを削除してもよろしいですか？この操作は元に戻せません。</value>
+    <value>この {0} 個のバックアップを削除しますか？可能な場合はごみ箱に移動し、ごみ箱を利用できない場合は完全に削除します。</value>
   </data>
   <data name="Dialog_RestoreBackupTitle" xml:space="preserve">
     <value>バックアップを復元</value>
@@ -3019,10 +3019,10 @@
     <value>Mod を削除</value>
   </data>
   <data name="Dialog_DeleteSingleModMessageFormat" xml:space="preserve">
-    <value>mod「{0}」を削除してもよろしいですか？この操作は元に戻せません。</value>
+    <value>mod「{0}」を削除しますか？可能な場合はごみ箱に移動し、ごみ箱を利用できない場合は完全に削除します。</value>
   </data>
   <data name="Dialog_DeleteMultipleModsMessageFormat" xml:space="preserve">
-    <value>この {0} 個の mod を削除してもよろしいですか？この操作は元に戻せません。</value>
+    <value>この {0} 個の mod を削除しますか？可能な場合はごみ箱に移動し、ごみ箱を利用できない場合は完全に削除します。</value>
   </data>
   <data name="Status_SelectedModsEnabledFormat" xml:space="preserve">
     <value>{0} 個の mod を有効化しました</value>
@@ -3133,10 +3133,10 @@
     <value>セーブデータを削除</value>
   </data>
   <data name="Dialog_DeleteSingleSaveMessageFormat" xml:space="preserve">
-    <value>セーブデータ「{0}」を削除してもよろしいですか？この操作は元に戻せません。</value>
+    <value>セーブデータ「{0}」を削除しますか？可能な場合はごみ箱に移動し、ごみ箱を利用できない場合は完全に削除します。</value>
   </data>
   <data name="Dialog_DeleteMultipleSavesMessageFormat" xml:space="preserve">
-    <value>この {0} 個のセーブデータを削除してもよろしいですか？この操作は元に戻せません。</value>
+    <value>この {0} 個のセーブデータを削除しますか？可能な場合はごみ箱に移動し、ごみ箱を利用できない場合は完全に削除します。</value>
   </data>
   <data name="Dialog_InvalidSaveImportTitle" xml:space="preserve">
     <value>セーブデータをインポートできません</value>
@@ -3190,13 +3190,13 @@
     <value>{0} 個のセーブデータをインポートしました</value>
   </data>
   <data name="Dialog_DeleteMultipleResourcePacksMessageFormat" xml:space="preserve">
-    <value>この {0} 個のリソースパックを削除してもよろしいですか？この操作は元に戻せません。</value>
+    <value>この {0} 個のリソースパックを削除しますか？可能な場合はごみ箱に移動し、ごみ箱を利用できない場合は完全に削除します。</value>
   </data>
   <data name="Dialog_DeleteResourcePacksTitle" xml:space="preserve">
     <value>リソースパックを削除</value>
   </data>
   <data name="Dialog_DeleteSingleResourcePackMessageFormat" xml:space="preserve">
-    <value>リソースパック「{0}」を削除してもよろしいですか？この操作は元に戻せません。</value>
+    <value>リソースパック「{0}」を削除しますか？可能な場合はごみ箱に移動し、ごみ箱を利用できない場合は完全に削除します。</value>
   </data>
   <data name="Dialog_InvalidResourcePackImportTitle" xml:space="preserve">
     <value>リソースパックをインポートできません</value>
@@ -3295,13 +3295,13 @@
     <value>{0} 個のリソースパックを削除しました</value>
   </data>
   <data name="Dialog_DeleteMultipleShaderPacksMessageFormat" xml:space="preserve">
-    <value>この {0} 個のシェーダーパックを削除してもよろしいですか？この操作は元に戻せません。</value>
+    <value>この {0} 個のシェーダーパックを削除しますか？可能な場合はごみ箱に移動し、ごみ箱を利用できない場合は完全に削除します。</value>
   </data>
   <data name="Dialog_DeleteShaderPacksTitle" xml:space="preserve">
     <value>シェーダーパックを削除</value>
   </data>
   <data name="Dialog_DeleteSingleShaderPackMessageFormat" xml:space="preserve">
-    <value>シェーダーパック「{0}」を削除してもよろしいですか？この操作は元に戻せません。</value>
+    <value>シェーダーパック「{0}」を削除しますか？可能な場合はごみ箱に移動し、ごみ箱を利用できない場合は完全に削除します。</value>
   </data>
   <data name="Dialog_InvalidShaderPackImportTitle" xml:space="preserve">
     <value>シェーダーパックをインポートできません</value>

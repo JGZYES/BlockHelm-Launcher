@@ -133,7 +133,7 @@ internal sealed partial class AccountSkinCacheService
         foreach (var candidate in candidates)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            TryDeleteFile(candidate);
+            userFileDeletionService.DeleteFile(candidate);
         }
 
         return Task.CompletedTask;

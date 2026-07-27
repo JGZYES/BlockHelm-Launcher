@@ -51,13 +51,18 @@ public sealed class ModService : IModService
 
     private readonly LauncherPathProvider pathProvider;
     private readonly ILogger<ModService> logger;
+    private readonly IUserFileDeletionService userFileDeletionService;
     private readonly string legacyIconCacheDirectory;
     private int legacyIconCacheCleanupStarted;
 
-    public ModService(LauncherPathProvider? pathProvider = null, ILogger<ModService>? logger = null)
+    public ModService(
+        LauncherPathProvider? pathProvider = null,
+        ILogger<ModService>? logger = null,
+        IUserFileDeletionService? userFileDeletionService = null)
     {
         this.pathProvider = pathProvider ?? new LauncherPathProvider();
         this.logger = logger ?? NullLogger<ModService>.Instance;
+        this.userFileDeletionService = userFileDeletionService ?? new UserFileDeletionService();
         legacyIconCacheDirectory = Path.Combine(this.pathProvider.DefaultDataDirectory, "cache", "mods", "icons");
     }
 
@@ -158,7 +163,7 @@ public sealed class ModService : IModService
     {
         if (File.Exists(mod.FullPath))
         {
-            File.Delete(mod.FullPath);
+            userFileDeletionService.DeleteFile(mod.FullPath);
             logger.LogInformation("Local mod deleted. FileName={FileName}", mod.FileName);
         }
 

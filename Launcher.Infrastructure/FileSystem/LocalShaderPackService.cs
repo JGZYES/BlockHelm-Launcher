@@ -29,10 +29,14 @@ public sealed class LocalShaderPackService : ILocalShaderPackService
 {
     private const string SupportedArchiveExtension = ".zip";
     private readonly ILogger<LocalShaderPackService> logger;
+    private readonly IUserFileDeletionService userFileDeletionService;
 
-    public LocalShaderPackService(ILogger<LocalShaderPackService>? logger = null)
+    public LocalShaderPackService(
+        ILogger<LocalShaderPackService>? logger = null,
+        IUserFileDeletionService? userFileDeletionService = null)
     {
         this.logger = logger ?? NullLogger<LocalShaderPackService>.Instance;
+        this.userFileDeletionService = userFileDeletionService ?? new UserFileDeletionService();
     }
 
     public Task<IReadOnlyList<LocalShaderPack>> GetShaderPacksAsync(
@@ -104,7 +108,7 @@ public sealed class LocalShaderPackService : ILocalShaderPackService
                     return;
                 }
 
-                File.Delete(shaderPack.FullPath);
+                userFileDeletionService.DeleteFile(shaderPack.FullPath);
                 logger.LogInformation("Local shader pack deleted. Name={Name}", shaderPack.Name);
                 logger.LogDebug("Deleted local shader pack path. Path={Path}", shaderPack.FullPath);
             },

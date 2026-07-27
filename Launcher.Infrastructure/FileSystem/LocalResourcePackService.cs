@@ -38,14 +38,17 @@ public sealed class LocalResourcePackService : ILocalResourcePackService
     private const string SupportedArchiveExtension = ".zip";
     private readonly LauncherPathProvider pathProvider;
     private readonly ILogger<LocalResourcePackService> logger;
+    private readonly IUserFileDeletionService userFileDeletionService;
     private readonly string iconCacheDirectory;
 
     public LocalResourcePackService(
         LauncherPathProvider? pathProvider = null,
-        ILogger<LocalResourcePackService>? logger = null)
+        ILogger<LocalResourcePackService>? logger = null,
+        IUserFileDeletionService? userFileDeletionService = null)
     {
         this.pathProvider = pathProvider ?? new LauncherPathProvider();
         this.logger = logger ?? NullLogger<LocalResourcePackService>.Instance;
+        this.userFileDeletionService = userFileDeletionService ?? new UserFileDeletionService();
         iconCacheDirectory = Path.Combine(this.pathProvider.DefaultDataDirectory, "cache", "resourcepacks", "icons");
     }
 
@@ -119,7 +122,7 @@ public sealed class LocalResourcePackService : ILocalResourcePackService
                     return;
                 }
 
-                File.Delete(resourcePack.FullPath);
+                userFileDeletionService.DeleteFile(resourcePack.FullPath);
                 logger.LogInformation("Local resource pack deleted. Name={Name}", resourcePack.Name);
                 logger.LogDebug("Deleted local resource pack path. Path={Path}", resourcePack.FullPath);
             },

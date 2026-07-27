@@ -104,6 +104,7 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<ILoaderInstallerJavaRuntimeProvisioner>(serviceProvider =>
             serviceProvider.GetRequiredService<CmlLibJavaRuntimeProvisioningService>());
         services.AddSingleton<ISystemMemoryService, WindowsSystemMemoryService>();
+        services.AddSingleton<IUserFileDeletionService, UserFileDeletionService>();
         services.AddSingleton<IModService, ModService>();
         services.AddSingleton<ILocalModIconEnrichmentService, LocalModIconEnrichmentService>();
         services.AddSingleton<ILocalResourceCategoryEnrichmentService, LocalResourceCategoryEnrichmentService>();

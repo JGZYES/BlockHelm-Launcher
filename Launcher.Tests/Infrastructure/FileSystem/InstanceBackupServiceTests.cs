@@ -71,6 +71,65 @@ public sealed class InstanceBackupServiceTests
     }
 
     [Fact]
+    public async Task DeleteBackupUsesUserDeletionAndRemovesManifestRecord()
+    {
+        var rootDirectory = CreateTempDirectory();
+        try
+        {
+            var instanceDirectory = Path.Combine(rootDirectory, ".minecraft", "versions", "instance-a");
+            var backupDirectory = Path.Combine(rootDirectory, "backups");
+            Directory.CreateDirectory(instanceDirectory);
+            File.WriteAllText(Path.Combine(instanceDirectory, "options.txt"), "options");
+            var deletion = new RecordingUserFileDeletionService();
+            var service = new InstanceBackupService(userFileDeletionService: deletion);
+            var backup = await service.CreateBackupAsync(
+                CreateInstance(instanceDirectory),
+                backupDirectory,
+                "Recoverable");
+
+            await service.DeleteBackupAsync(backupDirectory, backup.FullPath);
+
+            Assert.Equal(backup.FullPath, Assert.Single(deletion.Files));
+            Assert.Empty(await service.GetBackupsAsync(backupDirectory));
+        }
+        finally
+        {
+            DeleteDirectoryIfExists(rootDirectory);
+        }
+    }
+
+    [Fact]
+    public async Task DeleteBackupFailurePreservesFileAndManifestRecord()
+    {
+        var rootDirectory = CreateTempDirectory();
+        try
+        {
+            var instanceDirectory = Path.Combine(rootDirectory, ".minecraft", "versions", "instance-a");
+            var backupDirectory = Path.Combine(rootDirectory, "backups");
+            Directory.CreateDirectory(instanceDirectory);
+            File.WriteAllText(Path.Combine(instanceDirectory, "options.txt"), "options");
+            var deletion = new RecordingUserFileDeletionService();
+            var service = new InstanceBackupService(userFileDeletionService: deletion);
+            var backup = await service.CreateBackupAsync(
+                CreateInstance(instanceDirectory),
+                backupDirectory,
+                "Preserved");
+            deletion.Failure = new IOException("deletion failed");
+
+            await Assert.ThrowsAsync<IOException>(
+                () => service.DeleteBackupAsync(backupDirectory, backup.FullPath));
+
+            Assert.True(File.Exists(backup.FullPath));
+            Assert.Equal(backup.FullPath, Assert.Single(deletion.Files));
+            Assert.Equal(backup.FullPath, Assert.Single(await service.GetBackupsAsync(backupDirectory)).FullPath);
+        }
+        finally
+        {
+            DeleteDirectoryIfExists(rootDirectory);
+        }
+    }
+
+    [Fact]
     public async Task CreateBackupAsyncRejectsDirectoryReparsePointWithoutArchivingExternalFiles()
     {
         var rootDirectory = CreateTempDirectory();
@@ -459,5 +518,22 @@ public sealed class InstanceBackupServiceTests
         foreach (var file in Directory.EnumerateFiles(directory))
             File.Delete(file);
         Directory.Delete(directory, recursive: false);
+    }
+
+    private sealed class RecordingUserFileDeletionService : IUserFileDeletionService
+    {
+        public List<string> Files { get; } = [];
+        public Exception? Failure { get; set; }
+
+        public void DeleteFile(string path)
+        {
+            Files.Add(Path.GetFullPath(path));
+            if (Failure is not null)
+                throw Failure;
+            File.Delete(path);
+        }
+
+        public void DeleteDirectory(string path) =>
+            throw new InvalidOperationException("Backup deletion must not delete directories.");
     }
 }

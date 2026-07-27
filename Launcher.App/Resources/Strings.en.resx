@@ -2609,10 +2609,10 @@ Exception summary: {1}</value>
     <value>Delete Backup</value>
   </data>
   <data name="Dialog_DeleteBackupMessageFormat" xml:space="preserve">
-    <value>Delete backup "{0}"? This cannot be undone.</value>
+    <value>Delete backup "{0}"? It will be moved to the Recycle Bin when possible; otherwise it will be permanently deleted.</value>
   </data>
   <data name="Dialog_DeleteMultipleBackupsMessageFormat" xml:space="preserve">
-    <value>Delete these {0} backups? This cannot be undone.</value>
+    <value>Delete these {0} backups? They will be moved to the Recycle Bin when possible; otherwise they will be permanently deleted.</value>
   </data>
   <data name="Dialog_RestoreBackupTitle" xml:space="preserve">
     <value>Restore Backup</value>
@@ -3019,10 +3019,10 @@ The current game folder will be backed up first.</value>
     <value>Delete Mods</value>
   </data>
   <data name="Dialog_DeleteSingleModMessageFormat" xml:space="preserve">
-    <value>Delete mod "{0}"? This cannot be undone.</value>
+    <value>Delete mod "{0}"? It will be moved to the Recycle Bin when possible; otherwise it will be permanently deleted.</value>
   </data>
   <data name="Dialog_DeleteMultipleModsMessageFormat" xml:space="preserve">
-    <value>Delete these {0} mods? This cannot be undone.</value>
+    <value>Delete these {0} mods? They will be moved to the Recycle Bin when possible; otherwise they will be permanently deleted.</value>
   </data>
   <data name="Status_SelectedModsEnabledFormat" xml:space="preserve">
     <value>Enabled {0} mods</value>
@@ -3133,10 +3133,10 @@ The current game folder will be backed up first.</value>
     <value>Delete Saves</value>
   </data>
   <data name="Dialog_DeleteSingleSaveMessageFormat" xml:space="preserve">
-    <value>Delete save "{0}"? This cannot be undone.</value>
+    <value>Delete save "{0}"? It will be moved to the Recycle Bin when possible; otherwise it will be permanently deleted.</value>
   </data>
   <data name="Dialog_DeleteMultipleSavesMessageFormat" xml:space="preserve">
-    <value>Delete these {0} saves? This cannot be undone.</value>
+    <value>Delete these {0} saves? They will be moved to the Recycle Bin when possible; otherwise they will be permanently deleted.</value>
   </data>
   <data name="Dialog_InvalidSaveImportTitle" xml:space="preserve">
     <value>Cannot Import Save</value>
@@ -3190,13 +3190,13 @@ The current game folder will be backed up first.</value>
     <value>Imported {0} saves</value>
   </data>
   <data name="Dialog_DeleteMultipleResourcePacksMessageFormat" xml:space="preserve">
-    <value>Delete these {0} resource packs? This cannot be undone.</value>
+    <value>Delete these {0} resource packs? They will be moved to the Recycle Bin when possible; otherwise they will be permanently deleted.</value>
   </data>
   <data name="Dialog_DeleteResourcePacksTitle" xml:space="preserve">
     <value>Delete Resource Packs</value>
   </data>
   <data name="Dialog_DeleteSingleResourcePackMessageFormat" xml:space="preserve">
-    <value>Delete resource pack "{0}"? This cannot be undone.</value>
+    <value>Delete resource pack "{0}"? It will be moved to the Recycle Bin when possible; otherwise it will be permanently deleted.</value>
   </data>
   <data name="Dialog_InvalidResourcePackImportTitle" xml:space="preserve">
     <value>Cannot Import Resource Pack</value>
@@ -3295,13 +3295,13 @@ The current game folder will be backed up first.</value>
     <value>Deleted {0} resource packs</value>
   </data>
   <data name="Dialog_DeleteMultipleShaderPacksMessageFormat" xml:space="preserve">
-    <value>Delete these {0} shader packs? This cannot be undone.</value>
+    <value>Delete these {0} shader packs? They will be moved to the Recycle Bin when possible; otherwise they will be permanently deleted.</value>
   </data>
   <data name="Dialog_DeleteShaderPacksTitle" xml:space="preserve">
     <value>Delete Shader Packs</value>
   </data>
   <data name="Dialog_DeleteSingleShaderPackMessageFormat" xml:space="preserve">
-    <value>Delete shader pack "{0}"? This cannot be undone.</value>
+    <value>Delete shader pack "{0}"? It will be moved to the Recycle Bin when possible; otherwise it will be permanently deleted.</value>
   </data>
   <data name="Dialog_InvalidShaderPackImportTitle" xml:space="preserve">
     <value>Cannot Import Shader Pack</value>

@@ -21,20 +21,35 @@ internal static class WindowsRecycleBin
 
     public static void MoveDirectory(string path)
     {
+        if (!Directory.Exists(path))
+            return;
+        MovePath(path);
+    }
+
+    public static void MovePath(string path)
+    {
         if (!OperatingSystem.IsWindows())
             throw new PlatformNotSupportedException("The system recycle bin is only available on Windows.");
+
+        var normalizedPath = Path.GetFullPath(path);
+        if (!File.Exists(normalizedPath) && !Directory.Exists(normalizedPath))
+            return;
 
         var operation = new ShellFileOperation
         {
             Function = FileOperationDelete,
-            From = Path.GetFullPath(path) + '\0' + '\0',
+            From = normalizedPath + '\0' + '\0',
             Flags = AllowUndo | NoConfirmation | Silent | NoErrorUi
         };
         var result = SHFileOperation(ref operation);
         if (result != 0)
-            throw new Win32Exception(result, "Failed to move the staged instance directory to the recycle bin.");
-        if (operation.AnyOperationsAborted || Directory.Exists(path))
-            throw new IOException("Moving the staged instance directory to the recycle bin was aborted.");
+            throw new Win32Exception(result, "Failed to move the path to the recycle bin.");
+        if (operation.AnyOperationsAborted
+            || File.Exists(normalizedPath)
+            || Directory.Exists(normalizedPath))
+        {
+            throw new IOException("Moving the path to the recycle bin was aborted.");
+        }
     }
 
     [DllImport("shell32.dll", CharSet = CharSet.Unicode)]
