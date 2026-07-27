@@ -242,6 +242,63 @@ public sealed class ResourcesProjectInstallViewModelTests
         Assert.Equal(DownloadTaskState.Completed, remainingTask.State);
     }
 
+    [Fact]
+    public async Task LocalDownloadUsesExactSaveDialogDestination()
+    {
+        var destination = Path.Combine("chosen", "renamed.jar");
+        var picker = new StubFilePickerService { ResourceDestination = destination };
+        var installation = new RecordingInstallationService();
+        var tasks = new DownloadTasksPageViewModel(TimeSpan.FromMinutes(1));
+        var viewModel = CreateViewModel(
+            installation,
+            tasks,
+            _ => { },
+            filePickerService: picker);
+
+        await viewModel.InstallAsync(
+            CreateVersionItem(ResourceProjectKind.Mod),
+            ResourcesModInstallTargetItemViewModel.CreateLocalDownload(),
+            null);
+
+        var request = Assert.Single(installation.ExecutedRequests);
+        Assert.Equal(Path.GetFullPath(destination), request.DestinationPath);
+        Assert.Equal(Path.GetDirectoryName(Path.GetFullPath(destination)), request.TargetDirectory);
+        Assert.NotNull(request.ExpectedDestinationState);
+        Assert.Equal("mod.jar", picker.LastDefaultFileName);
+    }
+
+    [Fact]
+    public async Task ExistingInstanceRejectsDestinationOutsideItsContentDirectory()
+    {
+        var picker = new StubFilePickerService
+        {
+            ResourceDestination = Path.Combine(Path.GetTempPath(), "outside", "mod.jar")
+        };
+        var installation = new RecordingInstallationService();
+        var tasks = new DownloadTasksPageViewModel(TimeSpan.FromMinutes(1));
+        var statuses = new List<string>();
+        var viewModel = CreateViewModel(
+            installation,
+            tasks,
+            statuses.Add,
+            filePickerService: picker);
+        var instance = new GameInstance
+        {
+            Id = "instance",
+            InstanceDirectory = Path.Combine(Path.GetTempPath(), "instance")
+        };
+
+        await viewModel.InstallAsync(
+            CreateVersionItem(ResourceProjectKind.Mod),
+            ResourcesModInstallTargetItemViewModel.FromInstance(instance),
+            null);
+
+        Assert.Empty(installation.ExecutedRequests);
+        Assert.Empty(tasks.Tasks);
+        Assert.Contains(Strings.Status_ResourceProjectInstanceDestinationInvalid, statuses);
+        Assert.Equal(Path.Combine(instance.InstanceDirectory, "mods"), picker.LastInitialDirectory);
+    }
+
     private static ResourcesProjectInstallViewModel CreateViewModel(
         IResourceProjectInstallationService installation,
         DownloadTasksPageViewModel tasks,
@@ -332,7 +389,12 @@ public sealed class ResourcesProjectInstallViewModelTests
         public Task<ResourceProjectInstallationPreparationResult> PrepareAsync(
             ResourceProjectInstallationRequest request,
             CancellationToken cancellationToken = default) =>
-            Task.FromResult(new ResourceProjectInstallationPreparationResult(TargetExists, TargetPath));
+            Task.FromResult(new ResourceProjectInstallationPreparationResult(
+                TargetExists,
+                TargetPath,
+                request.DestinationPath is null
+                    ? null
+                    : new ResourceProjectDestinationState(false, 0, 0, string.Empty)));
 
         public async Task<ResourceProjectInstallationResult> ExecuteAsync(
             ResourceProjectInstallationRequest request,
@@ -449,6 +511,10 @@ public sealed class ResourcesProjectInstallViewModelTests
 
     private sealed class StubFilePickerService(string? folder = "target") : IFilePickerService
     {
+        public string? ResourceDestination { get; init; }
+        public string? LastDefaultFileName { get; private set; }
+        public string? LastInitialDirectory { get; private set; }
+
         public string? PickMinecraftSkin() => null;
         public string? PickJavaExecutable() => null;
         public string? PickLocalImportFile() => null;
@@ -459,6 +525,16 @@ public sealed class ResourcesProjectInstallViewModelTests
         public string? PickModpackExportArchive(string defaultFileName, ModpackExportKind kind) => null;
         public string? PickLaunchDiagnosticExportArchive(string instanceName) => null;
         public string? PickCustomDownloadDestination(string defaultFileName) => null;
+        public string? PickResourceProjectDestination(
+            string title,
+            string defaultFileName,
+            string? initialDirectory = null)
+        {
+            LastDefaultFileName = defaultFileName;
+            LastInitialDirectory = initialDirectory;
+            return ResourceDestination
+                ?? Path.Combine(initialDirectory ?? folder ?? string.Empty, defaultFileName);
+        }
         public string? PickFolder(string title, string? initialDirectory = null) => folder;
     }
 }

@@ -34,11 +34,39 @@ public sealed record ResourceProjectInstallationRequest(
     ResourceProjectInstallationTargetKind TargetKind,
     string? TargetDirectory = null,
     GameInstance? Instance = null,
-    ResourceProject? Project = null);
+    ResourceProject? Project = null,
+    string? DestinationPath = null,
+    ResourceProjectDestinationState? ExpectedDestinationState = null);
 
 public sealed record ResourceProjectInstallationPreparationResult(
     bool TargetExists,
-    string? TargetPath = null);
+    string? TargetPath = null,
+    ResourceProjectDestinationState? DestinationState = null);
+
+public sealed record ResourceProjectDestinationState(
+    bool Exists,
+    long Length,
+    long LastWriteTimeUtcTicks,
+    string Sha256);
+
+public enum ResourceProjectDestinationConflictReason
+{
+    ExistingDifferentContent,
+    ChangedAfterConfirmation,
+    OutsideInstanceContentDirectory,
+    InvalidFileName
+}
+
+public sealed class ResourceProjectDestinationConflictException(
+    string destinationPath,
+    ResourceProjectDestinationConflictReason reason,
+    Exception? innerException = null)
+    : IOException($"Resource project destination conflict: {reason}.", innerException)
+{
+    public string DestinationPath { get; } = destinationPath;
+
+    public ResourceProjectDestinationConflictReason Reason { get; } = reason;
+}
 
 public sealed record ResourceProjectInstallationResult(
     string? InstalledPath = null,

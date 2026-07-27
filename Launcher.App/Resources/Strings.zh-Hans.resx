@@ -1297,4 +1297,6 @@
   <data name="Status_CustomFileDownloading" xml:space="preserve"><value>正在下载...</value></data>
   <data name="Status_CustomFileDownloadCompleted" xml:space="preserve"><value>下载完成</value></data>
   <data name="Status_CustomFileDownloadFailed" xml:space="preserve"><value>下载失败，请检查网络或保存位置后重试。</value></data>
+  <data name="Status_ResourceProjectDestinationConflictFormat" xml:space="preserve"><value>文件“{0}”已存在或在确认后发生变化，下载已停止，原文件未被覆盖。</value></data>
+  <data name="Status_ResourceProjectInstanceDestinationInvalid" xml:space="preserve"><value>请选择当前实例对应的模组、资源包或光影包目录，不能保存到其他位置。</value></data>
 </root>

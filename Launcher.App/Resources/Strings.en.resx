@@ -3589,4 +3589,6 @@ The current game folder will be backed up first.</value>
   <data name="Status_CustomFileDownloading" xml:space="preserve"><value>Downloading...</value></data>
   <data name="Status_CustomFileDownloadCompleted" xml:space="preserve"><value>Download complete</value></data>
   <data name="Status_CustomFileDownloadFailed" xml:space="preserve"><value>Download failed. Check the network or save location and try again.</value></data>
+  <data name="Status_ResourceProjectDestinationConflictFormat" xml:space="preserve"><value>“{0}” already exists or changed after confirmation. The download was stopped and the original file was not overwritten.</value></data>
+  <data name="Status_ResourceProjectInstanceDestinationInvalid" xml:space="preserve"><value>Choose this instance's mods, resourcepacks, or shaderpacks folder. Other locations are not allowed.</value></data>
 </root>

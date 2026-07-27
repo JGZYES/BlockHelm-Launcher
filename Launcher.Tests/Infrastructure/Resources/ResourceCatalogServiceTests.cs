@@ -160,20 +160,161 @@ public sealed class ResourceCatalogServiceTests : TestTempDirectory
             Content = new StringContent("modified")
         });
         var service = CreateService(handler);
+        var destinationWriter = Assert.IsAssignableFrom<IResourceCatalogDestinationWriter>(service);
+        var version = new ResourceProjectVersion
+        {
+            VersionId = "v1",
+            FileName = "mod.jar",
+            PrimaryDownloadUrl = "https://download.test/mod.jar",
+            ExpectedFileSize = Encoding.UTF8.GetByteCount("modified"),
+            FileHashes = [CreateHash(ResourceFileHashAlgorithm.Sha512, "expected")]
+        };
+        var destinationState = await destinationWriter.CaptureDownloadDestinationAsync(
+            version,
+            target,
+            CancellationToken.None);
 
         var exception = await Assert.ThrowsAsync<ResourceProjectIntegrityException>(() =>
-            service.DownloadProjectVersionAsync(new ResourceProjectVersion
-            {
-                VersionId = "v1",
-                FileName = "mod.jar",
-                PrimaryDownloadUrl = "https://download.test/mod.jar",
-                ExpectedFileSize = Encoding.UTF8.GetByteCount("modified"),
-                FileHashes = [CreateHash(ResourceFileHashAlgorithm.Sha512, "expected")]
-            }, TempRoot));
+            destinationWriter.DownloadProjectVersionToDestinationAsync(
+                version,
+                target,
+                destinationState,
+                progress: null,
+                CancellationToken.None));
 
         Assert.Equal(ResourceProjectIntegrityFailureReason.HashMismatch, exception.Reason);
         Assert.Equal("existing", await File.ReadAllTextAsync(target));
         Assert.Empty(Directory.GetFiles(TempRoot, "*.download"));
+    }
+
+    [Fact]
+    public async Task InstanceInstallRejectsSameNameDifferentContentWithoutDownloadingOrOverwriting()
+    {
+        var instanceDirectory = Path.Combine(TempRoot, "instance");
+        var modsDirectory = Path.Combine(instanceDirectory, "mods");
+        Directory.CreateDirectory(modsDirectory);
+        var target = Path.Combine(modsDirectory, "dependency.jar");
+        await File.WriteAllTextAsync(target, "user-owned");
+        var handler = new StubHandler(_ =>
+            new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent("dependency") });
+        var service = CreateService(handler);
+
+        var exception = await Assert.ThrowsAsync<ResourceProjectDestinationConflictException>(() =>
+            service.InstallProjectVersionAsync(
+                new ResourceProjectVersion
+                {
+                    Kind = ResourceProjectKind.Mod,
+                    VersionId = "dependency",
+                    FileName = "dependency.jar",
+                    PrimaryDownloadUrl = "https://download.test/dependency.jar",
+                    ExpectedFileSize = Encoding.UTF8.GetByteCount("dependency"),
+                    FileHashes = [CreateHash(ResourceFileHashAlgorithm.Sha512, "dependency")]
+                },
+                new GameInstance { Id = "instance", InstanceDirectory = instanceDirectory }));
+
+        Assert.Equal(ResourceProjectDestinationConflictReason.ExistingDifferentContent, exception.Reason);
+        Assert.Equal("user-owned", await File.ReadAllTextAsync(target));
+        Assert.Empty(handler.Requests);
+    }
+
+    [Fact]
+    public async Task ExplicitDownloadStopsWhenMissingTargetAppearsAfterConfirmation()
+    {
+        Directory.CreateDirectory(TempRoot);
+        var target = Path.Combine(TempRoot, "resource.zip");
+        var handler = new StubHandler(_ =>
+            new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent("downloaded") });
+        var service = CreateService(handler);
+        var destinationWriter = Assert.IsAssignableFrom<IResourceCatalogDestinationWriter>(service);
+        var version = new ResourceProjectVersion
+        {
+            Kind = ResourceProjectKind.ResourcePack,
+            VersionId = "resource",
+            FileName = "resource.zip",
+            PrimaryDownloadUrl = "https://download.test/resource.zip",
+            ExpectedFileSize = Encoding.UTF8.GetByteCount("downloaded"),
+            FileHashes = [CreateHash(ResourceFileHashAlgorithm.Sha512, "downloaded")]
+        };
+        var expectedState = await destinationWriter.CaptureDownloadDestinationAsync(
+            version,
+            target,
+            CancellationToken.None);
+        await File.WriteAllTextAsync(target, "created-after-confirmation");
+
+        var exception = await Assert.ThrowsAsync<ResourceProjectDestinationConflictException>(() =>
+            destinationWriter.DownloadProjectVersionToDestinationAsync(
+                version,
+                target,
+                expectedState,
+                progress: null,
+                CancellationToken.None));
+
+        Assert.Equal(ResourceProjectDestinationConflictReason.ChangedAfterConfirmation, exception.Reason);
+        Assert.Equal("created-after-confirmation", await File.ReadAllTextAsync(target));
+        Assert.Empty(Directory.GetFiles(TempRoot, "*.download"));
+    }
+
+    [Fact]
+    public async Task ExplicitDownloadCanAtomicallyReplaceUnchangedConfirmedTarget()
+    {
+        Directory.CreateDirectory(TempRoot);
+        var target = Path.Combine(TempRoot, "resource.zip");
+        await File.WriteAllTextAsync(target, "old");
+        var handler = new StubHandler(_ =>
+            new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent("new") });
+        var service = CreateService(handler);
+        var destinationWriter = Assert.IsAssignableFrom<IResourceCatalogDestinationWriter>(service);
+        var version = new ResourceProjectVersion
+        {
+            Kind = ResourceProjectKind.ResourcePack,
+            VersionId = "resource",
+            FileName = "resource.zip",
+            PrimaryDownloadUrl = "https://download.test/resource.zip",
+            ExpectedFileSize = Encoding.UTF8.GetByteCount("new"),
+            FileHashes = [CreateHash(ResourceFileHashAlgorithm.Sha512, "new")]
+        };
+        var expectedState = await destinationWriter.CaptureDownloadDestinationAsync(
+            version,
+            target,
+            CancellationToken.None);
+
+        var installedPath = await destinationWriter.DownloadProjectVersionToDestinationAsync(
+            version,
+            target,
+            expectedState,
+            progress: null,
+            CancellationToken.None);
+
+        Assert.Equal(target, installedPath);
+        Assert.Equal("new", await File.ReadAllTextAsync(target));
+        Assert.Empty(Directory.GetFiles(TempRoot, "*.previous"));
+    }
+
+    [Fact]
+    public async Task ExplicitInstanceDestinationOutsideContentDirectoryIsRejected()
+    {
+        var instanceDirectory = Path.Combine(TempRoot, "instance");
+        Directory.CreateDirectory(Path.Combine(instanceDirectory, "mods"));
+        var outside = Path.Combine(TempRoot, "outside.jar");
+        var handler = new StubHandler(_ => throw new InvalidOperationException("Download must not start."));
+        var service = CreateService(handler);
+        var destinationWriter = Assert.IsAssignableFrom<IResourceCatalogDestinationWriter>(service);
+
+        var exception = await Assert.ThrowsAsync<ResourceProjectDestinationConflictException>(() =>
+            destinationWriter.CaptureInstallDestinationAsync(
+                new ResourceProjectVersion
+                {
+                    Kind = ResourceProjectKind.Mod,
+                    VersionId = "mod",
+                    FileName = "mod.jar"
+                },
+                new GameInstance { Id = "instance", InstanceDirectory = instanceDirectory },
+                outside,
+                CancellationToken.None));
+
+        Assert.Equal(ResourceProjectDestinationConflictReason.OutsideInstanceContentDirectory, exception.Reason);
+        Assert.Empty(handler.Requests);
+        Assert.False(File.Exists(outside));
     }
 
     [Theory]

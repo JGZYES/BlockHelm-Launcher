@@ -178,6 +178,29 @@ public sealed class FilePickerService : IFilePickerService
             : null;
     }
 
+    public string? PickResourceProjectDestination(
+        string title,
+        string defaultFileName,
+        string? initialDirectory = null)
+    {
+        var dialog = new SaveFileDialog
+        {
+            Title = title,
+            Filter = Strings.FilePicker_CustomFileDownloadFilter,
+            FileName = string.IsNullOrWhiteSpace(defaultFileName) ? "download" : defaultFileName,
+            AddExtension = false,
+            OverwritePrompt = true,
+            CheckPathExists = true,
+            RestoreDirectory = true
+        };
+        if (!string.IsNullOrWhiteSpace(initialDirectory) && Directory.Exists(initialDirectory))
+            dialog.InitialDirectory = initialDirectory;
+
+        return dialog.ShowDialog(System.Windows.Application.Current?.MainWindow) == true
+            ? dialog.FileName
+            : null;
+    }
+
     public string? PickFolder(string title, string? initialDirectory = null)
     {
         var dialog = new OpenFolderDialog

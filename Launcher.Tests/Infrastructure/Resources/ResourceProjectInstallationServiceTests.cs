@@ -29,6 +29,33 @@ namespace Launcher.Tests.Infrastructure.Resources;
 public sealed class ResourceProjectInstallationServiceTests
 {
     [Fact]
+    public async Task ExplicitDownloadDestinationIsPreparedAndForwardedWithExpectedState()
+    {
+        var catalog = new RecordingCatalogService();
+        var service = new ResourceProjectInstallationService(
+            catalog,
+            new StubModpackImportService(ModpackImportResult.Failure(ModpackImportFailureReason.UnexpectedError)),
+            new FakeGameInstanceService(),
+            NullLogger<ResourceProjectInstallationService>.Instance);
+        var destination = Path.Combine(Path.GetTempPath(), "chosen-resource.jar");
+        var request = new ResourceProjectInstallationRequest(
+            CreateVersion(ResourceProjectKind.Mod),
+            ResourceProjectInstallationTargetKind.LocalDirectory,
+            TargetDirectory: Path.GetDirectoryName(destination),
+            DestinationPath: destination);
+
+        var preparation = await service.PrepareAsync(request);
+        var result = await service.ExecuteAsync(
+            request with { ExpectedDestinationState = preparation.DestinationState });
+
+        Assert.Equal(catalog.DestinationState, preparation.DestinationState);
+        Assert.Equal(destination, preparation.TargetPath);
+        Assert.Equal(destination, result.InstalledPath);
+        Assert.Equal(destination, catalog.LastExplicitDestinationPath);
+        Assert.Equal(catalog.DestinationState, catalog.LastExpectedDestinationState);
+    }
+
+    [Fact]
     public async Task ModpackWorkspaceIsRemovedAfterSuccessfulImport()
     {
         var catalog = new RecordingCatalogService();
@@ -230,11 +257,16 @@ public sealed class ResourceProjectInstallationServiceTests
     private sealed class RecordingCatalogService :
         IResourceCatalogService,
         IResourceCatalogProgressReporter,
+        IResourceCatalogDestinationWriter,
         IResourceThumbnailService
     {
         public string? LastTargetDirectory { get; private set; }
         public GameInstance? LastInstallExistsInstance { get; private set; }
         public bool InstallExists { get; init; }
+        public ResourceProjectDestinationState DestinationState { get; } =
+            new(false, 0, 0, string.Empty);
+        public string? LastExplicitDestinationPath { get; private set; }
+        public ResourceProjectDestinationState? LastExpectedDestinationState { get; private set; }
         public Dictionary<string, string?> ThumbnailSources { get; } = [];
 
         public Task<ResourceCatalogSearchResult> SearchModsAsync(ResourceCatalogSearchRequest request, CancellationToken cancellationToken = default) =>
@@ -282,6 +314,50 @@ public sealed class ResourceProjectInstallationServiceTests
         {
             LastInstallExistsInstance = instance;
             return Task.FromResult(InstallExists);
+        }
+
+        public Task<ResourceProjectDestinationState> CaptureDownloadDestinationAsync(
+            ResourceProjectVersion version,
+            string destinationPath,
+            CancellationToken cancellationToken)
+        {
+            LastExplicitDestinationPath = destinationPath;
+            return Task.FromResult(DestinationState);
+        }
+
+        public Task<ResourceProjectDestinationState> CaptureInstallDestinationAsync(
+            ResourceProjectVersion version,
+            GameInstance instance,
+            string destinationPath,
+            CancellationToken cancellationToken)
+        {
+            LastExplicitDestinationPath = destinationPath;
+            return Task.FromResult(DestinationState);
+        }
+
+        public Task<string> DownloadProjectVersionToDestinationAsync(
+            ResourceProjectVersion version,
+            string destinationPath,
+            ResourceProjectDestinationState expectedState,
+            IProgress<LauncherProgress>? progress,
+            CancellationToken cancellationToken)
+        {
+            LastExplicitDestinationPath = destinationPath;
+            LastExpectedDestinationState = expectedState;
+            return Task.FromResult(destinationPath);
+        }
+
+        public Task<string> InstallProjectVersionToDestinationAsync(
+            ResourceProjectVersion version,
+            GameInstance instance,
+            string destinationPath,
+            ResourceProjectDestinationState expectedState,
+            IProgress<LauncherProgress>? progress,
+            CancellationToken cancellationToken)
+        {
+            LastExplicitDestinationPath = destinationPath;
+            LastExpectedDestinationState = expectedState;
+            return Task.FromResult(destinationPath);
         }
 
         public string? TryGetCachedThumbnailSource(ResourceProject project) =>

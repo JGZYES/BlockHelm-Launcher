@@ -33,5 +33,10 @@ public interface IFilePickerService
     string? PickModpackExportArchive(string defaultFileName, ModpackExportKind kind);
     string? PickLaunchDiagnosticExportArchive(string instanceName);
     string? PickCustomDownloadDestination(string defaultFileName);
+    string? PickResourceProjectDestination(
+        string title,
+        string defaultFileName,
+        string? initialDirectory = null) =>
+        PickCustomDownloadDestination(defaultFileName);
     string? PickFolder(string title, string? initialDirectory = null);
 }

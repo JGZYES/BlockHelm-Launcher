@@ -69,7 +69,14 @@ internal sealed class ResourceProjectStorage
             installDirectory,
             installDirectory,
             "Resource project install directory");
-        return await DownloadCoreAsync(version, installDirectory, progress, cancellationToken).ConfigureAwait(false);
+        var target = Path.Combine(installDirectory, ResolveFileName(version));
+        return await DownloadToUnconfirmedDestinationAsync(
+                version,
+                target,
+                installDirectory,
+                progress,
+                cancellationToken)
+            .ConfigureAwait(false);
     }
 
     public Task<string> InstallAsync(
@@ -90,7 +97,14 @@ internal sealed class ResourceProjectStorage
             targetDirectory,
             targetDirectory,
             "Resource project download directory");
-        return await DownloadCoreAsync(version, targetDirectory, progress, cancellationToken).ConfigureAwait(false);
+        var target = Path.Combine(targetDirectory, ResolveFileName(version));
+        return await DownloadToUnconfirmedDestinationAsync(
+                version,
+                target,
+                targetDirectory,
+                progress,
+                cancellationToken)
+            .ConfigureAwait(false);
     }
 
     public Task<string> DownloadAsync(
@@ -98,6 +112,48 @@ internal sealed class ResourceProjectStorage
         string targetDirectory,
         CancellationToken cancellationToken) =>
         DownloadAsync(version, targetDirectory, progress: null, cancellationToken);
+
+    public Task<ResourceProjectDestinationState> CaptureDownloadDestinationAsync(
+        ResourceProjectVersion version,
+        string destinationPath,
+        CancellationToken cancellationToken)
+    {
+        var (target, parentDirectory) = ValidateDownloadDestination(destinationPath);
+        return CaptureDestinationStateAsync(target, parentDirectory, cancellationToken);
+    }
+
+    public Task<ResourceProjectDestinationState> CaptureInstallDestinationAsync(
+        ResourceProjectVersion version,
+        GameInstance instance,
+        string destinationPath,
+        CancellationToken cancellationToken)
+    {
+        var (target, installDirectory) = ValidateInstallDestination(version, instance, destinationPath);
+        return CaptureDestinationStateAsync(target, installDirectory, cancellationToken);
+    }
+
+    public Task<string> DownloadToDestinationAsync(
+        ResourceProjectVersion version,
+        string destinationPath,
+        ResourceProjectDestinationState expectedState,
+        IProgress<LauncherProgress>? progress,
+        CancellationToken cancellationToken)
+    {
+        var (target, parentDirectory) = ValidateDownloadDestination(destinationPath);
+        return DownloadCoreAsync(version, target, parentDirectory, expectedState, progress, cancellationToken);
+    }
+
+    public Task<string> InstallToDestinationAsync(
+        ResourceProjectVersion version,
+        GameInstance instance,
+        string destinationPath,
+        ResourceProjectDestinationState expectedState,
+        IProgress<LauncherProgress>? progress,
+        CancellationToken cancellationToken)
+    {
+        var (target, installDirectory) = ValidateInstallDestination(version, instance, destinationPath);
+        return DownloadCoreAsync(version, target, installDirectory, expectedState, progress, cancellationToken);
+    }
 
     public Task<bool> DownloadExistsAsync(
         ResourceProjectVersion version,
@@ -128,13 +184,46 @@ internal sealed class ResourceProjectStorage
                 cancellationToken);
     }
 
-    private async Task<string> DownloadCoreAsync(
+    private async Task<string> DownloadToUnconfirmedDestinationAsync(
         ResourceProjectVersion version,
+        string target,
         string targetDirectory,
         IProgress<LauncherProgress>? progress,
         CancellationToken cancellationToken)
     {
-        var target = Path.Combine(targetDirectory, ResolveFileName(version));
+        if (File.Exists(target))
+        {
+            if (await ExistingFileMatchesAsync(version, target, cancellationToken).ConfigureAwait(false))
+                return target;
+
+            throw new ResourceProjectDestinationConflictException(
+                target,
+                ResourceProjectDestinationConflictReason.ExistingDifferentContent);
+        }
+
+        var expectedState = await CaptureDestinationStateAsync(
+                target,
+                targetDirectory,
+                cancellationToken)
+            .ConfigureAwait(false);
+        return await DownloadCoreAsync(
+                version,
+                target,
+                targetDirectory,
+                expectedState,
+                progress,
+                cancellationToken)
+            .ConfigureAwait(false);
+    }
+
+    private async Task<string> DownloadCoreAsync(
+        ResourceProjectVersion version,
+        string target,
+        string targetDirectory,
+        ResourceProjectDestinationState expectedState,
+        IProgress<LauncherProgress>? progress,
+        CancellationToken cancellationToken)
+    {
         MinecraftPathGuard.EnsureSafeFileDestination(
             target,
             targetDirectory,
@@ -179,7 +268,13 @@ internal sealed class ResourceProjectStorage
                 targetDirectory,
                 tempPath,
                 "Resource project temporary file");
-            File.Move(tempPath, target, overwrite: true);
+            await CommitDownloadedFileAsync(
+                    tempPath,
+                    target,
+                    targetDirectory,
+                    expectedState,
+                    cancellationToken)
+                .ConfigureAwait(false);
             logScope.Complete(resolution);
             return target;
         }
@@ -196,6 +291,10 @@ internal sealed class ResourceProjectStorage
                 "Resource project download timed out. VersionId={VersionId} CandidateCount={CandidateCount}",
                 version.VersionId,
                 urls.Length);
+        }
+        catch (ResourceProjectDestinationConflictException)
+        {
+            throw;
         }
         catch (Exception exception) when (exception is HttpRequestException or IOException or ResourceProjectIntegrityException)
         {
@@ -217,6 +316,218 @@ internal sealed class ResourceProjectStorage
         throw new InvalidOperationException($"Failed to download resource project version: {version.VersionId}", lastException);
     }
 
+    private static (string Target, string ParentDirectory) ValidateDownloadDestination(string destinationPath)
+    {
+        if (string.IsNullOrWhiteSpace(destinationPath))
+            throw new ResourceProjectDestinationConflictException(
+                destinationPath ?? string.Empty,
+                ResourceProjectDestinationConflictReason.InvalidFileName);
+
+        var target = Path.GetFullPath(destinationPath);
+        var parentDirectory = Path.GetDirectoryName(target);
+        if (string.IsNullOrWhiteSpace(parentDirectory)
+            || string.IsNullOrWhiteSpace(Path.GetFileName(target)))
+        {
+            throw new ResourceProjectDestinationConflictException(
+                target,
+                ResourceProjectDestinationConflictReason.InvalidFileName);
+        }
+
+        MinecraftPathGuard.EnsureSafeFileDestination(
+            target,
+            parentDirectory,
+            "Resource project download file");
+        return (target, parentDirectory);
+    }
+
+    private static (string Target, string InstallDirectory) ValidateInstallDestination(
+        ResourceProjectVersion version,
+        GameInstance instance,
+        string destinationPath)
+    {
+        if (version.Kind is ResourceProjectKind.World)
+        {
+            throw new ResourceProjectDestinationConflictException(
+                destinationPath,
+                ResourceProjectDestinationConflictReason.OutsideInstanceContentDirectory);
+        }
+        if (string.IsNullOrWhiteSpace(instance.InstanceDirectory)
+            || string.IsNullOrWhiteSpace(destinationPath))
+        {
+            throw new ResourceProjectDestinationConflictException(
+                destinationPath ?? string.Empty,
+                ResourceProjectDestinationConflictReason.InvalidFileName);
+        }
+
+        var installDirectory = Path.GetFullPath(ResolveInstallDirectory(instance, version.Kind));
+        var target = Path.GetFullPath(destinationPath);
+        var selectedDirectory = Path.GetDirectoryName(target);
+        if (!string.Equals(selectedDirectory, installDirectory, StringComparison.OrdinalIgnoreCase))
+        {
+            throw new ResourceProjectDestinationConflictException(
+                target,
+                ResourceProjectDestinationConflictReason.OutsideInstanceContentDirectory);
+        }
+        if (string.IsNullOrWhiteSpace(Path.GetFileName(target)))
+        {
+            throw new ResourceProjectDestinationConflictException(
+                target,
+                ResourceProjectDestinationConflictReason.InvalidFileName);
+        }
+
+        MinecraftPathGuard.EnsureSafeDirectory(
+            installDirectory,
+            installDirectory,
+            "Resource project install directory");
+        MinecraftPathGuard.EnsureSafeFileDestination(
+            target,
+            installDirectory,
+            "Resource project install file");
+        return (target, installDirectory);
+    }
+
+    private static async Task<ResourceProjectDestinationState> CaptureDestinationStateAsync(
+        string target,
+        string managedRoot,
+        CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        MinecraftPathGuard.EnsureSafeFileDestination(target, managedRoot, "Resource project destination");
+        if (!File.Exists(target))
+            return new ResourceProjectDestinationState(false, 0, 0, string.Empty);
+
+        try
+        {
+            var fileInfo = new FileInfo(target);
+            await using var source = new FileStream(
+                target,
+                FileMode.Open,
+                FileAccess.Read,
+                FileShare.Read,
+                81920,
+                FileOptions.Asynchronous | FileOptions.SequentialScan);
+            using var hasher = IncrementalHash.CreateHash(HashAlgorithmName.SHA256);
+            var buffer = new byte[81920];
+            while (true)
+            {
+                var read = await source.ReadAsync(buffer, cancellationToken).ConfigureAwait(false);
+                if (read == 0)
+                    break;
+                hasher.AppendData(buffer.AsSpan(0, read));
+            }
+
+            return new ResourceProjectDestinationState(
+                true,
+                fileInfo.Length,
+                fileInfo.LastWriteTimeUtc.Ticks,
+                Convert.ToHexString(hasher.GetHashAndReset()));
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+        {
+            throw new ResourceProjectDestinationConflictException(
+                target,
+                ResourceProjectDestinationConflictReason.ChangedAfterConfirmation,
+                exception);
+        }
+    }
+
+    private async Task CommitDownloadedFileAsync(
+        string tempPath,
+        string target,
+        string managedRoot,
+        ResourceProjectDestinationState expectedState,
+        CancellationToken cancellationToken)
+    {
+        var currentState = await CaptureDestinationStateAsync(target, managedRoot, cancellationToken)
+            .ConfigureAwait(false);
+        if (!DestinationStatesMatch(expectedState, currentState))
+        {
+            throw new ResourceProjectDestinationConflictException(
+                target,
+                ResourceProjectDestinationConflictReason.ChangedAfterConfirmation);
+        }
+
+        if (!expectedState.Exists)
+        {
+            try
+            {
+                File.Move(tempPath, target, overwrite: false);
+                return;
+            }
+            catch (IOException exception) when (File.Exists(target))
+            {
+                throw new ResourceProjectDestinationConflictException(
+                    target,
+                    ResourceProjectDestinationConflictReason.ChangedAfterConfirmation,
+                    exception);
+            }
+        }
+
+        var backupPath = Path.Combine(
+            managedRoot,
+            $".{Path.GetFileName(target)}.{Guid.NewGuid():N}.previous");
+        var committed = false;
+        try
+        {
+            File.Replace(tempPath, target, backupPath, ignoreMetadataErrors: true);
+            var replacedState = await CaptureDestinationStateAsync(backupPath, managedRoot, cancellationToken)
+                .ConfigureAwait(false);
+            if (!DestinationStatesMatch(expectedState, replacedState))
+            {
+                File.Replace(backupPath, target, destinationBackupFileName: null, ignoreMetadataErrors: true);
+                throw new ResourceProjectDestinationConflictException(
+                    target,
+                    ResourceProjectDestinationConflictReason.ChangedAfterConfirmation);
+            }
+
+            committed = true;
+        }
+        catch (Exception exception) when (!committed && File.Exists(backupPath))
+        {
+            try
+            {
+                File.Replace(backupPath, target, destinationBackupFileName: null, ignoreMetadataErrors: true);
+            }
+            catch (Exception rollbackException) when (rollbackException is IOException or UnauthorizedAccessException)
+            {
+                throw new IOException(
+                    "Failed to restore the confirmed destination after resource file commit verification failed.",
+                    new AggregateException(exception, rollbackException));
+            }
+            throw;
+        }
+        finally
+        {
+            if (committed && File.Exists(backupPath))
+            {
+                try
+                {
+                    File.Delete(backupPath);
+                }
+                catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+                {
+                    logger.LogWarning(
+                        exception,
+                        "Failed to delete resource project replacement backup. FileName={FileName}",
+                        Path.GetFileName(backupPath));
+                }
+            }
+        }
+    }
+
+    private static bool DestinationStatesMatch(
+        ResourceProjectDestinationState expected,
+        ResourceProjectDestinationState actual)
+    {
+        if (expected.Exists != actual.Exists)
+            return false;
+        if (!expected.Exists)
+            return true;
+        return expected.Length == actual.Length
+            && expected.LastWriteTimeUtcTicks == actual.LastWriteTimeUtcTicks
+            && string.Equals(expected.Sha256, actual.Sha256, StringComparison.OrdinalIgnoreCase);
+    }
+
     private static async Task<bool> ExistingFileMatchesAsync(
         ResourceProjectVersion version,
         string path,
@@ -228,7 +539,7 @@ internal sealed class ResourceProjectStorage
 
         var expectation = ResolveIntegrityExpectation(version);
         if (expectation.FileSize is null && expectation.Hash is null)
-            return true;
+            return false;
 
         try
         {
@@ -497,7 +808,13 @@ internal sealed class ResourceProjectStorage
         Directory.CreateDirectory(tempDirectory);
         try
         {
-            var archivePath = await DownloadCoreAsync(version, tempDirectory, progress, cancellationToken).ConfigureAwait(false);
+            var archivePath = await DownloadToUnconfirmedDestinationAsync(
+                    version,
+                    Path.Combine(tempDirectory, ResolveFileName(version)),
+                    tempDirectory,
+                    progress,
+                    cancellationToken)
+                .ConfigureAwait(false);
             var result = await localSaveService.ImportFromArchiveAsync(instance, archivePath, cancellationToken)
                 .ConfigureAwait(false);
             if (!result.IsSuccess || result.ImportedSave is null)

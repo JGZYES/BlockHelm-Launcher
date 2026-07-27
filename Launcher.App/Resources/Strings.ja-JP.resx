@@ -3589,4 +3589,6 @@
   <data name="Status_CustomFileDownloading" xml:space="preserve"><value>ダウンロード中...</value></data>
   <data name="Status_CustomFileDownloadCompleted" xml:space="preserve"><value>ダウンロードが完了しました</value></data>
   <data name="Status_CustomFileDownloadFailed" xml:space="preserve"><value>ダウンロードに失敗しました。ネットワークまたは保存先を確認して、もう一度お試しください。</value></data>
+  <data name="Status_ResourceProjectDestinationConflictFormat" xml:space="preserve"><value>「{0}」は既に存在するか、確認後に変更されました。ダウンロードを停止し、元のファイルは上書きしていません。</value></data>
+  <data name="Status_ResourceProjectInstanceDestinationInvalid" xml:space="preserve"><value>このインスタンスの mods、resourcepacks、または shaderpacks フォルダーを選択してください。他の場所には保存できません。</value></data>
 </root>

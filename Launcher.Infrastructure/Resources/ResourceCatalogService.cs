@@ -29,7 +29,11 @@ using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Launcher.Infrastructure.Resources;
 
-public sealed class ResourceCatalogService : IResourceCatalogService, IResourceCatalogProgressReporter, IResourceThumbnailService
+public sealed class ResourceCatalogService :
+    IResourceCatalogService,
+    IResourceCatalogProgressReporter,
+    IResourceCatalogDestinationWriter,
+    IResourceThumbnailService
 {
     private readonly IReadOnlyDictionary<ResourceProjectSource, IResourceProviderClient> providers;
     private readonly ResourceProjectStorage storage;
@@ -300,6 +304,65 @@ public sealed class ResourceCatalogService : IResourceCatalogService, IResourceC
         var target = await storage.DownloadAsync(version, targetDirectory, progress, cancellationToken).ConfigureAwait(false);
         logger.LogInformation("Resource project version downloaded. VersionId={VersionId}", version.VersionId);
         logger.LogDebug("Resource project download target resolved. VersionId={VersionId} Target={Target}", version.VersionId, target);
+        return target;
+    }
+
+    Task<ResourceProjectDestinationState> IResourceCatalogDestinationWriter.CaptureDownloadDestinationAsync(
+        ResourceProjectVersion version,
+        string destinationPath,
+        CancellationToken cancellationToken) =>
+        storage.CaptureDownloadDestinationAsync(version, destinationPath, cancellationToken);
+
+    Task<ResourceProjectDestinationState> IResourceCatalogDestinationWriter.CaptureInstallDestinationAsync(
+        ResourceProjectVersion version,
+        GameInstance instance,
+        string destinationPath,
+        CancellationToken cancellationToken) =>
+        storage.CaptureInstallDestinationAsync(version, instance, destinationPath, cancellationToken);
+
+    async Task<string> IResourceCatalogDestinationWriter.DownloadProjectVersionToDestinationAsync(
+        ResourceProjectVersion version,
+        string destinationPath,
+        ResourceProjectDestinationState expectedState,
+        IProgress<LauncherProgress>? progress,
+        CancellationToken cancellationToken)
+    {
+        var target = await storage.DownloadToDestinationAsync(
+                version,
+                destinationPath,
+                expectedState,
+                progress,
+                cancellationToken)
+            .ConfigureAwait(false);
+        logger.LogInformation("Resource project version downloaded. VersionId={VersionId}", version.VersionId);
+        logger.LogDebug(
+            "Resource project explicit download target committed. VersionId={VersionId} Target={Target}",
+            version.VersionId,
+            target);
+        return target;
+    }
+
+    async Task<string> IResourceCatalogDestinationWriter.InstallProjectVersionToDestinationAsync(
+        ResourceProjectVersion version,
+        GameInstance instance,
+        string destinationPath,
+        ResourceProjectDestinationState expectedState,
+        IProgress<LauncherProgress>? progress,
+        CancellationToken cancellationToken)
+    {
+        var target = await storage.InstallToDestinationAsync(
+                version,
+                instance,
+                destinationPath,
+                expectedState,
+                progress,
+                cancellationToken)
+            .ConfigureAwait(false);
+        logger.LogInformation("Resource project version installed. VersionId={VersionId}", version.VersionId);
+        logger.LogDebug(
+            "Resource project explicit install target committed. VersionId={VersionId} Target={Target}",
+            version.VersionId,
+            target);
         return target;
     }
 

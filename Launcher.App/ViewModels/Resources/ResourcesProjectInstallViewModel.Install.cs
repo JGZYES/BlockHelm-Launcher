@@ -74,6 +74,25 @@ internal async Task InstallAsync(
                 exception.Reason,
                 exception.Algorithm);
         }
+        catch (ResourceProjectDestinationConflictException exception)
+        {
+            var message = exception.Reason is
+                ResourceProjectDestinationConflictReason.OutsideInstanceContentDirectory
+                or ResourceProjectDestinationConflictReason.InvalidFileName
+                ? Strings.Status_ResourceProjectInstanceDestinationInvalid
+                : string.Format(
+                    Strings.Status_ResourceProjectDestinationConflictFormat,
+                    Path.GetFileName(exception.DestinationPath));
+            PresentFailure(context, message);
+            logger?.LogWarning(
+                exception,
+                "Resource project destination changed or conflicts with existing content. Kind={Kind} ProjectId={ProjectId} VersionId={VersionId} Reason={Reason} FileName={FileName}",
+                options.Kind,
+                selectedProject?.Project.ProjectId,
+                item.Version.VersionId,
+                exception.Reason,
+                Path.GetFileName(exception.DestinationPath));
+        }
         catch (ServerDeploymentDirectoryExistsException exception)
         {
             ShowServerDirectoryExists(exception.Directory);
@@ -185,13 +204,19 @@ internal async Task InstallAsync(
     private async Task DownloadToDirectoryAsync(InstallOperationContext context)
     {
         // 同名文件不直接覆盖，先交还给用户确认，避免普通下载造成不可逆的数据替换。
-        var targetDirectory = filePickerService?.PickFolder(options.DownloadDirectoryPickerTitle);
+        var destinationPath = filePickerService?.PickResourceProjectDestination(
+            options.DownloadDirectoryPickerTitle,
+            ResolveFileName(context.Item));
+        if (string.IsNullOrWhiteSpace(destinationPath))
+            return;
+        destinationPath = NormalizeTargetPath(destinationPath);
+        var targetDirectory = Path.GetDirectoryName(destinationPath);
         if (string.IsNullOrWhiteSpace(targetDirectory))
             return;
         if (!TryBeginInstall(
                 context,
                 nameof(ResourceProjectInstallationTargetKind.LocalDirectory),
-                Path.Combine(NormalizeTargetPath(targetDirectory), ResolveFileName(context.Item))))
+                destinationPath))
         {
             ReportDuplicateInstall(context);
             return;
@@ -200,15 +225,12 @@ internal async Task InstallAsync(
         var request = new ResourceProjectInstallationRequest(
             context.Item.Version,
             ResourceProjectInstallationTargetKind.LocalDirectory,
-            TargetDirectory: targetDirectory);
-        if ((await installationService!.PrepareAsync(
-                request,
-                context.Session!.CancellationToken).ConfigureAwait(false)).TargetExists)
-        {
-            context.Session.Dismiss();
-            ShowFileExists(context.Item);
-            return;
-        }
+            TargetDirectory: targetDirectory,
+            DestinationPath: destinationPath);
+        var preparation = await installationService!.PrepareAsync(
+            request,
+            context.Session!.CancellationToken).ConfigureAwait(false);
+        request = request with { ExpectedDestinationState = preparation.DestinationState };
         BeginUserFeedback(context.Item);
         context.Session!.BeginPrimaryDownload(hasDependencies: false);
         await installationService.ExecuteAsync(request, context.Session.Progress, context.Session.CancellationToken)
@@ -307,13 +329,31 @@ internal async Task InstallAsync(
         var instance = context.Target.Instance;
         if (instance is null)
             return;
+        string? destinationPath = null;
+        if (options.Kind is not ResourceProjectKind.World)
+        {
+            var installDirectory = ResolveInstanceContentDirectory(instance, options.Kind);
+            destinationPath = filePickerService?.PickResourceProjectDestination(
+                options.DownloadDirectoryPickerTitle,
+                ResolveFileName(context.Item),
+                installDirectory);
+            if (string.IsNullOrWhiteSpace(destinationPath))
+                return;
+            destinationPath = NormalizeTargetPath(destinationPath);
+            if (!IsDirectChildPath(destinationPath, installDirectory))
+            {
+                floatingMessageService?.Show(Strings.Status_ResourceProjectInstanceDestinationInvalid);
+                reportStatus(Strings.Status_ResourceProjectInstanceDestinationInvalid);
+                return;
+            }
+        }
         var instanceIdentity = string.IsNullOrWhiteSpace(instance.Id)
             ? NormalizeTargetPath(instance.InstanceDirectory)
             : instance.Id;
         if (!TryBeginInstall(
                 context,
                 nameof(ResourceProjectInstallationTargetKind.ExistingInstance),
-                instanceIdentity))
+                destinationPath ?? instanceIdentity))
         {
             ReportDuplicateInstall(context);
             return;
@@ -322,15 +362,12 @@ internal async Task InstallAsync(
         var request = new ResourceProjectInstallationRequest(
             context.Item.Version,
             ResourceProjectInstallationTargetKind.ExistingInstance,
-            Instance: instance);
-        if ((await installationService!.PrepareAsync(
-                request,
-                context.Session!.CancellationToken).ConfigureAwait(false)).TargetExists)
-        {
-            context.Session.Dismiss();
-            ShowFileExists(context.Item);
-            return;
-        }
+            Instance: instance,
+            DestinationPath: destinationPath);
+        var preparation = await installationService!.PrepareAsync(
+            request,
+            context.Session!.CancellationToken).ConfigureAwait(false);
+        request = request with { ExpectedDestinationState = preparation.DestinationState };
         var dependencyPlan = await dependencyPlanner.ResolveInstallPlanAsync(
             context.Item,
             instance,
@@ -361,5 +398,37 @@ internal async Task InstallAsync(
         var message = string.Format(options.InstalledFormat, context.Project?.Title ?? context.Item.Title);
         context.Session.Complete(message);
         reportStatus(message);
+    }
+
+    private static string ResolveInstanceContentDirectory(
+        GameInstance instance,
+        ResourceProjectKind kind)
+    {
+        var directoryName = kind switch
+        {
+            ResourceProjectKind.ResourcePack => "resourcepacks",
+            ResourceProjectKind.ShaderPack => "shaderpacks",
+            _ => "mods"
+        };
+        return Path.GetFullPath(Path.Combine(instance.InstanceDirectory, directoryName));
+    }
+
+    private static bool IsDirectChildPath(string path, string expectedDirectory)
+    {
+        try
+        {
+            return string.Equals(
+                Path.GetDirectoryName(Path.GetFullPath(path)),
+                Path.GetFullPath(expectedDirectory),
+                StringComparison.OrdinalIgnoreCase)
+                && !string.IsNullOrWhiteSpace(Path.GetFileName(path));
+        }
+        catch (Exception exception) when (exception is
+            ArgumentException
+            or NotSupportedException
+            or PathTooLongException)
+        {
+            return false;
+        }
     }
 }

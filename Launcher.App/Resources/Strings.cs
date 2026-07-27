@@ -1174,6 +1174,8 @@ public static class Strings
     public static string Status_ModpackHashMismatch => Get(nameof(Status_ModpackHashMismatch));
     public static string Status_ResourceProjectIntegrityFailed => Get(nameof(Status_ResourceProjectIntegrityFailed));
     public static string Status_ResourceProjectDownloadAlreadyRunning => Get(nameof(Status_ResourceProjectDownloadAlreadyRunning));
+    public static string Status_ResourceProjectDestinationConflictFormat => Get(nameof(Status_ResourceProjectDestinationConflictFormat));
+    public static string Status_ResourceProjectInstanceDestinationInvalid => Get(nameof(Status_ResourceProjectInstanceDestinationInvalid));
     public static string Status_ModpackExporting => Get(nameof(Status_ModpackExporting));
     public static string Status_ModpackExported => Get(nameof(Status_ModpackExported));
     public static string Status_ModpackExportedFormat => Get(nameof(Status_ModpackExportedFormat));

@@ -72,6 +72,32 @@ public sealed class ResourceProjectInstallationService : IResourceProjectInstall
         ResourceProjectInstallationRequest request,
         CancellationToken cancellationToken = default)
     {
+        if (!string.IsNullOrWhiteSpace(request.DestinationPath))
+        {
+            var destinationWriter = RequireDestinationWriter();
+            var destinationState = request.TargetKind switch
+            {
+                ResourceProjectInstallationTargetKind.LocalDirectory =>
+                    await destinationWriter.CaptureDownloadDestinationAsync(
+                        request.Version,
+                        request.DestinationPath,
+                        cancellationToken).ConfigureAwait(false),
+                ResourceProjectInstallationTargetKind.ExistingInstance =>
+                    await destinationWriter.CaptureInstallDestinationAsync(
+                        request.Version,
+                        RequireInstance(request),
+                        request.DestinationPath,
+                        cancellationToken).ConfigureAwait(false),
+                _ => throw new ArgumentException(
+                    "An explicit destination is not supported for this installation target.",
+                    nameof(request))
+            };
+            return new ResourceProjectInstallationPreparationResult(
+                destinationState.Exists,
+                Path.GetFullPath(request.DestinationPath),
+                destinationState);
+        }
+
         if (request.TargetKind is ResourceProjectInstallationTargetKind.NewServerDirectory)
         {
             var targetPath = serverModpackDeploymentService.ResolveTargetDirectory(
@@ -115,21 +141,36 @@ public sealed class ResourceProjectInstallationService : IResourceProjectInstall
         {
             case ResourceProjectInstallationTargetKind.LocalDirectory:
             {
-                var path = await DownloadProjectVersionAsync(
-                    request.Version,
-                    RequireTargetDirectory(request),
-                    progress,
-                    cancellationToken).ConfigureAwait(false);
+                var path = !string.IsNullOrWhiteSpace(request.DestinationPath)
+                    ? await RequireDestinationWriter().DownloadProjectVersionToDestinationAsync(
+                        request.Version,
+                        request.DestinationPath,
+                        RequireExpectedDestinationState(request),
+                        progress,
+                        cancellationToken).ConfigureAwait(false)
+                    : await DownloadProjectVersionAsync(
+                        request.Version,
+                        RequireTargetDirectory(request),
+                        progress,
+                        cancellationToken).ConfigureAwait(false);
                 progress?.Report(new LauncherProgress(InstallProgressStages.CompletingFiles, string.Empty, 99));
                 return new ResourceProjectInstallationResult(InstalledPath: path);
             }
             case ResourceProjectInstallationTargetKind.ExistingInstance:
             {
-                var path = await InstallProjectVersionAsync(
-                    request.Version,
-                    RequireInstance(request),
-                    progress,
-                    cancellationToken).ConfigureAwait(false);
+                var path = !string.IsNullOrWhiteSpace(request.DestinationPath)
+                    ? await RequireDestinationWriter().InstallProjectVersionToDestinationAsync(
+                        request.Version,
+                        RequireInstance(request),
+                        request.DestinationPath,
+                        RequireExpectedDestinationState(request),
+                        progress,
+                        cancellationToken).ConfigureAwait(false)
+                    : await InstallProjectVersionAsync(
+                        request.Version,
+                        RequireInstance(request),
+                        progress,
+                        cancellationToken).ConfigureAwait(false);
                 progress?.Report(new LauncherProgress(InstallProgressStages.CompletingFiles, string.Empty, 99));
                 return new ResourceProjectInstallationResult(InstalledPath: path);
             }
@@ -161,6 +202,18 @@ public sealed class ResourceProjectInstallationService : IResourceProjectInstall
         resourceCatalogService is IResourceCatalogProgressReporter progressReporter
             ? progressReporter.InstallProjectVersionWithProgressAsync(version, instance, progress, cancellationToken)
             : resourceCatalogService.InstallProjectVersionAsync(version, instance, cancellationToken);
+
+    private IResourceCatalogDestinationWriter RequireDestinationWriter() =>
+        resourceCatalogService as IResourceCatalogDestinationWriter
+        ?? throw new InvalidOperationException(
+            "The configured resource catalog does not support explicit download destinations.");
+
+    private static ResourceProjectDestinationState RequireExpectedDestinationState(
+        ResourceProjectInstallationRequest request) =>
+        request.ExpectedDestinationState
+        ?? throw new ArgumentException(
+            "The explicit destination must be prepared before execution.",
+            nameof(request));
 
     private async Task<ResourceProjectInstallationResult> ImportModpackAsNewInstanceAsync(
         ResourceProjectInstallationRequest request,
