@@ -24,7 +24,6 @@ using System.Net.Http;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using CmlLib.Core;
-using System.Text.RegularExpressions;
 using System.Xml.Linq;
 using Launcher.Application.Services;
 using Launcher.Domain.Models;
@@ -38,9 +37,6 @@ namespace Launcher.Infrastructure.Minecraft;
 /// </summary>
 public sealed class NeoForgeLoaderProvider : ILoaderProvider, IStagedLoaderProvider, IDirectSharedContentStagedLoaderProvider
 {
-    private const string MetadataUrl = "https://maven.neoforged.net/releases/net/neoforged/neoforge/maven-metadata.xml";
-    private const string ArtifactBaseUrl = "https://maven.neoforged.net/releases/net/neoforged/neoforge";
-    private static readonly Regex MinecraftVersionPattern = new(@"^1\.(?<minor>\d+)\.(?<patch>\d+)$", RegexOptions.Compiled);
     private readonly HttpClient httpClient;
     private readonly IForgeInstallerRunner installerRunner;
     private readonly IFinalVersionInstaller finalVersionInstaller;
@@ -97,7 +93,7 @@ public sealed class NeoForgeLoaderProvider : ILoaderProvider, IStagedLoaderProvi
         CancellationToken cancellationToken = default,
         int downloadSpeedLimitMbPerSecond = 0)
     {
-        if (!TryGetNeoForgeVersionPrefix(minecraftVersion, out var versionPrefix))
+        if (!NeoForgeArtifactResolver.TryResolveCatalog(minecraftVersion, out var catalog))
         {
             logger.LogDebug(
                 "Skipping NeoForge version lookup because the Minecraft version is unsupported. MinecraftVersion={MinecraftVersion}",
@@ -108,7 +104,7 @@ public sealed class NeoForgeLoaderProvider : ILoaderProvider, IStagedLoaderProvi
         logger.LogDebug(
             "Loading NeoForge versions. MinecraftVersion={MinecraftVersion} Prefix={VersionPrefix}",
             minecraftVersion,
-            versionPrefix);
+            catalog.VersionPrefix);
 
         var executor = new MinecraftDownloadRequestExecutor(
             httpClient,
@@ -116,7 +112,7 @@ public sealed class NeoForgeLoaderProvider : ILoaderProvider, IStagedLoaderProvi
             DownloadBandwidthLimiter.Create(downloadSpeedLimitMbPerSecond, downloadSpeedLimitState),
             category: DownloadConcurrencyCategory.Metadata);
         var result = await executor.ExecuteLookupAsync(
-            MetadataUrl,
+            catalog.MetadataUrl,
             downloadSourcePreference,
             categoryHint: "NeoForge",
             async (context, token) =>
@@ -134,7 +130,8 @@ public sealed class NeoForgeLoaderProvider : ILoaderProvider, IStagedLoaderProvi
                     .Select(element => element.Value?.Trim())
                     .Where(version => !string.IsNullOrWhiteSpace(version))
                     .Select(version => version!)
-                    .Where(version => version.StartsWith(versionPrefix, StringComparison.OrdinalIgnoreCase))
+                    .Where(catalog.Matches)
+                    .Select(catalog.NormalizeVersion)
                     .Select(CreateLoaderVersionInfo)
                     .OrderByDescending(info => info.IsStable)
                     .ThenByDescending(info => ParseVersionKey(info.Version), NeoForgeVersionKeyComparer.Instance)
@@ -230,6 +227,10 @@ public sealed class NeoForgeLoaderProvider : ILoaderProvider, IStagedLoaderProvi
 
         if (string.IsNullOrWhiteSpace(selectedLoaderVersion))
             throw new InvalidOperationException($"No NeoForge loader version available for {minecraftVersion}.");
+        var installerArtifact = NeoForgeArtifactResolver.ResolveInstaller(
+            minecraftVersion,
+            selectedLoaderVersion);
+        selectedLoaderVersion = installerArtifact.LoaderVersion;
 
         logger.LogInformation(
             "Installing NeoForge. MinecraftVersion={MinecraftVersion} LoaderVersion={LoaderVersion} TargetVersionName={TargetVersionName}",
@@ -255,7 +256,7 @@ public sealed class NeoForgeLoaderProvider : ILoaderProvider, IStagedLoaderProvi
 
             progress?.Report(new LauncherProgress(InstallProgressStages.DownloadingLoaderInstaller, string.Empty));
             await DownloadInstallerAsync(
-                selectedLoaderVersion,
+                installerArtifact,
                 installerJarPath,
                 downloadSourcePreference,
                 cancellationToken,
@@ -334,7 +335,7 @@ public sealed class NeoForgeLoaderProvider : ILoaderProvider, IStagedLoaderProvi
 
             var sourceVersionName = FindInstalledSourceVersionName(
                 installerMinecraftDirectory,
-                selectedLoaderVersion,
+                installerArtifact,
                 existingVersionNames);
 
             progress?.Report(new LauncherProgress(InstallProgressStages.FinalizingVersion, string.Empty));
@@ -427,7 +428,7 @@ public sealed class NeoForgeLoaderProvider : ILoaderProvider, IStagedLoaderProvi
     }
 
     private async Task DownloadInstallerAsync(
-        string loaderVersion,
+        NeoForgeInstallerArtifact artifact,
         string destinationPath,
         DownloadSourcePreference downloadSourcePreference,
         CancellationToken cancellationToken,
@@ -439,7 +440,7 @@ public sealed class NeoForgeLoaderProvider : ILoaderProvider, IStagedLoaderProvi
             logger,
             DownloadBandwidthLimiter.Create(downloadSpeedLimitMbPerSecond, downloadSpeedLimitState),
             category: DownloadConcurrencyCategory.Runtime);
-        var sourceUrl = $"{ArtifactBaseUrl}/{loaderVersion}/neoforge-{loaderVersion}-installer.jar";
+        var sourceUrl = artifact.Url;
         var logScope = new ForegroundDownloadLogScope(
             logger,
             "NeoForgeInstall",
@@ -491,19 +492,6 @@ public sealed class NeoForgeLoaderProvider : ILoaderProvider, IStagedLoaderProvi
             downloadSpeedLimitMbPerSecond: downloadSpeedLimitMbPerSecond);
     }
 
-    private static bool TryGetNeoForgeVersionPrefix(string minecraftVersion, out string prefix)
-    {
-        var match = MinecraftVersionPattern.Match(minecraftVersion);
-        if (!match.Success)
-        {
-            prefix = string.Empty;
-            return false;
-        }
-
-        prefix = $"{match.Groups["minor"].Value}.{match.Groups["patch"].Value}.";
-        return true;
-    }
-
     private static LoaderVersionInfo CreateLoaderVersionInfo(string version)
     {
         return new LoaderVersionInfo(version, IsStableVersion(version));
@@ -514,7 +502,8 @@ public sealed class NeoForgeLoaderProvider : ILoaderProvider, IStagedLoaderProvi
         return version.IndexOf("-beta", StringComparison.OrdinalIgnoreCase) < 0
                && version.IndexOf("-alpha", StringComparison.OrdinalIgnoreCase) < 0
                && version.IndexOf("+snapshot", StringComparison.OrdinalIgnoreCase) < 0
-               && version.IndexOf("+pre", StringComparison.OrdinalIgnoreCase) < 0;
+               && version.IndexOf("+pre", StringComparison.OrdinalIgnoreCase) < 0
+               && version.IndexOf("+rc", StringComparison.OrdinalIgnoreCase) < 0;
     }
 
     private static NeoForgeVersionKey ParseVersionKey(string version)
@@ -536,14 +525,13 @@ public sealed class NeoForgeLoaderProvider : ILoaderProvider, IStagedLoaderProvi
     /// </summary>
     private static string FindInstalledSourceVersionName(
         string gameDirectory,
-        string loaderVersion,
+        NeoForgeInstallerArtifact artifact,
         HashSet<string> existingVersionNames)
     {
         var versionsDirectory = Path.Combine(gameDirectory, "versions");
         if (!Directory.Exists(versionsDirectory))
             throw new InvalidOperationException("NeoForge installation did not create a version directory.");
 
-        var expectedVersionId = $"neoforge-{loaderVersion}";
         var candidates = Directory.GetDirectories(versionsDirectory)
             .Select(directory => new DirectoryInfo(directory))
             .OrderByDescending(directory => directory.LastWriteTimeUtc)
@@ -552,34 +540,38 @@ public sealed class NeoForgeLoaderProvider : ILoaderProvider, IStagedLoaderProvi
         // 安装器输出名称会随版本变化，先限定新目录，再按库坐标和版本身份验证候选。
         var sourceVersion = candidates
             .Where(directory => !existingVersionNames.Contains(directory.Name))
-            .Select(directory => TryCreateSourceMatch(directory.FullName, directory.Name, expectedVersionId, loaderVersion))
+            .Select(directory => TryCreateSourceMatch(directory.FullName, directory.Name, artifact))
             .FirstOrDefault(match => match is not null)
             ?? candidates
-                .Select(directory => TryCreateSourceMatch(directory.FullName, directory.Name, expectedVersionId, loaderVersion))
+                .Select(directory => TryCreateSourceMatch(directory.FullName, directory.Name, artifact))
                 .FirstOrDefault(match => match is not null);
 
         return sourceVersion?.VersionName
-            ?? throw new InvalidOperationException($"NeoForge installer did not produce a usable version for {loaderVersion}.");
+            ?? throw new InvalidOperationException(
+                $"NeoForge installer did not produce a usable version for {artifact.LoaderVersion}.");
     }
 
     private static NeoForgeSourceMatch? TryCreateSourceMatch(
         string versionDirectory,
         string versionName,
-        string expectedVersionId,
-        string loaderVersion)
+        NeoForgeInstallerArtifact artifact)
     {
         var metadata = TryReadVersionMetadata(versionDirectory, versionName);
         if (metadata is null)
             return null;
 
-        var hasExactNeoForgeLibrary = metadata.LibraryNames.Any(library =>
-            library.Contains($"net.neoforged:neoforge:{loaderVersion}", StringComparison.OrdinalIgnoreCase));
-        var normalizedMetadata = $"{metadata.Id} {metadata.InheritsFrom} {metadata.Jar} {versionName}";
-        var hasExpectedVersionId = normalizedMetadata.Contains(expectedVersionId, StringComparison.OrdinalIgnoreCase);
-        var hasLooseNeoForgeMatch = normalizedMetadata.Contains("neoforge", StringComparison.OrdinalIgnoreCase)
-            && normalizedMetadata.Contains(loaderVersion, StringComparison.OrdinalIgnoreCase);
+        var hasExactRuntimeLibrary = metadata.LibraryNames.Any(library =>
+            string.Equals(library, artifact.RuntimeLibraryCoordinate, StringComparison.OrdinalIgnoreCase)
+            || library.StartsWith(
+                artifact.RuntimeLibraryCoordinate + ":",
+                StringComparison.OrdinalIgnoreCase));
+        var hasExpectedVersionId =
+            string.Equals(metadata.Id, artifact.ExpectedVersionId, StringComparison.OrdinalIgnoreCase)
+            || string.Equals(metadata.InheritsFrom, artifact.ExpectedVersionId, StringComparison.OrdinalIgnoreCase)
+            || string.Equals(metadata.Jar, artifact.ExpectedVersionId, StringComparison.OrdinalIgnoreCase)
+            || string.Equals(versionName, artifact.ExpectedVersionId, StringComparison.OrdinalIgnoreCase);
 
-        if (!hasExactNeoForgeLibrary && !hasExpectedVersionId && !hasLooseNeoForgeMatch)
+        if (!hasExactRuntimeLibrary && !hasExpectedVersionId)
             return null;
 
         return new NeoForgeSourceMatch(versionName, metadata);

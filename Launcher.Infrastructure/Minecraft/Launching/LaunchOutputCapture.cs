@@ -28,6 +28,7 @@ internal sealed class LaunchOutputCapture
     private readonly IReadOnlyList<string> sensitiveValues;
     private readonly long maxOutputBytes;
     private readonly int maxLineCharacters;
+    private readonly Action<string>? lineObserver;
     private readonly Channel<CapturedLine> channel = Channel.CreateBounded<CapturedLine>(
         new BoundedChannelOptions(1024)
         {
@@ -45,12 +46,14 @@ internal sealed class LaunchOutputCapture
         string outputPath,
         IReadOnlyList<string> sensitiveValues,
         long maxOutputBytes = DefaultMaxOutputBytes,
-        int maxLineCharacters = DefaultMaxLineCharacters)
+        int maxLineCharacters = DefaultMaxLineCharacters,
+        Action<string>? lineObserver = null)
     {
         this.outputPath = outputPath;
         this.sensitiveValues = sensitiveValues;
         this.maxOutputBytes = maxOutputBytes;
         this.maxLineCharacters = maxLineCharacters;
+        this.lineObserver = lineObserver;
     }
 
     public void Start(Process process)
@@ -187,6 +190,7 @@ internal sealed class LaunchOutputCapture
         }
 
         var redacted = LaunchDiagnosticRedactor.Redact(line, sensitiveValues);
+        lineObserver?.Invoke(redacted);
         lock (tailLock)
         {
             tail.Enqueue(redacted);

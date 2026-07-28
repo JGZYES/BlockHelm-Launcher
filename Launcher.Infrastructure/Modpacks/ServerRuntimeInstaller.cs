@@ -472,21 +472,11 @@ internal sealed class ServerRuntimeInstaller : IServerRuntimeInstaller
         if (modpack.Loader is not LoaderKind.NeoForge)
             throw new InvalidDataException($"Unsupported Forge-like loader: {modpack.Loader}.");
 
-        if (string.Equals(minecraftVersion, "1.20.1", StringComparison.OrdinalIgnoreCase))
-        {
-            var coordinate = AddMinecraftVersionPrefix(minecraftVersion, loaderVersion);
-            return new ForgeLikeServerInstallerArtifact(
-                coordinate,
-                "forge",
-                $"https://maven.neoforged.net/releases/net/neoforged/forge/{coordinate}/forge-{coordinate}-installer.jar",
-                "NeoForge");
-        }
-
-        var neoForgeCoordinate = RemoveMinecraftVersionPrefix(minecraftVersion, loaderVersion);
+        var neoForgeArtifact = NeoForgeArtifactResolver.ResolveInstaller(minecraftVersion, loaderVersion);
         return new ForgeLikeServerInstallerArtifact(
-            neoForgeCoordinate,
-            "neoforge",
-            $"https://maven.neoforged.net/releases/net/neoforged/neoforge/{neoForgeCoordinate}/neoforge-{neoForgeCoordinate}-installer.jar",
+            neoForgeArtifact.Coordinate,
+            neoForgeArtifact.ArtifactName,
+            neoForgeArtifact.Url,
             "NeoForge");
     }
 

@@ -125,7 +125,7 @@ public sealed class LaunchServiceTests : TestTempDirectory
         var service = CreateService(
             launcher: launcher,
             crashMonitor: new LaunchCrashMonitor(),
-            windowReadinessWaiter: new GameWindowReadinessWaiter());
+            startupReadinessWaiter: new GameStartupReadinessWaiter());
         var reports = new List<LauncherProgress>();
 
         var exception = await Assert.ThrowsAsync<LaunchProcessExitedException>(() =>
@@ -156,6 +156,36 @@ public sealed class LaunchServiceTests : TestTempDirectory
         Assert.Contains("[stderr]", capturedOutput);
         Assert.Contains("<redacted>", capturedOutput);
         Assert.DoesNotContain("super-secret-access-token", capturedOutput);
+    }
+
+    [Fact]
+    public async Task ReadyGameOutputCompletesLaunchWhenWindowDiscoveryMisses()
+    {
+        var settings = CreateSettings();
+        settings.DefaultCheckFilesBeforeLaunch = false;
+        var launcher = new FakeLauncherFactory
+        {
+            BuildProcess = (_, _) => CreateCommandProcess(
+                "/c echo [Render thread/INFO]: OpenAL initialized on device Test"
+                + " & ping 127.0.0.1 -n 3 >nul & exit 0")
+        };
+        var service = CreateService(
+            launcher: launcher,
+            crashMonitor: new LaunchCrashMonitor(),
+            startupReadinessWaiter: new GameStartupReadinessWaiter(new NeverVisibleWindowProbe()));
+        var reports = new List<LauncherProgress>();
+
+        var session = await service.LaunchAsync(
+                CreateInstance(settings.MinecraftDirectory, "Output Ready"),
+                CreateAccount(),
+                settings,
+                new InlineProgress(reports))
+            .WaitAsync(TimeSpan.FromSeconds(10));
+        var exit = await session.ExitTask.WaitAsync(TimeSpan.FromSeconds(10));
+
+        Assert.Contains(reports, report => report.Percent == 100);
+        Assert.Null(exit.FailureReport);
+        Assert.Equal(0, exit.ExitCode);
     }
 
     [Fact]
@@ -360,13 +390,13 @@ public sealed class LaunchServiceTests : TestTempDirectory
         ILaunchAccountSessionService? accountSession = null,
         IAuthlibInjectorProvisioningService? authlibInjector = null,
         IOfflineSkinLaunchService? offlineSkin = null,
-        IGameWindowReadinessWaiter? windowReadinessWaiter = null,
+        IGameStartupReadinessWaiter? startupReadinessWaiter = null,
         ILaunchProcessTerminator? processTerminator = null)
     {
         var resolvedAccountSession = accountSession ?? new FakeAccountSession();
         var resolvedLauncher = launcher ?? new FakeLauncherFactory();
         var resolvedCrashMonitor = crashMonitor ?? new NoOpCrashMonitor();
-        var resolvedWindowWaiter = windowReadinessWaiter ?? new ImmediateWindowReadinessWaiter();
+        var resolvedStartupWaiter = startupReadinessWaiter ?? new ImmediateStartupReadinessWaiter();
         return integrity is not null
             ? new LaunchService(
                 resolvedAccountSession,
@@ -377,7 +407,7 @@ public sealed class LaunchServiceTests : TestTempDirectory
                 javaRuntimeProvisioningService: javaProvisioning,
                 authlibInjectorProvisioningService: authlibInjector,
                 offlineSkinLaunchService: offlineSkin,
-                gameWindowReadinessWaiter: resolvedWindowWaiter,
+                gameStartupReadinessWaiter: resolvedStartupWaiter,
                 launchProcessTerminator: processTerminator)
             : new LaunchService(
                 resolvedAccountSession,
@@ -388,7 +418,7 @@ public sealed class LaunchServiceTests : TestTempDirectory
                 javaRuntimeProvisioningService: javaProvisioning,
                 authlibInjectorProvisioningService: authlibInjector,
                 offlineSkinLaunchService: offlineSkin,
-                gameWindowReadinessWaiter: resolvedWindowWaiter,
+                gameStartupReadinessWaiter: resolvedStartupWaiter,
                 launchProcessTerminator: processTerminator);
     }
 
@@ -619,6 +649,7 @@ public sealed class LaunchServiceTests : TestTempDirectory
 
         private sealed class Session : ILaunchCrashMonitorSession
         {
+            public Task GameOutputReady { get; } = Task.Delay(Timeout.InfiniteTimeSpan);
             public void Configure(Process process) { }
             public void BeginMonitoring(Process process, LaunchDiagnosticContext context) { }
             public Task<LaunchCrashMonitorResult> CreateStartupExitResultAsync(
@@ -631,9 +662,17 @@ public sealed class LaunchServiceTests : TestTempDirectory
         }
     }
 
-    private sealed class ImmediateWindowReadinessWaiter : IGameWindowReadinessWaiter
+    private sealed class ImmediateStartupReadinessWaiter : IGameStartupReadinessWaiter
     {
-        public Task<GameWindowReadinessResult> WaitAsync(Process process, CancellationToken cancellationToken) =>
-            Task.FromResult(GameWindowReadinessResult.WindowVisible);
+        public Task<GameStartupReadinessResult> WaitAsync(
+            Process process,
+            Task gameOutputReady,
+            CancellationToken cancellationToken) =>
+            Task.FromResult(GameStartupReadinessResult.WindowVisible);
+    }
+
+    private sealed class NeverVisibleWindowProbe : IGameWindowReadinessProbe
+    {
+        public bool HasVisibleTopLevelWindow(int processId) => false;
     }
 }

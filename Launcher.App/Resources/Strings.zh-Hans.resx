@@ -55,17 +55,9 @@
   <data name="Page_Multiplayer" xml:space="preserve"><value>联机</value></data>
   <data name="Multiplayer_SectionCreateLobby" xml:space="preserve"><value>创建房间</value></data>
   <data name="Multiplayer_SectionJoinLobby" xml:space="preserve"><value>加入房间</value></data>
-  <data name="Multiplayer_Create_SelectGameInstanceSection" xml:space="preserve"><value>选择已开放的局域网世界</value></data>
-  <data name="Multiplayer_Create_GameInstancePlaceholder" xml:space="preserve"><value>刷新以探测世界</value></data>
-  <data name="Multiplayer_Create_LanWorldRefreshHint" xml:space="preserve"><value>点击“刷新”探测本机已开放的局域网世界。</value></data>
-  <data name="Multiplayer_Create_LanWorldDiscovering" xml:space="preserve"><value>正在刷新</value></data>
-  <data name="Multiplayer_Create_LanWorldNotFound" xml:space="preserve"><value>未检测到本机已开放的局域网世界，请确认已在游戏中开放到局域网。</value></data>
-  <data name="Multiplayer_Create_LanWorldDiscoveryFailed" xml:space="preserve"><value>无法检测局域网世界，请检查网络权限后重试。</value></data>
-  <data name="Multiplayer_Create_UnknownLanWorld" xml:space="preserve"><value>未命名的局域网世界</value></data>
-  <data name="Multiplayer_Create_LanWorldItemFormat" xml:space="preserve"><value>{0} · 端口 {1}</value></data>
-  <data name="Multiplayer_Create_StepOpenToLan" xml:space="preserve"><value>第一步：进入世界，并在游戏菜单中点击“对局域网开放”。</value></data>
-  <data name="Multiplayer_Create_StepSelectInstance" xml:space="preserve"><value>第二步：点击刷新，确认已探测到开放的局域网世界。</value></data>
-  <data name="Multiplayer_Create_StepCreateLobby" xml:space="preserve"><value>第三步：点击“创建房间”。</value></data>
+  <data name="Multiplayer_Create_StepOpenToLan" xml:space="preserve"><value>第一步：进入要联机的游戏世界。</value></data>
+  <data name="Multiplayer_Create_StepSelectInstance" xml:space="preserve"><value>第二步：在游戏菜单中点击“创建局域网世界”。</value></data>
+  <data name="Multiplayer_Create_StepCreateLobby" xml:space="preserve"><value>第三步：返回启动器，点击“创建房间”。</value></data>
   <data name="Multiplayer_LobbyTitleFormat" xml:space="preserve"><value>{0}的游戏房间</value></data>
   <data name="Multiplayer_LobbyOwnerPlaceholder" xml:space="preserve"><value>玩家</value></data>
   <data name="Multiplayer_LobbyGameWorldPlaceholder" xml:space="preserve"><value>实例名字-世界名字</value></data>
@@ -1230,7 +1222,6 @@
   <data name="DownloadSpeed_BytesPerSecondFormat" xml:space="preserve"><value>{0:0} B/s</value></data>
   <data name="DownloadSpeed_KilobytesPerSecondFormat" xml:space="preserve"><value>{0:0.0} KB/s</value></data>
   <data name="DownloadSpeed_MegabytesPerSecondFormat" xml:space="preserve"><value>{0:0.0} MB/s</value></data>
-  <data name="Multiplayer_Create_CreatingLobby" xml:space="preserve"><value>正在创建房间</value></data>
   <data name="Multiplayer_Create_LobbyFailed" xml:space="preserve"><value>创建房间失败，请稍后重试。</value></data>
   <data name="Multiplayer_Create_TerracottaUnavailable" xml:space="preserve"><value>Terracotta 联机模块不可用，请重新进入联机页面后重试。</value></data>
   <data name="Multiplayer_Create_WorldUnavailable" xml:space="preserve"><value>未检测到可用的局域网世界，请确认世界仍已开放到局域网。</value></data>
@@ -1244,7 +1235,6 @@
   <data name="Multiplayer_LobbyWorldClosed" xml:space="preserve"><value>局域网世界已关闭，房间已自动解散。</value></data>
   <data name="Multiplayer_LobbyTerracottaExited" xml:space="preserve"><value>Terracotta 联机模块已停止，房间已自动解散。</value></data>
   <data name="Multiplayer_LobbyTerracottaServiceFailed" xml:space="preserve"><value>Terracotta 联机服务异常，房间已自动解散。</value></data>
-  <data name="Multiplayer_Create_MultipleLanWorldsWarning" xml:space="preserve"><value>检测到多个世界，Terracotta 将自动使用最先探测到的世界。</value></data>
   <data name="Multiplayer_LobbyPoweredByTerracotta" xml:space="preserve"><value>联机服务由 Terracotta | 陶瓦联机提供</value></data>
   <data name="Multiplayer_Create_TerracottaAttributionPrefix" xml:space="preserve"><value>联机功能由 </value></data>
   <data name="Multiplayer_Create_TerracottaAttributionLinkText" xml:space="preserve"><value>Terracotta | 陶瓦联机</value></data>
@@ -1265,6 +1255,8 @@
   <data name="Dialog_MultiplayerLeaveJoinedLobbyConfirmButton" xml:space="preserve"><value>离开房间</value></data>
   <data name="Dialog_MultiplayerLobbySectionSwitchBlockedTitle" xml:space="preserve"><value>无法切换联机模式</value></data>
   <data name="Dialog_MultiplayerLobbySectionSwitchBlockedMessage" xml:space="preserve"><value>当前在房间内，请先退出房间。</value></data>
+  <data name="Dialog_MultiplayerLanWorldDetectionTitle" xml:space="preserve"><value>正在检测局域网世界</value></data>
+  <data name="Dialog_MultiplayerLanWorldDetectionMessage" xml:space="preserve"><value>正在检测局域网世界，请在游戏菜单中点击创建局域网世界。</value></data>
   <data name="Status_ServerDeploying" xml:space="preserve"><value>正在部署整合包服务端...</value></data>
   <data name="Status_ServerDeployedFormat" xml:space="preserve"><value>服务端已部署到 {0}</value></data>
   <data name="Status_ServerDeployFailed" xml:space="preserve"><value>整合包服务端部署失败</value></data>

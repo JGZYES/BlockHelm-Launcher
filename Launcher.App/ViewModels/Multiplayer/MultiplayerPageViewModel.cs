@@ -19,7 +19,6 @@ namespace Launcher.App.ViewModels.Multiplayer;
 public sealed partial class MultiplayerPageViewModel : ObservableObject
 {
     private readonly AccountPageViewModel? accountPage;
-    private readonly IMinecraftLanWorldDiscoveryService lanWorldDiscoveryService;
     private readonly IMultiplayerLobbyService lobbyService;
     private readonly IClipboardService clipboardService;
     private readonly IUiDispatcher uiDispatcher;
@@ -54,14 +53,11 @@ public sealed partial class MultiplayerPageViewModel : ObservableObject
     private bool isLobbySectionSwitchBlockedDialogOpen;
 
     [ObservableProperty]
-    [NotifyCanExecuteChangedFor(nameof(RefreshLanWorldsCommand))]
-    [NotifyCanExecuteChangedFor(nameof(CreateLobbyCommand))]
-    private bool isRefreshingLanWorlds;
-
-    [ObservableProperty]
-    [NotifyCanExecuteChangedFor(nameof(RefreshLanWorldsCommand))]
     [NotifyCanExecuteChangedFor(nameof(CreateLobbyCommand))]
     private bool isCreatingLobby;
+
+    [ObservableProperty]
+    private bool isLanWorldDetectionDialogOpen;
 
     [ObservableProperty]
     [NotifyCanExecuteChangedFor(nameof(PasteRoomCodeCommand))]
@@ -74,13 +70,9 @@ public sealed partial class MultiplayerPageViewModel : ObservableObject
     private bool isStoppingLobby;
 
     [ObservableProperty]
-    private string lanWorldDiscoveryStatus = Strings.Multiplayer_Create_LanWorldRefreshHint;
-
-    [ObservableProperty]
     private string joinLobbyStatus = string.Empty;
 
     public MultiplayerPageViewModel(
-        IMinecraftLanWorldDiscoveryService lanWorldDiscoveryService,
         IMultiplayerLobbyService lobbyService,
         IClipboardService clipboardService,
         IUiDispatcher uiDispatcher,
@@ -90,7 +82,6 @@ public sealed partial class MultiplayerPageViewModel : ObservableObject
         IExternalLinkService? externalLinkService = null,
         ILogger<MultiplayerPageViewModel>? logger = null)
     {
-        this.lanWorldDiscoveryService = lanWorldDiscoveryService;
         this.lobbyService = lobbyService;
         this.clipboardService = clipboardService;
         this.uiDispatcher = uiDispatcher;
@@ -113,8 +104,6 @@ public sealed partial class MultiplayerPageViewModel : ObservableObject
 
     public ObservableCollection<MultiplayerLobbyPlayerItem> LobbyPlayers { get; } = [];
 
-    public ObservableCollection<MultiplayerLanWorldItem> LanWorlds { get; } = [];
-
     public string SectionTitle => IsLobbyStep
         ? LobbyTitle
         : SelectedSection?.Title ?? Strings.Multiplayer_SectionCreateLobby;
@@ -126,16 +115,6 @@ public sealed partial class MultiplayerPageViewModel : ObservableObject
     public bool IsLobbyStep => CreateLobbyStep is MultiplayerCreateLobbyStep.Lobby;
 
     public string LobbyTitle => string.Format(Strings.Multiplayer_LobbyTitleFormat, LobbyOwnerName);
-
-    public bool HasLanWorldDiscoveryStatus => !string.IsNullOrWhiteSpace(LanWorldDiscoveryStatus);
-
-    public bool HasLanWorlds => LanWorlds.Count > 0;
-
-    public bool HasMultipleLanWorlds => LanWorlds.Count > 1;
-
-    public string CreateLobbyButtonText => IsCreatingLobby
-        ? Strings.Multiplayer_Create_CreatingLobby
-        : Strings.Multiplayer_SectionCreateLobby;
 
     public string JoinLobbyButtonText => IsJoiningLobby
         ? Strings.Multiplayer_Join_Joining
@@ -159,11 +138,7 @@ public sealed partial class MultiplayerPageViewModel : ObservableObject
         ? Strings.Dialog_MultiplayerLeaveLobbyConfirmButton
         : Strings.Dialog_MultiplayerLeaveJoinedLobbyConfirmButton;
 
-    private bool CanRefreshLanWorlds => !IsRefreshingLanWorlds && !IsCreatingLobby;
-
-    private bool CanCreateLobby => LanWorlds.Count > 0
-        && !IsRefreshingLanWorlds
-        && !IsCreatingLobby;
+    private bool CanCreateLobby => !IsCreatingLobby;
 
     private bool CanPasteRoomCode => !IsJoiningLobby;
 
@@ -175,6 +150,8 @@ public sealed partial class MultiplayerPageViewModel : ObservableObject
     private bool CanConfirmLeaveLobby => IsLobbyStep && !IsStoppingLobby;
 
     private bool CanCopyRoomCode => !string.IsNullOrWhiteSpace(RoomCode);
+
+    private bool CanCancelLobbyDetection => IsCreatingLobby;
 
     [RelayCommand]
     private void SelectSection(MultiplayerSectionItem? section)
@@ -197,74 +174,11 @@ public sealed partial class MultiplayerPageViewModel : ObservableObject
         IsLobbySectionSwitchBlockedDialogOpen = false;
     }
 
-    [RelayCommand(CanExecute = nameof(CanRefreshLanWorlds))]
-    private async Task RefreshLanWorldsAsync(CancellationToken cancellationToken)
-    {
-        IsRefreshingLanWorlds = true;
-        LanWorldDiscoveryStatus = Strings.Multiplayer_Create_LanWorldDiscovering;
-        var discoveryCompleted = false;
-        try
-        {
-            var hasPublishedProgress = false;
-            var progress = new Progress<MinecraftLanWorld>(world =>
-            {
-                if (discoveryCompleted)
-                    return;
-
-                if (!hasPublishedProgress)
-                {
-                    LanWorlds.Clear();
-                    NotifyLanWorldsChanged();
-                    hasPublishedProgress = true;
-                }
-
-                var item = CreateLanWorldItem(world);
-                var existing = LanWorlds.FirstOrDefault(candidate => candidate.World.Port == world.Port);
-                if (existing is not null)
-                    LanWorlds[LanWorlds.IndexOf(existing)] = item;
-                else
-                    LanWorlds.Add(item);
-                NotifyLanWorldsChanged();
-            });
-            var discoveredWorlds = await lanWorldDiscoveryService
-                .DiscoverLocalWorldsAsync(cancellationToken, progress);
-            discoveryCompleted = true;
-            var items = discoveredWorlds.Select(CreateLanWorldItem).ToArray();
-
-            LanWorlds.Clear();
-            foreach (var item in items)
-                LanWorlds.Add(item);
-            NotifyLanWorldsChanged();
-            LanWorldDiscoveryStatus = items.Length == 0
-                ? Strings.Multiplayer_Create_LanWorldNotFound
-                : items.Length > 1
-                    ? Strings.Multiplayer_Create_MultipleLanWorldsWarning
-                    : string.Empty;
-        }
-        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
-        {
-            LanWorldDiscoveryStatus = string.Empty;
-        }
-        catch (Exception exception)
-        {
-            logger.LogWarning(exception, "Failed to discover local Minecraft LAN worlds.");
-            LanWorldDiscoveryStatus = Strings.Multiplayer_Create_LanWorldDiscoveryFailed;
-        }
-        finally
-        {
-            discoveryCompleted = true;
-            IsRefreshingLanWorlds = false;
-        }
-    }
-
     [RelayCommand(CanExecute = nameof(CanCreateLobby))]
     private async Task CreateLobbyAsync(CancellationToken cancellationToken)
     {
-        if (LanWorlds.Count == 0)
-            return;
-
         IsCreatingLobby = true;
-        LanWorldDiscoveryStatus = string.Empty;
+        IsLanWorldDetectionDialogOpen = true;
         try
         {
             var hostName = accountPage?.SelectedAccount?.DisplayName
@@ -291,8 +205,16 @@ public sealed partial class MultiplayerPageViewModel : ObservableObject
         }
         finally
         {
+            IsLanWorldDetectionDialogOpen = false;
             IsCreatingLobby = false;
         }
+    }
+
+    [RelayCommand(CanExecute = nameof(CanCancelLobbyDetection))]
+    private void CancelLobbyDetection()
+    {
+        IsLanWorldDetectionDialogOpen = false;
+        CreateLobbyCommand.Cancel();
     }
 
     [RelayCommand(CanExecute = nameof(CanPasteRoomCode))]
@@ -501,6 +423,7 @@ public sealed partial class MultiplayerPageViewModel : ObservableObject
     private void ResetLobbyView()
     {
         CreateLobbyStep = MultiplayerCreateLobbyStep.Setup;
+        IsLanWorldDetectionDialogOpen = false;
         IsLeaveLobbyDialogOpen = false;
         IsLobbySectionSwitchBlockedDialogOpen = false;
         IsLobbyHost = false;
@@ -512,8 +435,6 @@ public sealed partial class MultiplayerPageViewModel : ObservableObject
     {
         if (IsJoinLobbySection)
             JoinLobbyStatus = message;
-        else
-            LanWorldDiscoveryStatus = message;
         statusService.Report(message);
         floatingMessageService.Show(message);
     }
@@ -579,7 +500,7 @@ public sealed partial class MultiplayerPageViewModel : ObservableObject
 
     partial void OnIsCreatingLobbyChanged(bool value)
     {
-        OnPropertyChanged(nameof(CreateLobbyButtonText));
+        CancelLobbyDetectionCommand.NotifyCanExecuteChanged();
     }
 
     partial void OnIsJoiningLobbyChanged(bool value)
@@ -593,11 +514,6 @@ public sealed partial class MultiplayerPageViewModel : ObservableObject
         OnPropertyChanged(nameof(LeaveLobbyDialogTitle));
         OnPropertyChanged(nameof(LeaveLobbyDialogMessage));
         OnPropertyChanged(nameof(LeaveLobbyConfirmButtonText));
-    }
-
-    partial void OnLanWorldDiscoveryStatusChanged(string value)
-    {
-        OnPropertyChanged(nameof(HasLanWorldDiscoveryStatus));
     }
 
     partial void OnJoinLobbyStatusChanged(string value)
@@ -615,20 +531,4 @@ public sealed partial class MultiplayerPageViewModel : ObservableObject
         OnPropertyChanged(nameof(IsJoinLobbySection));
     }
 
-    private static MultiplayerLanWorldItem CreateLanWorldItem(MinecraftLanWorld world)
-    {
-        var name = string.IsNullOrWhiteSpace(world.Name)
-            ? Strings.Multiplayer_Create_UnknownLanWorld
-            : world.Name;
-        return new MultiplayerLanWorldItem(
-            world,
-            string.Format(Strings.Multiplayer_Create_LanWorldItemFormat, name, world.Port));
-    }
-
-    private void NotifyLanWorldsChanged()
-    {
-        OnPropertyChanged(nameof(HasLanWorlds));
-        OnPropertyChanged(nameof(HasMultipleLanWorlds));
-        CreateLobbyCommand.NotifyCanExecuteChanged();
-    }
 }

@@ -141,18 +141,14 @@
   <data name="Multiplayer_SectionJoinLobby" xml:space="preserve">
     <value>加入房間</value>
   </data>
-  <data name="Multiplayer_Create_SelectGameInstanceSection" xml:space="preserve">
-    <value>選擇已開放的區域網路世界</value>
-  </data>  <data name="Multiplayer_Create_LanWorldRefreshHint" xml:space="preserve"><value>點擊「重新整理」以偵測這台電腦上已開放的區域網路世界。</value></data>
-  <data name="Multiplayer_Create_LanWorldDiscovering" xml:space="preserve"><value>正在重新整理</value></data>
-  <data name="Multiplayer_Create_LanWorldNotFound" xml:space="preserve"><value>未偵測到這台電腦上已開放的區域網路世界，請確認已在遊戲中開放至區域網路。</value></data>
-  <data name="Multiplayer_Create_LanWorldDiscoveryFailed" xml:space="preserve"><value>無法偵測區域網路世界，請檢查網路權限後重試。</value></data>
-  <data name="Multiplayer_Create_UnknownLanWorld" xml:space="preserve"><value>未命名的區域網路世界</value></data>
-  <data name="Multiplayer_Create_LanWorldItemFormat" xml:space="preserve"><value>{0} · 連接埠 {1}</value></data>
   <data name="Multiplayer_Create_StepOpenToLan" xml:space="preserve">
-    <value>第一步：進入世界，並在遊戲選單中點擊「對區域網路開放」。</value>
-  </data>  <data name="Multiplayer_Create_StepCreateLobby" xml:space="preserve">
-    <value>第三步：點擊「建立房間」。</value>
+    <value>第一步：進入要連線的遊戲世界。</value>
+  </data>
+  <data name="Multiplayer_Create_StepSelectInstance" xml:space="preserve">
+    <value>第二步：在遊戲選單中點擊「建立區域網路世界」。</value>
+  </data>
+  <data name="Multiplayer_Create_StepCreateLobby" xml:space="preserve">
+    <value>第三步：返回啟動器，點擊「建立房間」。</value>
   </data>
   <data name="Multiplayer_LobbyTitleFormat" xml:space="preserve">
     <value>{0}的遊戲房間</value>
@@ -3520,7 +3516,6 @@
   <data name="DownloadSpeed_BytesPerSecondFormat" xml:space="preserve"><value>{0:0} B/s</value></data>
   <data name="DownloadSpeed_KilobytesPerSecondFormat" xml:space="preserve"><value>{0:0.0} KB/s</value></data>
   <data name="DownloadSpeed_MegabytesPerSecondFormat" xml:space="preserve"><value>{0:0.0} MB/s</value></data>
-  <data name="Multiplayer_Create_CreatingLobby" xml:space="preserve"><value>正在建立房間</value></data>
   <data name="Multiplayer_Create_LobbyFailed" xml:space="preserve"><value>建立房間失敗，請稍後再試。</value></data>
   <data name="Multiplayer_Create_TerracottaUnavailable" xml:space="preserve"><value>Terracotta 連線模組無法使用，請重新進入連線頁面後再試。</value></data>
   <data name="Multiplayer_Create_WorldUnavailable" xml:space="preserve"><value>未偵測到可用的區域網路世界，請確認世界仍已開放至區域網路。</value></data>
@@ -3534,9 +3529,6 @@
   <data name="Multiplayer_LobbyWorldClosed" xml:space="preserve"><value>區域網路世界已關閉，房間已自動解散。</value></data>
   <data name="Multiplayer_LobbyTerracottaExited" xml:space="preserve"><value>Terracotta 連線模組已停止，房間已自動解散。</value></data>
   <data name="Multiplayer_LobbyTerracottaServiceFailed" xml:space="preserve"><value>Terracotta 連線服務發生異常，房間已自動解散。</value></data>
-  <data name="Multiplayer_Create_GameInstancePlaceholder" xml:space="preserve"><value>重新整理以偵測世界</value></data>
-  <data name="Multiplayer_Create_MultipleLanWorldsWarning" xml:space="preserve"><value>偵測到多個世界，Terracotta 將自動使用最先偵測到的世界。</value></data>
-  <data name="Multiplayer_Create_StepSelectInstance" xml:space="preserve"><value>第二步：點擊重新整理，確認已偵測到開放的區域網路世界。</value></data>
   <data name="Multiplayer_LobbyPoweredByTerracotta" xml:space="preserve"><value>連線服務由 Terracotta | 陶瓦聯機提供</value></data>
   <data name="Multiplayer_Create_TerracottaAttributionPrefix" xml:space="preserve"><value>連線功能由 </value></data>
   <data name="Multiplayer_Create_TerracottaAttributionLinkText" xml:space="preserve"><value>Terracotta | 陶瓦联机</value></data>
@@ -3557,6 +3549,8 @@
   <data name="Dialog_MultiplayerLeaveJoinedLobbyConfirmButton" xml:space="preserve"><value>離開房間</value></data>
   <data name="Dialog_MultiplayerLobbySectionSwitchBlockedTitle" xml:space="preserve"><value>無法切換聯機模式</value></data>
   <data name="Dialog_MultiplayerLobbySectionSwitchBlockedMessage" xml:space="preserve"><value>目前仍在房間內，請先退出房間。</value></data>
+  <data name="Dialog_MultiplayerLanWorldDetectionTitle" xml:space="preserve"><value>正在偵測區域網路世界</value></data>
+  <data name="Dialog_MultiplayerLanWorldDetectionMessage" xml:space="preserve"><value>正在偵測區域網路世界，請在遊戲選單中點擊建立區域網路世界。</value></data>
   <data name="Status_ServerDeploying" xml:space="preserve"><value>正在部署整合包伺服端...</value></data>
   <data name="Status_ServerDeployedFormat" xml:space="preserve"><value>伺服端已部署到 {0}</value></data>
   <data name="Status_ServerDeployFailed" xml:space="preserve"><value>整合包伺服端部署失敗</value></data>

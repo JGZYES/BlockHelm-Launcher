@@ -31,6 +31,8 @@ internal interface ILaunchCrashMonitor
 
 internal interface ILaunchCrashMonitorSession
 {
+    Task GameOutputReady { get; }
+
     void Configure(Process process);
 
     void BeginMonitoring(Process process, LaunchDiagnosticContext context);
@@ -59,7 +61,10 @@ internal sealed class LaunchCrashMonitor : ILaunchCrashMonitor
         private readonly string instanceDirectory;
         private readonly DateTimeOffset createdAt = DateTimeOffset.UtcNow;
         private readonly LaunchSessionDiagnosticCollector diagnosticCollector;
+        private readonly GameStartupLogReadinessDetector startupReadinessDetector = new();
         private LaunchOutputCapture? outputCapture;
+
+        public Task GameOutputReady => startupReadinessDetector.Ready;
 
         public Session(
             string minecraftDirectory,
@@ -191,7 +196,10 @@ internal sealed class LaunchCrashMonitor : ILaunchCrashMonitor
                 LauncherApplicationIdentity.StorageDirectoryName,
                 "logs",
                 $"launch-output-{Guid.NewGuid():N}.log");
-            outputCapture = new LaunchOutputCapture(outputPath, context.SensitiveValues);
+            outputCapture = new LaunchOutputCapture(
+                outputPath,
+                context.SensitiveValues,
+                lineObserver: startupReadinessDetector.Observe);
             outputCapture.Start(process);
         }
 

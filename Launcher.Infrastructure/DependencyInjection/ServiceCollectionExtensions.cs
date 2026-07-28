@@ -155,7 +155,6 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<IAuthlibInjectorProvisioningService, AuthlibInjectorProvisioningService>();
         services.AddSingleton<IOfflineSkinLaunchService, OfflineSkinYggdrasilService>();
         services.AddSingleton<ITerracottaProvisioningService, TerracottaProvisioningService>();
-        services.AddSingleton<IMinecraftLanWorldDiscoveryService, MinecraftLanWorldDiscoveryService>();
         services.AddSingleton<IMultiplayerLobbyService, MultiplayerLobbyService>();
         services.AddSingleton<IAccountSkinLibraryService, AccountSkinLibraryService>();
         services.AddSingleton<IMinecraftSkinFileValidator, MinecraftSkinFileValidator>();

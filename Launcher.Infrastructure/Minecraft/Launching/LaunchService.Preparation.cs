@@ -320,7 +320,7 @@ public sealed partial class LaunchService
         crashMonitorSession.BeginMonitoring(process, preparedRuntime.DiagnosticContext);
 
         logger.LogInformation(
-            "Minecraft process started; waiting for a visible game window. VersionName={VersionName} ProcessId={ProcessId}",
+            "Minecraft process started; waiting for startup readiness. VersionName={VersionName} ProcessId={ProcessId}",
             resolvedSettings.VersionName,
             process.Id);
         return new StartedLaunchProcess(process, crashMonitorSession);

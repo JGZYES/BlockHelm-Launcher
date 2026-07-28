@@ -163,6 +163,56 @@ public sealed class NeoForgeLoaderProviderTests : TestTempDirectory
         Assert.False(Directory.Exists(Path.Combine(minecraftDirectory, "versions", "1.20.4-neoforge-20.4.237")));
     }
 
+    [Fact]
+    public async Task NeoForgeLoaderProviderInstalls1201FromLegacyArtifactCoordinates()
+    {
+        const string minecraftVersion = "1.20.1";
+        const string loaderVersion = "47.1.106";
+        const string legacyCoordinate = "1.20.1-47.1.106";
+        var minecraftDirectory = Path.Combine(TempRoot, ".minecraft");
+        await CreateVanillaVersionAsync(minecraftDirectory, minecraftVersion);
+        var handler = new LegacyNeoForge1201HttpHandler();
+        var provider = new NeoForgeLoaderProvider(
+            new HttpClient(handler),
+            new ScriptedForgeInstallerRunner((gameDirectory, _, _) =>
+                CreateLegacy1201SandboxInstallAsync(
+                    gameDirectory,
+                    minecraftVersion,
+                    loaderVersion,
+                    legacyCoordinate)),
+            new NoOpFinalVersionInstaller(),
+            TempRoot,
+            javaRuntimeResolver: new FixedJavaRuntimeResolver());
+
+        var installedName = await provider.InstallAsync(
+            minecraftVersion,
+            minecraftDirectory,
+            "Legacy NeoForge Pack",
+            loaderVersion,
+            progress: null);
+
+        Assert.Equal("Legacy NeoForge Pack", installedName);
+        Assert.Contains(
+            handler.RequestUris,
+            uri => uri.AbsoluteUri
+                == "https://maven.neoforged.net/releases/net/neoforged/forge/1.20.1-47.1.106/forge-1.20.1-47.1.106-installer.jar");
+        Assert.DoesNotContain(
+            handler.RequestUris,
+            uri => uri.AbsoluteUri.Contains(
+                "/net/neoforged/neoforge/47.1.106/",
+                StringComparison.OrdinalIgnoreCase));
+
+        var versionJson = JsonNode.Parse(await File.ReadAllTextAsync(Path.Combine(
+            minecraftDirectory,
+            "versions",
+            installedName,
+            $"{installedName}.json")))!.AsObject();
+        Assert.Contains(
+            versionJson["libraries"]!.AsArray(),
+            node => node?["name"]?.GetValue<string>()
+                == "net.neoforged:forge:1.20.1-47.1.106:universal");
+    }
+
     private NeoForgeLoaderProvider CreateProvider(
         IForgeInstallerRunner? runner = null,
         IFinalVersionInstaller? finalVersionInstaller = null,
@@ -185,6 +235,49 @@ public sealed class NeoForgeLoaderProviderTests : TestTempDirectory
         await CreateVanillaVersionAsync(minecraftDirectory, inheritsFrom);
         CreateNeoForgeDerivedVersion(minecraftDirectory, versionName, inheritsFrom, loaderVersion);
         CreateGeneratedNeoForgeLibrary(minecraftDirectory, loaderVersion, includeUniversal: true);
+    }
+
+    private static async Task CreateLegacy1201SandboxInstallAsync(
+        string minecraftDirectory,
+        string minecraftVersion,
+        string loaderVersion,
+        string legacyCoordinate)
+    {
+        await CreateVanillaVersionAsync(minecraftDirectory, minecraftVersion);
+        var versionName = $"{minecraftVersion}-forge-{loaderVersion}";
+        var versionDirectory = Path.Combine(minecraftDirectory, "versions", versionName);
+        Directory.CreateDirectory(versionDirectory);
+        var versionJson = new JsonObject
+        {
+            ["id"] = versionName,
+            ["inheritsFrom"] = minecraftVersion,
+            ["mainClass"] = "cpw.mods.modlauncher.Launcher",
+            ["libraries"] = new JsonArray
+            {
+                new JsonObject { ["name"] = $"net.neoforged:forge:{legacyCoordinate}" }
+            }
+        };
+        File.WriteAllText(
+            Path.Combine(versionDirectory, $"{versionName}.json"),
+            versionJson.ToJsonString(new JsonSerializerOptions { WriteIndented = true }));
+        File.WriteAllText(
+            Path.Combine(versionDirectory, "win_args.txt"),
+            "--launchTarget forge_client");
+
+        var libraryDirectory = Path.Combine(
+            minecraftDirectory,
+            "libraries",
+            "net",
+            "neoforged",
+            "forge",
+            legacyCoordinate);
+        Directory.CreateDirectory(libraryDirectory);
+        File.WriteAllText(
+            Path.Combine(libraryDirectory, $"forge-{legacyCoordinate}-client.jar"),
+            "patched neoforge client");
+        File.WriteAllText(
+            Path.Combine(libraryDirectory, $"forge-{legacyCoordinate}-universal.jar"),
+            "universal neoforge runtime");
     }
 
     private static async Task CreateVanillaVersionAsync(string minecraftDirectory, string versionName)
@@ -393,6 +486,68 @@ public sealed class NeoForgeLoaderProviderTests : TestTempDirectory
         }
     }
 
+    private sealed class LegacyNeoForge1201HttpHandler : HttpMessageHandler
+    {
+        private const string OfficialVersionJson =
+            """{"id":"1.20.1","type":"release","mainClass":"net.minecraft.client.main.Main"}""";
+
+        public List<Uri> RequestUris { get; } = [];
+
+        protected override Task<HttpResponseMessage> SendAsync(
+            HttpRequestMessage request,
+            CancellationToken cancellationToken)
+        {
+            RequestUris.Add(request.RequestUri!);
+            var uri = request.RequestUri!.AbsoluteUri
+                .Replace(
+                    "https://bmclapi2.bangbang93.com/maven/",
+                    "https://maven.neoforged.net/releases/",
+                    StringComparison.OrdinalIgnoreCase);
+            if (uri == "https://piston-meta.mojang.com/mc/game/version_manifest_v2.json")
+            {
+                var sha1 = Convert.ToHexString(SHA1.HashData(Encoding.UTF8.GetBytes(OfficialVersionJson)))
+                    .ToLowerInvariant();
+                return Task.FromResult(CreateTextResponse(
+                    request,
+                    $$"""{"versions":[{"id":"1.20.1","url":"https://piston-meta.mojang.com/v1/packages/test/1.20.1.json","sha1":"{{sha1}}"}]}"""));
+            }
+
+            if (uri == "https://piston-meta.mojang.com/v1/packages/test/1.20.1.json")
+                return Task.FromResult(CreateTextResponse(request, OfficialVersionJson));
+            if (uri
+                == "https://maven.neoforged.net/releases/net/neoforged/forge/1.20.1-47.1.106/forge-1.20.1-47.1.106-installer.jar")
+            {
+                return Task.FromResult(CreateBinaryResponse(request, CreateLegacy1201InstallerBytes()));
+            }
+
+            if (uri
+                == "https://maven.neoforged.net/releases/net/neoforged/forge/1.20.1-47.1.106/forge-1.20.1-47.1.106-universal.jar")
+            {
+                return Task.FromResult(CreateTextResponse(request, "universal neoforge runtime"));
+            }
+
+            throw new InvalidOperationException($"Unexpected request: {uri}");
+        }
+
+        private static HttpResponseMessage CreateTextResponse(
+            HttpRequestMessage request,
+            string content) =>
+            new(HttpStatusCode.OK)
+            {
+                RequestMessage = request,
+                Content = new StringContent(content)
+            };
+
+        private static HttpResponseMessage CreateBinaryResponse(
+            HttpRequestMessage request,
+            byte[] content) =>
+            new(HttpStatusCode.OK)
+            {
+                RequestMessage = request,
+                Content = new ByteArrayContent(content)
+            };
+    }
+
     private static byte[] CreateInstallerBytes()
     {
         using var stream = new MemoryStream();
@@ -445,6 +600,67 @@ public sealed class NeoForgeLoaderProviderTests : TestTempDirectory
                 }
                 """);
         }
+        return stream.ToArray();
+    }
+
+    private static byte[] CreateLegacy1201InstallerBytes()
+    {
+        using var stream = new MemoryStream();
+        using (var archive = new ZipArchive(stream, ZipArchiveMode.Create, leaveOpen: true))
+        {
+            var profileEntry = archive.CreateEntry("install_profile.json");
+            using (var profileWriter = new StreamWriter(profileEntry.Open()))
+            {
+                profileWriter.Write(
+                    """
+                    {
+                      "data": {
+                        "PATCHED": {
+                          "client": "[net.neoforged:forge:1.20.1-47.1.106:client]"
+                        }
+                      },
+                      "libraries": [
+                        {
+                          "name": "net.neoforged:forge:1.20.1-47.1.106:universal",
+                          "url": "https://maven.neoforged.net/releases/",
+                          "downloads": {
+                            "artifact": {
+                              "path": "net/neoforged/forge/1.20.1-47.1.106/forge-1.20.1-47.1.106-universal.jar",
+                              "sha1": "bb0166e91991e502fc8d8daf77eedced1b734f6a",
+                              "size": 26
+                            }
+                          }
+                        }
+                      ],
+                      "processors": [
+                        { "args": ["--output", "{PATCHED}"] }
+                      ]
+                    }
+                    """);
+            }
+
+            var versionEntry = archive.CreateEntry("version.json");
+            using var versionWriter = new StreamWriter(versionEntry.Open());
+            versionWriter.Write(
+                """
+                {
+                  "libraries": [
+                    {
+                      "name": "net.neoforged:forge:1.20.1-47.1.106:universal",
+                      "url": "https://maven.neoforged.net/releases/",
+                      "downloads": {
+                        "artifact": {
+                          "path": "net/neoforged/forge/1.20.1-47.1.106/forge-1.20.1-47.1.106-universal.jar",
+                          "sha1": "bb0166e91991e502fc8d8daf77eedced1b734f6a",
+                          "size": 26
+                        }
+                      }
+                    }
+                  ]
+                }
+                """);
+        }
+
         return stream.ToArray();
     }
 }

@@ -478,7 +478,7 @@ internal sealed partial class LoaderInstallerArtifactService
             for (var index = 0; index < arguments.Count; index++)
             {
                 var argument = arguments[index]?.GetValue<string>();
-                if ((argument is "--output" or "--slim" or "--extra") && index + 1 < arguments.Count)
+                if (IsProcessorOutputOption(argument) && index + 1 < arguments.Count)
                 {
                     TryAddArgumentOutput(outputs, arguments[index + 1]?.GetValue<string>(), data);
                     index++;
@@ -493,7 +493,7 @@ internal sealed partial class LoaderInstallerArtifactService
             for (var index = 0; index < arguments.Count; index++)
             {
                 var argument = arguments[index]?.GetValue<string>();
-                if ((argument is "--output" or "--slim" or "--extra") && index + 1 < arguments.Count)
+                if (IsProcessorOutputOption(argument) && index + 1 < arguments.Count)
                 {
                     index++;
                     continue;
@@ -503,6 +503,13 @@ internal sealed partial class LoaderInstallerArtifactService
         }
         return outputs.Values.ToArray();
     }
+
+    private static bool IsProcessorOutputOption(string? argument) =>
+        argument is "--output"
+            or "--slim"
+            or "--extra"
+            or "--out-jar"
+            or "--jar-out";
 
     private static void AddCoordinate(string? coordinate, IReadOnlyDictionary<string, string> embeddedEntries,
         IDictionary<string, ForgeInstallerLibrary> prerequisites)

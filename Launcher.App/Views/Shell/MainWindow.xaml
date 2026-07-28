@@ -190,6 +190,38 @@
                 </StackPanel>
             </Grid>
 
+            <controls:DialogHost x:Name="MultiplayerLanWorldDetectionDialogHost"
+                                 Grid.ColumnSpan="2"
+                                 Grid.RowSpan="2"
+                                 DialogWidth="420"
+                                 UseIntegratedOverlay="True"
+                                 IsOpen="{Binding IsLanWorldDetectionDialogOpen}"
+                                 DataContext="{Binding MultiplayerPage}">
+                <Grid Style="{StaticResource DialogContentGridStyle}">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
+
+                    <TextBlock Text="{x:Static res:Strings.Dialog_MultiplayerLanWorldDetectionTitle}"
+                               Style="{StaticResource DialogTitleTextStyle}" />
+
+                    <TextBlock Grid.Row="1"
+                               Margin="0,16,0,24"
+                               Text="{x:Static res:Strings.Dialog_MultiplayerLanWorldDetectionMessage}"
+                               Style="{StaticResource DialogBodyTextStyle}"
+                               TextWrapping="Wrap" />
+
+                    <StackPanel Grid.Row="2"
+                                Style="{StaticResource DialogFooterStyle}">
+                        <Button Content="{x:Static res:Strings.Cancel_Button}"
+                                Command="{Binding CancelLobbyDetectionCommand}"
+                                Style="{StaticResource LauncherDialogButtonStyle}" />
+                    </StackPanel>
+                </Grid>
+            </controls:DialogHost>
+
             <controls:DialogHost x:Name="LeaveMultiplayerLobbyDialogHost"
                                  Grid.ColumnSpan="2"
                                  Grid.RowSpan="2"

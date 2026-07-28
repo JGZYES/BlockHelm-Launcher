@@ -39,7 +39,7 @@ public sealed partial class LaunchService : ILaunchService
     private readonly IGameFileIntegrityService gameFileIntegrityService;
     private readonly ILaunchGameLauncherFactory launcherFactory;
     private readonly ILaunchCrashMonitor crashMonitor;
-    private readonly IGameWindowReadinessWaiter gameWindowReadinessWaiter;
+    private readonly IGameStartupReadinessWaiter gameStartupReadinessWaiter;
     private readonly ILaunchCommandRunner commandRunner;
     private readonly ILaunchProcessTerminator launchProcessTerminator;
     private readonly IJavaRuntimeSelectionService? javaRuntimeSelectionService;
@@ -121,7 +121,7 @@ public sealed partial class LaunchService : ILaunchService
         ILogger<LaunchService>? logger = null,
         IAuthlibInjectorProvisioningService? authlibInjectorProvisioningService = null,
         IOfflineSkinLaunchService? offlineSkinLaunchService = null,
-        IGameWindowReadinessWaiter? gameWindowReadinessWaiter = null,
+        IGameStartupReadinessWaiter? gameStartupReadinessWaiter = null,
         ILaunchProcessTerminator? launchProcessTerminator = null)
         : this(
             accountSessionService,
@@ -137,7 +137,7 @@ public sealed partial class LaunchService : ILaunchService
             logger,
             authlibInjectorProvisioningService,
             offlineSkinLaunchService,
-            gameWindowReadinessWaiter,
+            gameStartupReadinessWaiter,
             launchProcessTerminator)
     {
     }
@@ -156,14 +156,14 @@ public sealed partial class LaunchService : ILaunchService
         ILogger<LaunchService>? logger = null,
         IAuthlibInjectorProvisioningService? authlibInjectorProvisioningService = null,
         IOfflineSkinLaunchService? offlineSkinLaunchService = null,
-        IGameWindowReadinessWaiter? gameWindowReadinessWaiter = null,
+        IGameStartupReadinessWaiter? gameStartupReadinessWaiter = null,
         ILaunchProcessTerminator? launchProcessTerminator = null)
     {
         this.accountSessionService = accountSessionService;
         this.gameFileIntegrityService = gameFileIntegrityService;
         this.launcherFactory = launcherFactory;
         this.crashMonitor = crashMonitor;
-        this.gameWindowReadinessWaiter = gameWindowReadinessWaiter ?? new GameWindowReadinessWaiter();
+        this.gameStartupReadinessWaiter = gameStartupReadinessWaiter ?? new GameStartupReadinessWaiter();
         this.commandRunner = commandRunner ?? new LaunchCommandRunner();
         this.launchProcessTerminator = launchProcessTerminator ?? new LaunchProcessTerminator();
         this.javaRuntimeSelectionService = javaRuntimeSelectionService;
@@ -273,17 +273,17 @@ public sealed partial class LaunchService : ILaunchService
             process = startedProcess.Process;
             crashMonitorSession = startedProcess.CrashMonitorSession;
 
-            var readiness = await gameWindowReadinessWaiter
-                .WaitAsync(process, cancellationToken)
+            var readiness = await gameStartupReadinessWaiter
+                .WaitAsync(process, startedProcess.CrashMonitorSession.GameOutputReady, cancellationToken)
                 .ConfigureAwait(false);
-            if (readiness == GameWindowReadinessResult.ProcessExited)
+            if (readiness == GameStartupReadinessResult.ProcessExited)
             {
                 var startupExitResult = await startedProcess.CrashMonitorSession
                     .CreateStartupExitResultAsync(process, diagnosticContext, cancellationToken)
                     .ConfigureAwait(false);
                 LogLaunchFailureReport(
                     LogLevel.Warning,
-                    "Minecraft process exited before a visible game window appeared.",
+                    "Minecraft process exited before startup readiness was confirmed.",
                     startupExitResult.Report,
                     diagnosticContext);
                 throw new LaunchProcessExitedException(startupExitResult.Report);
@@ -291,12 +291,13 @@ public sealed partial class LaunchService : ILaunchService
 
             progress?.Report(new LauncherProgress(
                 LaunchProgressStages.StartingProcess,
-                "Game window appeared",
+                "Game startup confirmed",
                 100));
             logger.LogInformation(
-                "Visible Minecraft window detected. VersionName={VersionName} ProcessId={ProcessId}",
+                "Minecraft startup readiness confirmed. VersionName={VersionName} ProcessId={ProcessId} Signal={Signal}",
                 versionName,
-                process.Id);
+                process.Id,
+                readiness);
             var session = startedProcess.CrashMonitorSession.CreateGameLaunchSession(process, diagnosticContext);
             return new GameLaunchSession(
                 session.InstanceId,

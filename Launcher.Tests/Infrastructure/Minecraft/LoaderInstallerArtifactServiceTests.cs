@@ -100,6 +100,40 @@ public sealed class LoaderInstallerArtifactServiceTests : TestTempDirectory
         Assert.Contains("identity", mismatched.Error, StringComparison.OrdinalIgnoreCase);
     }
 
+    [Theory]
+    [InlineData("--out-jar", ModpackInstallEnvironment.Client)]
+    [InlineData("--out-jar", ModpackInstallEnvironment.Server)]
+    [InlineData("--jar-out", ModpackInstallEnvironment.Client)]
+    [InlineData("--jar-out", ModpackInstallEnvironment.Server)]
+    public async Task ProcessorOutputOptionsDoNotMaterializeGeneratedCoordinates(
+        string outputOption,
+        ModpackInstallEnvironment environment)
+    {
+        var installerPath = await WriteProcessorOutputInstallerAsync(outputOption);
+        var handler = new RecordingHandler();
+        var service = new LoaderInstallerArtifactService(new HttpClient(handler));
+
+        var plan = await service.ReadPlanAsync(installerPath, environment, CancellationToken.None);
+
+        var expectedRelativePath = environment is ModpackInstallEnvironment.Server
+            ? "net/minecraft/server/1.0/server-1.0-srg.jar"
+            : "net/minecraft/client/1.0/client-1.0-srg.jar";
+        Assert.Contains(plan.ProcessorOutputs, output => output.RelativePath == expectedRelativePath);
+        Assert.DoesNotContain(
+            plan.PrerequisiteLibraries,
+            library => library.Artifact.RelativePath == expectedRelativePath);
+
+        await service.MaterializePrerequisitesAsync(
+            installerPath,
+            plan,
+            Path.Combine(TempRoot, environment.ToString()),
+            DownloadSourcePreference.Official,
+            0,
+            CancellationToken.None);
+
+        Assert.Empty(handler.RequestUris);
+    }
+
     private async Task<string> WriteInstallerAsync(bool includeEmbeddedExternal)
     {
         Directory.CreateDirectory(TempRoot);
@@ -146,6 +180,37 @@ public sealed class LoaderInstallerArtifactServiceTests : TestTempDirectory
         return installerPath;
     }
 
+    private async Task<string> WriteProcessorOutputInstallerAsync(string outputOption)
+    {
+        Directory.CreateDirectory(TempRoot);
+        var installerPath = Path.Combine(TempRoot, $"processor-output-{Guid.NewGuid():N}.jar");
+        await using var stream = new FileStream(installerPath, FileMode.CreateNew, FileAccess.Write, FileShare.None);
+        using var archive = new ZipArchive(stream, ZipArchiveMode.Create, leaveOpen: false);
+        WriteEntry(archive, "install_profile.json", $$"""
+            {
+              "data": {
+                "MC_SRG": {
+                  "client": "[net.minecraft:client:1.0:srg]",
+                  "server": "[net.minecraft:server:1.0:srg]"
+                }
+              },
+              "processors": [
+                {
+                  "jar": "com.example:processor:1.0",
+                  "args": ["{{outputOption}}", "{MC_SRG}"]
+                },
+                {
+                  "jar": "com.example:processor:1.0",
+                  "args": ["--clean", "{MC_SRG}"]
+                }
+              ]
+            }
+            """);
+        WriteEntry(archive, "version.json", """{ "libraries": [] }""");
+        WriteEntry(archive, "maven/com/example/processor/1.0/processor-1.0.jar", "processor");
+        return installerPath;
+    }
+
     private static void WriteEntry(ZipArchive archive, string path, string content)
     {
         var entry = archive.CreateEntry(path);
@@ -164,5 +229,21 @@ public sealed class LoaderInstallerArtifactServiceTests : TestTempDirectory
                 RequestMessage = request,
                 Content = new StringContent(content)
             });
+    }
+
+    private sealed class RecordingHandler : HttpMessageHandler
+    {
+        public List<Uri> RequestUris { get; } = [];
+
+        protected override Task<HttpResponseMessage> SendAsync(
+            HttpRequestMessage request,
+            CancellationToken cancellationToken)
+        {
+            RequestUris.Add(request.RequestUri!);
+            return Task.FromResult(new HttpResponseMessage(HttpStatusCode.NotFound)
+            {
+                RequestMessage = request
+            });
+        }
     }
 }
