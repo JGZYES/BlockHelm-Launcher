@@ -79,6 +79,40 @@ public sealed class ForgeLoaderProviderTests : TestTempDirectory
     }
 
     [Fact]
+    public async Task ForgeLoaderProviderAtomicallyReplacesExistingProcessorOutputs()
+    {
+        const string combinedForgeVersion = "1.20.1-47.4.20";
+        var minecraftDirectory = Path.Combine(TempRoot, ".minecraft");
+        await CreateVanillaVersionAsync(minecraftDirectory, "1.20.1");
+        var outputs = new Dictionary<string, string>
+        {
+            ["net/minecraft/client/1.20.1-20230612.114412/client-1.20.1-20230612.114412-extra.jar"] = "minecraft extra",
+            ["net/minecraft/client/1.20.1-20230612.114412/client-1.20.1-20230612.114412-srg.jar"] = "minecraft srg",
+            [$"net/minecraftforge/forge/{combinedForgeVersion}/forge-{combinedForgeVersion}-client.jar"] =
+                "profile injected forge client"
+        };
+        foreach (var relativePath in outputs.Keys)
+            WriteGeneratedLibrary(minecraftDirectory, relativePath, "stale-output");
+        var provider = CreateProvider(
+            new ScriptedForgeInstallerRunner((gameDirectory, _, _) =>
+                CreateSandboxForgeInstallAsync(
+                    gameDirectory,
+                    "forge-1.20.1-47.4.20",
+                    "1.20.1",
+                    combinedForgeVersion)));
+
+        await provider.InstallAsync(
+            "1.20.1",
+            minecraftDirectory,
+            "1.20.1-forge-47.4.20",
+            "47.4.20",
+            progress: null);
+
+        foreach (var output in outputs)
+            Assert.Equal(output.Value, await File.ReadAllTextAsync(GetGeneratedLibraryPath(minecraftDirectory, output.Key)));
+    }
+
+    [Fact]
     public async Task ForgeLoaderProviderDoesNotDownloadOrRunInstallerWhenChecksumIsUnavailable()
     {
         var minecraftDirectory = Path.Combine(TempRoot, ".minecraft");
@@ -335,7 +369,7 @@ public sealed class ForgeLoaderProviderTests : TestTempDirectory
         var provider = new ForgeLoaderProvider(
             httpClient,
             new ScriptedForgeInstallerRunner((gameDirectory, _, _) =>
-                CreateSandboxForgeInstallAsync(
+                CreateSandboxForgeInstallWithReadableProcessorOutputsAsync(
                     gameDirectory,
                     "forge-1.20.1-47.4.20",
                     "1.20.1",
@@ -531,6 +565,27 @@ public sealed class ForgeLoaderProviderTests : TestTempDirectory
         CreateGeneratedForgeLibrary(minecraftDirectory, combinedForgeVersion);
     }
 
+    private static async Task CreateSandboxForgeInstallWithReadableProcessorOutputsAsync(
+        string minecraftDirectory,
+        string versionName,
+        string inheritsFrom,
+        string combinedForgeVersion)
+    {
+        await CreateSandboxForgeInstallAsync(
+            minecraftDirectory,
+            versionName,
+            inheritsFrom,
+            combinedForgeVersion);
+        WriteGeneratedJar(
+            minecraftDirectory,
+            "net/minecraft/client/1.20.1-20230612.114412/client-1.20.1-20230612.114412-srg.jar",
+            "minecraft srg");
+        WriteGeneratedJar(
+            minecraftDirectory,
+            $"net/minecraftforge/forge/{combinedForgeVersion}/forge-{combinedForgeVersion}-client.jar",
+            "profile injected forge client");
+    }
+
     private static async Task CreateVanillaVersionAsync(string minecraftDirectory, string versionName)
     {
         var versionDirectory = Path.Combine(minecraftDirectory, "versions", versionName);
@@ -590,7 +645,7 @@ public sealed class ForgeLoaderProviderTests : TestTempDirectory
         WriteGeneratedLibrary(
             minecraftDirectory,
             $"net/minecraftforge/forge/{combinedForgeVersion}/forge-{combinedForgeVersion}-client.jar",
-            "patched forge client");
+            "profile injected forge client");
         WriteGeneratedLibrary(
             minecraftDirectory,
             "net/minecraftforge/fmlcore/1.20.1-47.4.20/fmlcore-1.20.1-47.4.20.jar",
@@ -602,6 +657,18 @@ public sealed class ForgeLoaderProviderTests : TestTempDirectory
         var path = GetGeneratedLibraryPath(minecraftDirectory, relativePath);
         Directory.CreateDirectory(Path.GetDirectoryName(path)!);
         File.WriteAllText(path, content);
+    }
+
+    private static void WriteGeneratedJar(string minecraftDirectory, string relativePath, string content)
+    {
+        var path = GetGeneratedLibraryPath(minecraftDirectory, relativePath);
+        Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+        using var stream = new FileStream(path, FileMode.Create, FileAccess.Write, FileShare.None);
+        using var archive = new ZipArchive(stream, ZipArchiveMode.Create, leaveOpen: false);
+        var entry = archive.CreateEntry("test.class", CompressionLevel.NoCompression);
+        entry.LastWriteTime = new DateTimeOffset(2020, 1, 1, 0, 0, 0, TimeSpan.Zero);
+        using var writer = new StreamWriter(entry.Open(), Encoding.UTF8, leaveOpen: false);
+        writer.Write(content);
     }
 
     private sealed class InlineProgress(ConcurrentQueue<LauncherProgress> reports) : IProgress<LauncherProgress>

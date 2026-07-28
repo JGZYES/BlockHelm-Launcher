@@ -155,6 +155,71 @@ public sealed class MinecraftInstallPathLayoutTests : TestTempDirectory
         Assert.Equal("old-library", await File.ReadAllTextAsync(destinationLibrary));
     }
 
+    [Theory]
+    [InlineData("client")]
+    [InlineData("server")]
+    public async Task LoaderDeltaAtomicallyReplacesDeclaredProcessorOutputEvenWhenSeeded(string side)
+    {
+        var relativePath = $"libraries/net/minecraft/{side}/1.16.5/{side}-1.16.5-srg.jar";
+        var workspace = Path.Combine(TempRoot, "installer", ".minecraft");
+        CreateFile(
+            Path.Combine("installer", ".minecraft", relativePath.Replace('/', Path.DirectorySeparatorChar)),
+            "new-processor-output");
+        var destination = Path.Combine(TempRoot, "published");
+        var destinationOutput = CreateFile(
+            Path.Combine("published", relativePath.Replace('/', Path.DirectorySeparatorChar)),
+            "old-processor-output");
+        var snapshot = new LoaderInstallerWorkspaceSnapshot(
+            workspace,
+            new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+            {
+                [relativePath] = ComputeSha1("old-processor-output")
+            });
+
+        await new LoaderInstallerPrerequisiteSeeder().PublishDeltaAsync(
+            snapshot,
+            destination,
+            CancellationToken.None,
+            replaceableFileExpectations: new Dictionary<string, string?>(StringComparer.OrdinalIgnoreCase)
+            {
+                [relativePath] = null
+            });
+
+        Assert.Equal("new-processor-output", await File.ReadAllTextAsync(destinationOutput));
+        Assert.Empty(Directory.GetFiles(
+            Path.GetDirectoryName(destinationOutput)!,
+            $".{Path.GetFileName(destinationOutput)}.*.tmp"));
+    }
+
+    [Fact]
+    public async Task LoaderDeltaPreservesExistingProcessorOutputWhenReplacementHashIsInvalid()
+    {
+        const string relativePath = "libraries/net/minecraft/client/1.16.5/client-1.16.5-srg.jar";
+        var workspace = Path.Combine(TempRoot, "installer", ".minecraft");
+        CreateFile(
+            Path.Combine("installer", ".minecraft", relativePath.Replace('/', Path.DirectorySeparatorChar)),
+            "untrusted-processor-output");
+        var destination = Path.Combine(TempRoot, "published");
+        var destinationOutput = CreateFile(
+            Path.Combine("published", relativePath.Replace('/', Path.DirectorySeparatorChar)),
+            "old-processor-output");
+
+        await Assert.ThrowsAsync<InvalidDataException>(() =>
+            new LoaderInstallerPrerequisiteSeeder().PublishDeltaAsync(
+                EmptySnapshot(workspace),
+                destination,
+                CancellationToken.None,
+                replaceableFileExpectations: new Dictionary<string, string?>(StringComparer.OrdinalIgnoreCase)
+                {
+                    [relativePath] = ComputeSha1("expected-processor-output")
+                }));
+
+        Assert.Equal("old-processor-output", await File.ReadAllTextAsync(destinationOutput));
+        Assert.Empty(Directory.GetFiles(
+            Path.GetDirectoryName(destinationOutput)!,
+            $".{Path.GetFileName(destinationOutput)}.*.tmp"));
+    }
+
     [Fact]
     public async Task LoaderDeltaPublicationRejectsJunctionWithoutReadingExternalFile()
     {

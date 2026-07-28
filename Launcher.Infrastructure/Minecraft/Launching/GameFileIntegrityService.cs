@@ -682,6 +682,7 @@ internal sealed class RequiredGameFileManifestBuilder
             ManagedRoot: versionDirectory));
         foreach (var artifact in contribution.Manifest.Artifacts)
         {
+            var usesRecordedHashes = LoaderArtifactVerificationPolicy.UsesRecordedHashes(artifact);
             Add(files, new RequiredGameFile(
                 LoaderArtifactManifestStore.ResolveManagedPath(request.MinecraftDirectory, artifact.RelativePath),
                 artifact.Kind switch
@@ -692,13 +693,16 @@ internal sealed class RequiredGameFileManifestBuilder
                     _ => "LoaderArtifact"
                 },
                 artifact.Source,
-                artifact.Sha1,
+                usesRecordedHashes ? artifact.Sha1 : null,
                 artifact.Size,
                 true,
                 "LoaderInstallerSandbox",
                 artifact.RelativePath,
-                Sha256: artifact.Sha256,
-                ManagedRoot: request.MinecraftDirectory));
+                Sha256: usesRecordedHashes ? artifact.Sha256 : null,
+                ManagedRoot: request.MinecraftDirectory,
+                Verification: usesRecordedHashes
+                    ? MinecraftFileVerification.Full
+                    : MinecraftFileVerification.SizeOnly));
         }
     }
 

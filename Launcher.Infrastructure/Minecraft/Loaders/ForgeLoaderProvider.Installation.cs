@@ -233,7 +233,8 @@ private async Task<string> InstallCoreAsync(
                 sharedMinecraftDirectory,
                 cancellationToken,
                 LoaderInstallerArtifactService.CreateTrustedSharedLibraryExpectations(installerPlan),
-                downloadOperation).ConfigureAwait(false);
+                downloadOperation,
+                LoaderInstallerArtifactService.CreateReplaceableProcessorOutputExpectations(installerPlan)).ConfigureAwait(false);
         logger.LogDebug(
                 "Forge Java sandbox shared output publication completed. MinecraftVersion={MinecraftVersion} LoaderVersion={LoaderVersion} DurationMs={DurationMs}",
                 minecraftVersion,

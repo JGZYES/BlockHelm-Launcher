@@ -74,7 +74,8 @@ internal sealed class LoaderInstallerPrerequisiteSeeder
         string destinationMinecraftDirectory,
         CancellationToken cancellationToken,
         IReadOnlyDictionary<string, VerifiedSharedFileExpectation>? trustedFileExpectations = null,
-        MinecraftDownloadOperationContext? operationContext = null)
+        MinecraftDownloadOperationContext? operationContext = null,
+        IReadOnlyDictionary<string, string?>? replaceableFileExpectations = null)
     {
         var verifiedSharedFiles = await ReadVerifiedSharedFileExpectationsAsync(
             snapshot.WorkspaceMinecraftDirectory,
@@ -100,6 +101,25 @@ internal sealed class LoaderInstallerPrerequisiteSeeder
                     destinationRoot,
                     "Loader installer shared destination");
                 EnsureOrdinaryExistingPath(destinationRoot, destinationPath);
+                if (replaceableFileExpectations?.TryGetValue(relativePath, out var replaceableExpectedSha1) is true)
+                {
+                    var stableSourceSha1 = MinecraftFileIntegrity.IsSha1(replaceableExpectedSha1)
+                        ? replaceableExpectedSha1!
+                        : AtomicSharedFilePublisher.ComputeSha1(confinedSourcePath);
+                    var result = await AtomicSharedFilePublisher.PublishVerifiedReplacementAsync(
+                        confinedSourcePath,
+                        destinationPath,
+                        stableSourceSha1,
+                        cancellationToken,
+                        destinationRoot).ConfigureAwait(false);
+                    if (result.Disposition == SharedFilePublishDisposition.Replaced)
+                    {
+                        logger.LogDebug(
+                            "Replaced shared loader processor output. RelativePath={RelativePath}",
+                            relativePath);
+                    }
+                    continue;
+                }
                 if (snapshot.SeededFiles.TryGetValue(relativePath, out var seededSha1))
                 {
                     VerifiedSharedFileExpectation? trustedExpectation = null;

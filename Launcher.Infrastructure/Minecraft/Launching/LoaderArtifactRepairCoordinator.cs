@@ -73,11 +73,14 @@ internal sealed class LoaderArtifactRepairCoordinator
         {
             var path = LoaderArtifactManifestStore.ResolveManagedPath(minecraftDirectory, artifact.RelativePath);
             MinecraftPathGuard.EnsureSafeFileDestination(path, minecraftDirectory, "Managed loader artifact");
+            var usesRecordedHashes = LoaderArtifactVerificationPolicy.UsesRecordedHashes(artifact);
             var status = await MinecraftFileIntegrity.EvaluateAsync(
                     path,
-                    artifact.Sha1,
+                    usesRecordedHashes ? artifact.Sha1 : null,
                     artifact.Size,
-                    MinecraftFileVerification.Full,
+                    usesRecordedHashes
+                        ? MinecraftFileVerification.Full
+                        : MinecraftFileVerification.SizeOnly,
                     cancellationToken)
                 .ConfigureAwait(false);
             if (status != MinecraftFileIntegrityStatus.Valid)

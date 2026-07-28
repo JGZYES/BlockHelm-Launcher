@@ -45,6 +45,25 @@ internal sealed record LoaderArtifactManifestReadResult(
     public bool IsValid => Manifest is not null && Error is null;
 }
 
+internal static class LoaderArtifactVerificationPolicy
+{
+    public static GameFileVerificationLevel ResolveManifestLevel(
+        LoaderArtifactKind kind,
+        string? authoritativeSha1)
+    {
+        if (MinecraftFileIntegrity.IsSha1(authoritativeSha1))
+            return GameFileVerificationLevel.HashVerified;
+
+        return kind == LoaderArtifactKind.ProcessorOutput
+            ? GameFileVerificationLevel.SizeVerified
+            : GameFileVerificationLevel.TrustedAcquisitionHash;
+    }
+
+    public static bool UsesRecordedHashes(LoaderArtifactManifestEntry artifact) =>
+        artifact.Kind != LoaderArtifactKind.ProcessorOutput
+        || artifact.VerificationLevel == GameFileVerificationLevel.HashVerified;
+}
+
 /// <summary>
 /// Persists the complete client-side closure declared by a Forge-like installer.
 /// File names and coordinates are taken exclusively from the installer plan.
@@ -221,9 +240,7 @@ internal static class LoaderArtifactManifestStore
             actualSha1,
             actualSha256,
             file.Length,
-            MinecraftFileIntegrity.IsSha1(authoritativeSha1)
-                ? GameFileVerificationLevel.HashVerified
-                : GameFileVerificationLevel.TrustedAcquisitionHash);
+            LoaderArtifactVerificationPolicy.ResolveManifestLevel(kind, authoritativeSha1));
     }
 
     private static void AddOrMerge(

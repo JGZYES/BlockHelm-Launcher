@@ -190,6 +190,19 @@ internal sealed partial class LoaderInstallerArtifactService
         return expectations;
     }
 
+    public static IReadOnlyDictionary<string, string?> CreateReplaceableProcessorOutputExpectations(
+        ForgeInstallerPlan plan)
+    {
+        var expectations = new Dictionary<string, string?>(StringComparer.OrdinalIgnoreCase);
+        foreach (var output in plan.ProcessorOutputs
+                     .OrderBy(output => output.RelativePath, StringComparer.OrdinalIgnoreCase))
+        {
+            expectations[$"libraries/{output.RelativePath.Replace('\\', '/')}"] = output.TrustedSha1;
+        }
+
+        return expectations;
+    }
+
     public static async Task ApplyRuntimeLibrariesAsync(
         string versionJsonPath,
         ForgeInstallerPlan plan,
@@ -611,9 +624,37 @@ internal sealed partial class LoaderInstallerArtifactService
             resolvedHash = TrimLiteral(tokenHash);
         if (!MinecraftFileIntegrity.IsSha1(resolvedHash))
             resolvedHash = null;
+        var isPatchedOutput = IsPatchedOutput(token, relativePath, data);
+        if (isPatchedOutput)
+            resolvedHash = null;
         if (outputs.TryGetValue(relativePath, out var existing) && !Compatible(existing.TrustedSha1, resolvedHash))
             throw new InvalidDataException($"Forge processor declared conflicting output checksums: {relativePath}");
-        outputs[relativePath] = new ForgeProcessorOutput(relativePath, existing?.TrustedSha1 ?? resolvedHash);
+        outputs[relativePath] = new ForgeProcessorOutput(
+            relativePath,
+            isPatchedOutput
+                ? null
+                : existing?.TrustedSha1 ?? resolvedHash);
+    }
+
+    private static bool IsPatchedOutput(
+        string? token,
+        string relativePath,
+        IReadOnlyDictionary<string, string> data)
+    {
+        if (string.Equals(token, "PATCHED", StringComparison.OrdinalIgnoreCase))
+            return true;
+        if (!data.TryGetValue("PATCHED", out var patchedExpression))
+            return false;
+
+        var resolved = ResolveExpression(patchedExpression, data).Trim();
+        return resolved.Length >= 3
+            && resolved[0] == '['
+            && resolved[^1] == ']'
+            && ManagedLibraryArtifactResolver.TryBuildMavenPath(
+                resolved[1..^1],
+                classifierOverride: null,
+                out var patchedRelativePath)
+            && string.Equals(relativePath, patchedRelativePath, StringComparison.OrdinalIgnoreCase);
     }
 
     private static void TryAddArgumentOutput(

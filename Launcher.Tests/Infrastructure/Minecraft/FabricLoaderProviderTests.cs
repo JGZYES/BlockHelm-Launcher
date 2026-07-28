@@ -20,6 +20,7 @@
 using System.Net;
 using System.Net.Http;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using Launcher.Domain.Models;
 using Launcher.Infrastructure.Minecraft;
 using Launcher.Tests.Helpers;
@@ -97,6 +98,35 @@ public sealed class FabricLoaderProviderTests : TestTempDirectory
         Assert.False(File.Exists(Path.Combine(versionsDirectory, "1.20.2-fabric-0.19.3", "1.20.2-fabric-0.19.3.jar")));
         using var fabricJson = JsonDocument.Parse(await File.ReadAllTextAsync(Path.Combine(versionsDirectory, "1.20.2-fabric-0.19.3", "1.20.2-fabric-0.19.3.json")));
         Assert.Equal("1.20.2", fabricJson.RootElement.GetProperty("launcher").GetProperty("minecraftVersion").GetString());
+    }
+
+    [Fact]
+    public void FabricVersionComposerPreservesVanillaNativeClassifierLibraries()
+    {
+        var baseVersion = new JsonObject
+        {
+            ["id"] = "1.16.5",
+            ["libraries"] = VersionJsonMergeHelperTests.CreateBaseLibraries()
+        };
+        var fabricProfile = new JsonObject
+        {
+            ["id"] = "fabric-loader-0.16.14-1.16.5",
+            ["inheritsFrom"] = "1.16.5",
+            ["libraries"] = new JsonArray
+            {
+                new JsonObject { ["name"] = "net.fabricmc:fabric-loader:0.16.14" }
+            }
+        };
+
+        var result = FabricVersionComposer.BuildFinalVersionJson(
+            baseVersion,
+            fabricProfile,
+            "1.16.5-fabric-0.16.14",
+            "1.16.5");
+
+        Assert.Contains(
+            result["libraries"]!.AsArray().OfType<JsonObject>(),
+            library => library["downloads"]?["classifiers"]?["natives-windows"] is JsonObject);
     }
 
     private sealed class NotFoundHandler : HttpMessageHandler

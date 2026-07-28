@@ -91,9 +91,8 @@ internal static class VersionJsonMergeHelper
 
     public static JsonArray MergeLibraries(JsonArray? baseLibraries, JsonArray? derivedLibraries)
     {
-        // 以 Maven name 作为身份并保留首次声明，避免继承链重复下载同一坐标。
+        // 同一 Maven name 可能分别描述主体和原生分类器，只去除结构完全相同的重复声明。
         var mergedLibraries = new JsonArray();
-        var seenNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
         AppendLibraries(baseLibraries);
         AppendLibraries(derivedLibraries);
@@ -109,14 +108,7 @@ internal static class VersionJsonMergeHelper
                 if (library is null)
                     continue;
 
-                var key = library is JsonObject libraryObject
-                    && libraryObject["name"] is JsonValue libraryNameValue
-                    && libraryNameValue.TryGetValue<string>(out var libraryName)
-                    && !string.IsNullOrWhiteSpace(libraryName)
-                        ? libraryName
-                        : library.ToJsonString();
-
-                if (!seenNames.Add(key))
+                if (mergedLibraries.Any(existing => JsonNode.DeepEquals(existing, library)))
                     continue;
 
                 mergedLibraries.Add(library.DeepClone());

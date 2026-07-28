@@ -20,6 +20,7 @@
 using System.Net;
 using System.Net.Http;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using Launcher.Infrastructure.Minecraft;
 using Launcher.Tests.Helpers;
 
@@ -67,6 +68,35 @@ public sealed class QuiltLoaderProviderTests : TestTempDirectory
                 "org.quiltmc:quilt-loader:0.29.2",
                 library.GetProperty("name").GetString(),
                 StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void QuiltVersionComposerPreservesVanillaNativeClassifierLibraries()
+    {
+        var baseVersion = new JsonObject
+        {
+            ["id"] = "1.18.2",
+            ["libraries"] = VersionJsonMergeHelperTests.CreateBaseLibraries()
+        };
+        var quiltProfile = new JsonObject
+        {
+            ["id"] = "quilt-loader-0.29.2-1.18.2",
+            ["inheritsFrom"] = "1.18.2",
+            ["libraries"] = new JsonArray
+            {
+                new JsonObject { ["name"] = "org.quiltmc:quilt-loader:0.29.2" }
+            }
+        };
+
+        var result = QuiltVersionComposer.BuildFinalVersionJson(
+            baseVersion,
+            quiltProfile,
+            "1.18.2-quilt-0.29.2",
+            "1.18.2");
+
+        Assert.Contains(
+            result["libraries"]!.AsArray().OfType<JsonObject>(),
+            library => library["downloads"]?["classifiers"]?["natives-windows"] is JsonObject);
     }
 
     private sealed class NotFoundHandler : HttpMessageHandler

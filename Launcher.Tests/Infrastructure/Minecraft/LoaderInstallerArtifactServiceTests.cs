@@ -91,6 +91,10 @@ public sealed class LoaderInstallerArtifactServiceTests : TestTempDirectory
         Assert.Contains(result.Manifest.Artifacts, artifact => artifact.Kind == LoaderArtifactKind.ProcessorOutput);
         Assert.All(result.Manifest.Artifacts, artifact => Assert.True(MinecraftFileIntegrity.IsSha1(artifact.Sha1)));
         Assert.All(result.Manifest.Artifacts, artifact => Assert.Equal(64, artifact.Sha256.Length));
+        Assert.Equal(
+            GameFileVerificationLevel.SizeVerified,
+            result.Manifest.Artifacts.Single(artifact => artifact.Kind == LoaderArtifactKind.ProcessorOutput)
+                .VerificationLevel);
 
         var mismatched = await LoaderArtifactManifestStore.ReadAsync(
             versionDirectory,
@@ -132,6 +136,99 @@ public sealed class LoaderInstallerArtifactServiceTests : TestTempDirectory
             CancellationToken.None);
 
         Assert.Empty(handler.RequestUris);
+    }
+
+    [Theory]
+    [InlineData(ModpackInstallEnvironment.Client, true)]
+    [InlineData(ModpackInstallEnvironment.Client, false)]
+    [InlineData(ModpackInstallEnvironment.Server, true)]
+    [InlineData(ModpackInstallEnvironment.Server, false)]
+    public async Task PatchedOutputUsesPostInjectionHashForFinalManifest(
+        ModpackInstallEnvironment environment,
+        bool usePlaceholder)
+    {
+        var installerPath = await WritePatchedOutputInstallerAsync(environment, usePlaceholder);
+        var minecraftDirectory = Path.Combine(TempRoot, $"patched-{environment}-{usePlaceholder}");
+        var versionDirectory = Path.Combine(minecraftDirectory, "versions", "Forge Test");
+        Directory.CreateDirectory(versionDirectory);
+        var service = new LoaderInstallerArtifactService(new HttpClient(new TestHandler("external")));
+        var plan = await service.ReadPlanAsync(installerPath, environment, CancellationToken.None);
+        var output = Assert.Single(plan.ProcessorOutputs);
+        Assert.Null(output.TrustedSha1);
+        var outputPath = Path.Combine(
+            minecraftDirectory,
+            "libraries",
+            output.RelativePath.Replace('/', Path.DirectorySeparatorChar));
+        Directory.CreateDirectory(Path.GetDirectoryName(outputPath)!);
+        const string finalContent = "profile-injected-patched-output";
+        await File.WriteAllTextAsync(outputPath, finalContent);
+
+        await service.ValidatePublishedArtifactsAsync(
+            minecraftDirectory,
+            plan,
+            CancellationToken.None);
+        var identity = new GameFileLoaderIdentity(LoaderKind.Forge, "1.17.1", "37.1.1");
+        await LoaderArtifactManifestStore.WriteAsync(
+            versionDirectory,
+            minecraftDirectory,
+            identity,
+            installerPath,
+            plan,
+            CancellationToken.None);
+
+        var result = await LoaderArtifactManifestStore.ReadAsync(
+            versionDirectory,
+            identity,
+            CancellationToken.None);
+        var artifact = Assert.Single(result.Manifest!.Artifacts);
+        Assert.Equal($"libraries/{output.RelativePath}", artifact.RelativePath);
+        Assert.Equal(Sha1(finalContent), artifact.Sha1, ignoreCase: true);
+        Assert.Equal(64, artifact.Sha256.Length);
+        Assert.Equal(Encoding.UTF8.GetByteCount(finalContent), artifact.Size);
+        Assert.Equal(GameFileVerificationLevel.SizeVerified, artifact.VerificationLevel);
+    }
+
+    [Fact]
+    public async Task NonPatchedProcessorOutputRetainsDeclaredHashValidation()
+    {
+        var installerPath = await WriteHashedSrgOutputInstallerAsync();
+        var minecraftDirectory = Path.Combine(TempRoot, "hashed-srg");
+        var service = new LoaderInstallerArtifactService(new HttpClient(new TestHandler("external")));
+        var plan = await service.ReadPlanAsync(installerPath, CancellationToken.None);
+        var output = Assert.Single(plan.ProcessorOutputs);
+        Assert.Equal(Sha1("expected-srg"), output.TrustedSha1, ignoreCase: true);
+        var outputPath = Path.Combine(
+            minecraftDirectory,
+            "libraries",
+            output.RelativePath.Replace('/', Path.DirectorySeparatorChar));
+        Directory.CreateDirectory(Path.GetDirectoryName(outputPath)!);
+        await File.WriteAllTextAsync(outputPath, "different-srg");
+
+        await Assert.ThrowsAsync<InvalidDataException>(() =>
+            service.ValidatePublishedArtifactsAsync(
+                minecraftDirectory,
+                plan,
+                CancellationToken.None));
+
+        await File.WriteAllTextAsync(outputPath, "expected-srg");
+        var versionDirectory = Path.Combine(minecraftDirectory, "versions", "Forge Test");
+        Directory.CreateDirectory(versionDirectory);
+        var identity = new GameFileLoaderIdentity(LoaderKind.Forge, "1.17.1", "37.1.1");
+        await LoaderArtifactManifestStore.WriteAsync(
+            versionDirectory,
+            minecraftDirectory,
+            identity,
+            installerPath,
+            plan,
+            CancellationToken.None);
+
+        var result = await LoaderArtifactManifestStore.ReadAsync(
+            versionDirectory,
+            identity,
+            CancellationToken.None);
+        Assert.Equal(
+            GameFileVerificationLevel.HashVerified,
+            Assert.Single(result.Manifest!.Artifacts).VerificationLevel);
     }
 
     [Fact]
@@ -226,6 +323,72 @@ public sealed class LoaderInstallerArtifactServiceTests : TestTempDirectory
             """);
         WriteEntry(archive, "version.json", """{ "libraries": [] }""");
         WriteEntry(archive, "maven/com/example/processor/1.0/processor-1.0.jar", "processor");
+        return installerPath;
+    }
+
+    private async Task<string> WritePatchedOutputInstallerAsync(
+        ModpackInstallEnvironment environment,
+        bool usePlaceholder)
+    {
+        Directory.CreateDirectory(TempRoot);
+        var installerPath = Path.Combine(TempRoot, $"patched-output-{Guid.NewGuid():N}.jar");
+        var coordinate = environment is ModpackInstallEnvironment.Server
+            ? "net.minecraftforge:forge:1.17.1-37.1.1:server"
+            : "net.minecraftforge:forge:1.17.1-37.1.1:client";
+        var outputExpression = usePlaceholder ? "{PATCHED}" : $"[{coordinate}]";
+        await using var stream = new FileStream(installerPath, FileMode.CreateNew, FileAccess.Write, FileShare.None);
+        using var archive = new ZipArchive(stream, ZipArchiveMode.Create, leaveOpen: false);
+        WriteEntry(archive, "install_profile.json", $$"""
+            {
+              "data": {
+                "PATCHED": {
+                  "client": "[net.minecraftforge:forge:1.17.1-37.1.1:client]",
+                  "server": "[net.minecraftforge:forge:1.17.1-37.1.1:server]"
+                },
+                "PATCHED_SHA": {
+                  "client": "'{{Sha1("processor-stage-client")}}'",
+                  "server": "'{{Sha1("processor-stage-server")}}'"
+                }
+              },
+              "processors": [
+                {
+                  "outputs": {
+                    "{{outputExpression}}": "{PATCHED_SHA}"
+                  }
+                }
+              ]
+            }
+            """);
+        WriteEntry(archive, "version.json", """{ "libraries": [] }""");
+        return installerPath;
+    }
+
+    private async Task<string> WriteHashedSrgOutputInstallerAsync()
+    {
+        Directory.CreateDirectory(TempRoot);
+        var installerPath = Path.Combine(TempRoot, $"hashed-srg-{Guid.NewGuid():N}.jar");
+        await using var stream = new FileStream(installerPath, FileMode.CreateNew, FileAccess.Write, FileShare.None);
+        using var archive = new ZipArchive(stream, ZipArchiveMode.Create, leaveOpen: false);
+        WriteEntry(archive, "install_profile.json", $$"""
+            {
+              "data": {
+                "MC_SRG": {
+                  "client": "[net.minecraft:client:1.17.1:srg]"
+                },
+                "MC_SRG_SHA": {
+                  "client": "'{{Sha1("expected-srg")}}'"
+                }
+              },
+              "processors": [
+                {
+                  "outputs": {
+                    "{MC_SRG}": "{MC_SRG_SHA}"
+                  }
+                }
+              ]
+            }
+            """);
+        WriteEntry(archive, "version.json", """{ "libraries": [] }""");
         return installerPath;
     }
 

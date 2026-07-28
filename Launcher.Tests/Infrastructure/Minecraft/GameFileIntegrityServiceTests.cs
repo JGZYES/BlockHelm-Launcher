@@ -6,6 +6,7 @@
  */
 
 using System.Diagnostics;
+using System.IO.Compression;
 using System.Net;
 using System.Security.Cryptography;
 using System.Text;
@@ -232,6 +233,63 @@ public sealed class GameFileIntegrityServiceTests : TestTempDirectory
         Assert.Equal(GameFileRepairFailureReason.DownloadFailed, Assert.Single(result.Failures).Reason);
     }
 
+    [Theory]
+    [InlineData(LoaderKind.Forge, GameFileVerificationLevel.SizeVerified)]
+    [InlineData(LoaderKind.Forge, GameFileVerificationLevel.TrustedAcquisitionHash)]
+    [InlineData(LoaderKind.NeoForge, GameFileVerificationLevel.SizeVerified)]
+    [InlineData(LoaderKind.NeoForge, GameFileVerificationLevel.TrustedAcquisitionHash)]
+    public async Task GeneratedProcessorOutputWithSameSizeDoesNotUseRecordedHashes(
+        LoaderKind loaderKind,
+        GameFileVerificationLevel verificationLevel)
+    {
+        var result = await ValidateLoaderArtifactAsync(
+            loaderKind,
+            LoaderArtifactKind.ProcessorOutput,
+            verificationLevel,
+            expectedContent: "old!",
+            actualContent: "new!");
+
+        Assert.True(result.LaunchAllowed);
+        Assert.DoesNotContain(result.Failures, failure => failure.Category == "LoaderProcessorOutput");
+    }
+
+    [Theory]
+    [InlineData(null, GameFileRepairFailureReason.Missing)]
+    [InlineData("different-size", GameFileRepairFailureReason.Corrupted)]
+    public async Task GeneratedProcessorOutputStillRequiresExistenceAndRecordedSize(
+        string? actualContent,
+        GameFileRepairFailureReason expectedReason)
+    {
+        var result = await ValidateLoaderArtifactAsync(
+            LoaderKind.Forge,
+            LoaderArtifactKind.ProcessorOutput,
+            GameFileVerificationLevel.SizeVerified,
+            expectedContent: "old!",
+            actualContent);
+
+        Assert.False(result.LaunchAllowed);
+        var failure = Assert.Single(result.Failures, item => item.Category == "LoaderProcessorOutput");
+        Assert.Equal(expectedReason, failure.Reason);
+    }
+
+    [Theory]
+    [InlineData((int)LoaderArtifactKind.ProcessorOutput, GameFileVerificationLevel.HashVerified)]
+    [InlineData((int)LoaderArtifactKind.RuntimeLibrary, GameFileVerificationLevel.TrustedAcquisitionHash)]
+    public async Task TrustedLoaderArtifactsRetainFullHashValidation(
+        int artifactKind,
+        GameFileVerificationLevel verificationLevel)
+    {
+        var result = await ValidateLoaderArtifactAsync(
+            LoaderKind.Forge,
+            (LoaderArtifactKind)artifactKind,
+            verificationLevel,
+            expectedContent: "old!",
+            actualContent: "new!");
+
+        Assert.False(result.LaunchAllowed);
+        Assert.Equal(GameFileRepairFailureReason.Corrupted, Assert.Single(result.Failures).Reason);
+    }
+
     [Fact]
     public async Task VerifiedFileLeaseBlocksConcurrentWrites()
     {
@@ -292,6 +350,67 @@ public sealed class GameFileIntegrityServiceTests : TestTempDirectory
             DownloadIntegrityExpectation.Sha1(Sha1(content), Encoding.UTF8.GetByteCount(content)));
     }
 
+    private async Task<GameFileRepairResult> ValidateLoaderArtifactAsync(
+        LoaderKind loaderKind,
+        LoaderArtifactKind artifactKind,
+        GameFileVerificationLevel verificationLevel,
+        string expectedContent,
+        string? actualContent)
+    {
+        const string versionName = "Loader Verification";
+        const string artifactRelativePath =
+            "libraries/net/minecraft/client/1.16.5-test/client-1.16.5-test-srg.jar";
+        var minecraftDirectory = Path.Combine(TempRoot, ".minecraft");
+        var versionDirectory = Path.Combine(minecraftDirectory, "versions", versionName);
+        CreateVersion(
+            minecraftDirectory,
+            versionName,
+            "com/example/runtime/1.0/runtime-1.0.jar",
+            "runtime");
+        var artifactPath = Path.Combine(
+            minecraftDirectory,
+            artifactRelativePath.Replace('/', Path.DirectorySeparatorChar));
+        Directory.CreateDirectory(Path.GetDirectoryName(artifactPath)!);
+        var expectedBytes = CreateJarBytes(expectedContent);
+        if (actualContent is not null)
+            await File.WriteAllBytesAsync(artifactPath, CreateJarBytes(actualContent));
+
+        var manifestPath = LoaderArtifactManifestStore.GetPath(versionDirectory);
+        Directory.CreateDirectory(Path.GetDirectoryName(manifestPath)!);
+        await File.WriteAllTextAsync(manifestPath, "{}");
+        var manifest = new LoaderArtifactManifest(
+            LoaderArtifactManifestStore.CurrentSchemaVersion,
+            loaderKind,
+            "1.16.5",
+            loaderKind == LoaderKind.Forge ? "36.2.42" : "20.4.237",
+            new string('a', 64),
+            [
+                new LoaderArtifactManifestEntry(
+                    artifactRelativePath,
+                    artifactKind,
+                    Source: null,
+                    Sha1(expectedBytes),
+                    Sha256(expectedBytes),
+                    expectedBytes.LongLength,
+                    verificationLevel)
+            ]);
+        var contributor = new StaticLoaderManifestContributor(loaderKind, manifestPath, manifest);
+        var service = new GameFileIntegrityService(
+            httpClient: null,
+            downloadSpeedLimitState: null,
+            manifestContributors: [contributor]);
+
+        return await service.ValidateAndRepairAsync(
+            new GameFileIntegrityRequest(minecraftDirectory, versionName, versionDirectory)
+            {
+                LoaderIdentity = new GameFileLoaderIdentity(
+                    loaderKind,
+                    "1.16.5",
+                    manifest.LoaderVersion)
+            },
+            new GameFileRepairOptions(AllowRepair: false));
+    }
+
     private static void CreateVersion(string minecraftDirectory, string versionName, string relativePath, string libraryContent, bool createLibrary = true)
     {
         var versionDirectory = Path.Combine(minecraftDirectory, "versions", versionName);
@@ -326,6 +445,22 @@ public sealed class GameFileIntegrityServiceTests : TestTempDirectory
     }
 
     private static string Sha1(string value) => Convert.ToHexString(SHA1.HashData(Encoding.UTF8.GetBytes(value))).ToLowerInvariant();
+    private static string Sha256(string value) => Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(value))).ToLowerInvariant();
+    private static string Sha1(byte[] value) => Convert.ToHexString(SHA1.HashData(value)).ToLowerInvariant();
+    private static string Sha256(byte[] value) => Convert.ToHexString(SHA256.HashData(value)).ToLowerInvariant();
+
+    private static byte[] CreateJarBytes(string content)
+    {
+        using var stream = new MemoryStream();
+        using (var archive = new ZipArchive(stream, ZipArchiveMode.Create, leaveOpen: true))
+        {
+            var entry = archive.CreateEntry("test.class", CompressionLevel.NoCompression);
+            entry.LastWriteTime = new DateTimeOffset(2020, 1, 1, 0, 0, 0, TimeSpan.Zero);
+            using var writer = new StreamWriter(entry.Open(), Encoding.UTF8, leaveOpen: false);
+            writer.Write(content);
+        }
+        return stream.ToArray();
+    }
 
     private sealed class ContentHandler(IReadOnlyDictionary<string, string> responses) : HttpMessageHandler
     {
@@ -345,6 +480,25 @@ public sealed class GameFileIntegrityServiceTests : TestTempDirectory
     private sealed class InlineProgress(List<LauncherProgress> reports) : IProgress<LauncherProgress>
     {
         public void Report(LauncherProgress value) => reports.Add(value);
+    }
+
+    private sealed class StaticLoaderManifestContributor(
+        LoaderKind kind,
+        string manifestPath,
+        LoaderArtifactManifest manifest)
+        : ILoaderFileManifestContributor
+    {
+        public LoaderKind Kind { get; } = kind;
+
+        public Task<LoaderFileManifestContribution> ResolveAsync(
+            string versionDirectory,
+            GameFileLoaderIdentity identity,
+            CancellationToken cancellationToken) =>
+            Task.FromResult(new LoaderFileManifestContribution(
+                RequiresManifest: true,
+                manifestPath,
+                manifest,
+                Error: null));
     }
 
     private sealed class FailingLoaderProvider(LoaderKind kind, Exception exception) : ILoaderProvider
