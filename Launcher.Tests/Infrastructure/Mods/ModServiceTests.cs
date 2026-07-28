@@ -22,6 +22,7 @@ using System.Text;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using Launcher.Application;
+using Launcher.Application.Services;
 using Launcher.Domain.Models;
 using Launcher.Infrastructure;
 using Launcher.Infrastructure.FileSystem;
@@ -58,6 +59,64 @@ public sealed class ModServiceTests : TestTempDirectory
         Assert.True(File.Exists(Path.Combine(instanceDirectory, "mods", "example.jar")));
     }
 
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task SetEnabledAsyncRejectsExistingTargetWithoutChangingEitherFile(bool enabled)
+    {
+        var modsDirectory = Directory.CreateDirectory(Path.Combine(TempRoot, "instances", "conflict", "mods")).FullName;
+        var enabledPath = Path.Combine(modsDirectory, "example.jar");
+        var disabledPath = Path.Combine(modsDirectory, "example.jar.disabled");
+        await File.WriteAllTextAsync(enabledPath, "enabled-content");
+        await File.WriteAllTextAsync(disabledPath, "disabled-content");
+        var sourcePath = enabled ? disabledPath : enabledPath;
+        var targetPath = enabled ? enabledPath : disabledPath;
+        var mod = CreateLocalMod(sourcePath, isEnabled: !enabled);
+        var service = CreateService();
+
+        var exception = await Assert.ThrowsAsync<ModEnabledStateConflictException>(
+            () => service.SetEnabledAsync(mod, enabled));
+
+        Assert.Equal(targetPath, exception.TargetPath);
+        Assert.Equal("enabled-content", await File.ReadAllTextAsync(enabledPath));
+        Assert.Equal("disabled-content", await File.ReadAllTextAsync(disabledPath));
+    }
+
+    [Fact]
+    public async Task SetEnabledAsyncRejectsExistingTargetDirectoryWithoutChangingSource()
+    {
+        var modsDirectory = Directory.CreateDirectory(Path.Combine(TempRoot, "instances", "directory-conflict", "mods")).FullName;
+        var sourcePath = Path.Combine(modsDirectory, "example.jar.disabled");
+        var targetPath = Path.Combine(modsDirectory, "example.jar");
+        await File.WriteAllTextAsync(sourcePath, "source-content");
+        Directory.CreateDirectory(targetPath);
+        var service = CreateService();
+
+        var exception = await Assert.ThrowsAsync<ModEnabledStateConflictException>(
+            () => service.SetEnabledAsync(CreateLocalMod(sourcePath, isEnabled: false), enabled: true));
+
+        Assert.Equal(targetPath, exception.TargetPath);
+        Assert.Equal("source-content", await File.ReadAllTextAsync(sourcePath));
+        Assert.True(Directory.Exists(targetPath));
+    }
+
+    [Fact]
+    public async Task MoveFileWithoutOverwriteMapsTargetCreatedAfterPrecheckToConflict()
+    {
+        var modsDirectory = Directory.CreateDirectory(Path.Combine(TempRoot, "instances", "race-conflict", "mods")).FullName;
+        var sourcePath = Path.Combine(modsDirectory, "example.jar.disabled");
+        var targetPath = Path.Combine(modsDirectory, "example.jar");
+        await File.WriteAllTextAsync(sourcePath, "source-content");
+        await File.WriteAllTextAsync(targetPath, "target-content");
+
+        var exception = Assert.Throws<ModEnabledStateConflictException>(
+            () => ModService.MoveFileWithoutOverwrite(sourcePath, targetPath));
+
+        Assert.Equal(targetPath, exception.TargetPath);
+        Assert.Equal("source-content", await File.ReadAllTextAsync(sourcePath));
+        Assert.Equal("target-content", await File.ReadAllTextAsync(targetPath));
+    }
+
     [Fact]
     public async Task ModServiceImportAsyncOverwritesExistingJarWhenRequested()
     {
@@ -83,6 +142,14 @@ public sealed class ModServiceTests : TestTempDirectory
     {
         return new ModService(new LauncherPathProvider(TempRoot));
     }
+
+    private static LocalMod CreateLocalMod(string fullPath, bool isEnabled) => new()
+    {
+        Name = "Example",
+        FileName = Path.GetFileName(fullPath),
+        FullPath = fullPath,
+        IsEnabled = isEnabled
+    };
 
     private static (string EntryName, byte[] Content) TextEntry(string entryName, string content)
     {

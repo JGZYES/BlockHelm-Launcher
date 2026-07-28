@@ -30,6 +30,16 @@ public sealed class StringResourceTests
             Assert.Equal(Placeholders(entry.Value), Placeholders(localized[entry.Key])));
     }
 
+    [Fact]
+    public void ModEnabledStateConflictDefaultMessageDoesNotAddPlaceholderBrackets()
+    {
+        var defaults = Load("Strings.resx");
+
+        Assert.Equal(
+            "{0}已存在，操作失败",
+            defaults["Status_ModEnabledStateTargetExistsFormat"]);
+    }
+
     private static IReadOnlyDictionary<string, string> Load(string fileName)
     {
         var root = new DirectoryInfo(AppContext.BaseDirectory);

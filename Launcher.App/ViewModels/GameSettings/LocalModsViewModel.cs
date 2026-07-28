@@ -28,6 +28,10 @@ using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Launcher.App.ViewModels.GameSettings;
 
+public sealed record LocalModEnabledStateBatchResult(
+    int FailedCount,
+    string? FirstConflictTargetPath);
+
 /// <summary>
 /// 维护所选实例的 Mod 快照、目录监听和图标渐进补全，并保证异步结果只作用于当前实例。
 /// </summary>
@@ -304,12 +308,15 @@ public sealed class LocalModsViewModel : IDisposable
     /// <summary>
     /// 批量切换 Mod 状态；允许部分失败并返回失败数量，成功项一次性发布到界面。
     /// </summary>
-    public async Task<int> SetModsEnabledAsync(IEnumerable<LocalMod> mods, bool enabled)
+    public async Task<LocalModEnabledStateBatchResult> SetModsEnabledAsync(
+        IEnumerable<LocalMod> mods,
+        bool enabled)
     {
         ArgumentNullException.ThrowIfNull(mods);
 
         // 先收集成功项，循环结束后一次性更新模型，避免 watcher/界面在中间状态反复刷新。
         var failedCount = 0;
+        string? firstConflictTargetPath = null;
         var appliedUpdates = new List<(LocalMod Mod, string TargetPath)>();
         foreach (var mod in mods
                      .Where(mod => mod.IsEnabled != enabled)
@@ -322,6 +329,18 @@ public sealed class LocalModsViewModel : IDisposable
             {
                 await modService.SetEnabledAsync(mod, enabled);
                 appliedUpdates.Add((mod, targetPath));
+            }
+            catch (ModEnabledStateConflictException exception)
+            {
+                RemoveIgnoredWatcherPaths(sourcePath, targetPath);
+                failedCount++;
+                firstConflictTargetPath ??= exception.TargetPath;
+                logger.LogWarning(
+                    exception,
+                    "Local mod enabled state target already exists. Path={Path} TargetPath={TargetPath} Enabled={Enabled}",
+                    mod.FullPath,
+                    exception.TargetPath,
+                    enabled);
             }
             catch (Exception exception)
             {
@@ -348,7 +367,7 @@ public sealed class LocalModsViewModel : IDisposable
             });
         }
 
-        return failedCount;
+        return new LocalModEnabledStateBatchResult(failedCount, firstConflictTargetPath);
     }
 
     public async Task<int> DeleteModsAsync(IEnumerable<LocalMod> mods)

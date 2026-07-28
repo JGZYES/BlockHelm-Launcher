@@ -42,9 +42,10 @@ public sealed partial class InstanceModManagementSettingsViewModel : GameSetting
     private readonly IFilePickerService filePickerService;
     private readonly IInstanceContentImportPathValidator importPathValidator;
     private readonly IUiDispatcher uiDispatcher;
+    private readonly IFloatingMessageService floatingMessageService;
     private readonly ILogger<InstanceModManagementSettingsViewModel> logger;
-    // 规范化路径索引用于跨刷新复用 Item ViewModel；多选集合也以路径而非对象引用保存身份。
-    private readonly Dictionary<string, ModManagementModItemViewModel> allModsByStablePath = new(StringComparer.OrdinalIgnoreCase);
+    // 投影路径索引用于跨刷新复用 Item ViewModel；同名启用/禁用文件并存时必须保持两个独立键。
+    private readonly Dictionary<string, ModManagementModItemViewModel> allModsByProjectionPath = new(StringComparer.OrdinalIgnoreCase);
     private readonly HashSet<string> selectedModPaths = new(StringComparer.OrdinalIgnoreCase);
     // 冲突对话框通过 TaskCompletionSource 将事件驱动 UI 转换为可顺序 await 的导入步骤。
     private TaskCompletionSource<bool>? pendingImportConflictResolutionSource;
@@ -104,6 +105,7 @@ public sealed partial class InstanceModManagementSettingsViewModel : GameSetting
         IInstanceFolderService instanceFolderService,
         IFilePickerService filePickerService,
         IInstanceContentImportPathValidator importPathValidator,
+        IFloatingMessageService floatingMessageService,
         IUiDispatcher? uiDispatcher = null,
         ILogger<InstanceModManagementSettingsViewModel>? logger = null)
         : base(parent)
@@ -113,6 +115,7 @@ public sealed partial class InstanceModManagementSettingsViewModel : GameSetting
         this.instanceFolderService = instanceFolderService;
         this.filePickerService = filePickerService;
         this.importPathValidator = importPathValidator;
+        this.floatingMessageService = floatingMessageService;
         this.uiDispatcher = uiDispatcher ?? ImmediateUiDispatcher.Instance;
         this.logger = logger ?? NullLogger<InstanceModManagementSettingsViewModel>.Instance;
         this.localModsViewModel.ModsChanged += LocalModsViewModel_ModsChanged;
@@ -206,7 +209,7 @@ public sealed partial class InstanceModManagementSettingsViewModel : GameSetting
 
         IsLoadingMods = false;
         HasLoadedMods = false;
-        allModsByStablePath.Clear();
+        allModsByProjectionPath.Clear();
         SetInitialProjectionReady(false);
         ResetSelectionState();
         ClearDisplayedMods();

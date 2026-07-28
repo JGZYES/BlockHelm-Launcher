@@ -1228,6 +1228,9 @@
   <data name="Account_AddButton" xml:space="preserve">
     <value>新增帳戶</value>
   </data>
+  <data name="Account_BuyMinecraftButton" xml:space="preserve">
+    <value>購買 Minecraft</value>
+  </data>
   <data name="Account_EmptySelection" xml:space="preserve">
     <value>選擇帳號以瀏覽或修改設定。</value>
   </data>
@@ -1403,7 +1406,7 @@
     <value>選擇要新增的帳戶類型。</value>
   </data>
   <data name="Dialog_AddOfflineAccountSubtitle" xml:space="preserve">
-    <value>輸入要新增的離線帳戶名。</value>
+    <value>如果您尚未擁有正版 Minecraft，請始終優先考慮購買正版 Minecraft。</value>
   </data>
   <data name="Dialog_AddMicrosoftAccountSubtitle" xml:space="preserve">
     <value>請在彈出的 Microsoft 官方頁面完成登入。</value>
@@ -2233,6 +2236,9 @@
   <data name="Status_OpenFeedbackPageFailed" xml:space="preserve">
     <value>無法開啟意見回饋頁面，請稍後再試。</value>
   </data>
+  <data name="Status_OpenMinecraftPurchasePageFailed" xml:space="preserve">
+    <value>無法開啟 Minecraft 購買頁面，請稍後再試。</value>
+  </data>
   <data name="Status_OpenReferenceProjectFailed" xml:space="preserve">
     <value>開啟專案連結失敗</value>
   </data>
@@ -3019,6 +3025,9 @@
   </data>
   <data name="Dialog_DeleteMultipleModsMessageFormat" xml:space="preserve">
     <value>確認刪除這 {0} 個模組嗎？將優先移至系統資源回收筒；資源回收筒無法使用時將直接刪除。</value>
+  </data>
+  <data name="Status_ModEnabledStateTargetExistsFormat" xml:space="preserve">
+    <value>{0}已存在，操作失敗</value>
   </data>
   <data name="Status_SelectedModsEnabledFormat" xml:space="preserve">
     <value>已啟用 {0} 個模組</value>

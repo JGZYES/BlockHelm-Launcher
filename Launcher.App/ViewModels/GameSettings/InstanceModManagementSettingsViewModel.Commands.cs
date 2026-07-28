@@ -133,6 +133,20 @@ public sealed partial class InstanceModManagementSettingsViewModel
         var previousSelectedPath = lastSingleSelectedModPath;
         var wasSelectedInMultiSelect = selectedModPaths.Contains(localMod.FullPath);
 
+        void RestoreSelectionAfterFailure()
+        {
+            if (IsMultiSelectMode)
+            {
+                selectedModPaths.Remove(nextPath);
+                if (wasSelectedInMultiSelect)
+                    selectedModPaths.Add(localMod.FullPath);
+            }
+            else
+            {
+                lastSingleSelectedModPath = previousSelectedPath;
+            }
+        }
+
         if (IsMultiSelectMode)
         {
             selectedModPaths.Remove(localMod.FullPath);
@@ -164,6 +178,21 @@ public sealed partial class InstanceModManagementSettingsViewModel
 
             RefreshFromLocalMods();
         }
+        catch (ModEnabledStateConflictException exception)
+        {
+            suppressLocalCollectionEvents = false;
+            logger.LogWarning(
+                exception,
+                "Local mod enabled state target already exists. InstanceId={InstanceId} Path={Path} TargetPath={TargetPath}",
+                selectedInstance?.Id ?? "<none>",
+                localMod.FullPath,
+                exception.TargetPath);
+            var message = FormatModEnabledStateTargetExists(exception.TargetPath);
+            statusService.Report(message);
+            floatingMessageService.Show(message);
+            RestoreSelectionAfterFailure();
+            RefreshFromLocalMods();
+        }
         catch (Exception exception)
         {
             suppressLocalCollectionEvents = false;
@@ -175,18 +204,7 @@ public sealed partial class InstanceModManagementSettingsViewModel
             statusService.Report(localMod.IsEnabled
                 ? Strings.Status_SelectedModsDisableFailed
                 : Strings.Status_SelectedModsEnableFailed);
-
-            if (IsMultiSelectMode)
-            {
-                selectedModPaths.Remove(nextPath);
-                if (wasSelectedInMultiSelect)
-                    selectedModPaths.Add(localMod.FullPath);
-            }
-            else
-            {
-                lastSingleSelectedModPath = previousSelectedPath;
-            }
-
+            RestoreSelectionAfterFailure();
             RefreshFromLocalMods();
         }
     }

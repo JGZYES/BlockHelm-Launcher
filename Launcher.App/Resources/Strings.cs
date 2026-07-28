@@ -718,6 +718,7 @@ public static class Strings
     public static string Launch_Button => Get(nameof(Launch_Button));
     public static string Account_ListTitle => Get(nameof(Account_ListTitle));
     public static string Account_AddButton => Get(nameof(Account_AddButton));
+    public static string Account_BuyMinecraftButton => Get(nameof(Account_BuyMinecraftButton));
     public static string Account_EmptySelection => Get(nameof(Account_EmptySelection));
     public static string Account_SkinHeader => Get(nameof(Account_SkinHeader));
     public static string Account_CapeHeader => Get(nameof(Account_CapeHeader));
@@ -1010,6 +1011,7 @@ public static class Strings
     public static string Status_LocalShaderPackImportFileNotFound => Get(nameof(Status_LocalShaderPackImportFileNotFound));
     public static string Status_LocalShaderPackImportFailed => Get(nameof(Status_LocalShaderPackImportFailed));
     public static string Status_LocalShaderPacksImportedFormat => Get(nameof(Status_LocalShaderPacksImportedFormat));
+    public static string Status_ModEnabledStateTargetExistsFormat => Get(nameof(Status_ModEnabledStateTargetExistsFormat));
     public static string Status_SelectedModsEnabledFormat => Get(nameof(Status_SelectedModsEnabledFormat));
     public static string Status_SelectedModsEnablePartialFailedFormat => Get(nameof(Status_SelectedModsEnablePartialFailedFormat));
     public static string Status_SelectedModsEnableFailed => Get(nameof(Status_SelectedModsEnableFailed));
@@ -1105,6 +1107,7 @@ public static class Strings
     public static string Status_OpenLaunchReportFailed => Get(nameof(Status_OpenLaunchReportFailed));
     public static string Status_OpenGithubRepositoryFailed => Get(nameof(Status_OpenGithubRepositoryFailed));
     public static string Status_OpenFeedbackPageFailed => Get(nameof(Status_OpenFeedbackPageFailed));
+    public static string Status_OpenMinecraftPurchasePageFailed => Get(nameof(Status_OpenMinecraftPurchasePageFailed));
     public static string Status_OpenReferenceProjectFailed => Get(nameof(Status_OpenReferenceProjectFailed));
     public static string Status_OpenRelatedWebsiteFailed => Get(nameof(Status_OpenRelatedWebsiteFailed));
     public static string Status_OpenResourceDetailsFailed => Get(nameof(Status_OpenResourceDetailsFailed));

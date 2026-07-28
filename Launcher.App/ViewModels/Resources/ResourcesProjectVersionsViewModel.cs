@@ -351,7 +351,8 @@ public sealed partial class ResourcesProjectVersionsViewModel : ObservableObject
 
         // Vanilla 实例不能直接安装 Mod 项目；本地下载目标始终可用且不受实例兼容限制。
         var targets = instances
-            .Where(instance => instance.Loader is not LoaderKind.Vanilla)
+            .Where(instance => options.Kind is not ResourceProjectKind.Mod
+                || instance.Loader is not LoaderKind.Vanilla)
             .Select(ResourcesModInstallTargetItemViewModel.FromInstance)
             .ToList();
         if (options.InstallTargetMode is ResourcesOnlineProjectInstallTargetMode.NewInstance)

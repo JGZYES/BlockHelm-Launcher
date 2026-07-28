@@ -34,12 +34,14 @@ public sealed partial class AccountPageViewModel : ObservableObject
         AccountDialogViewModel dialog,
         AccountAppearanceViewModel appearance,
         AccountOfflineUuidViewModel offlineUuid,
+        AccountPurchaseViewModel purchase,
         IAccountDialogService dialogService)
     {
         AccountList = accountList;
         Dialog = dialog;
         Appearance = appearance;
         OfflineUuid = offlineUuid;
+        Purchase = purchase;
         this.dialogService = dialogService;
         Details = new AccountDetailsViewModel(this);
 
@@ -57,6 +59,8 @@ public sealed partial class AccountPageViewModel : ObservableObject
     public AccountAppearanceViewModel Appearance { get; }
 
     public AccountOfflineUuidViewModel OfflineUuid { get; }
+
+    public AccountPurchaseViewModel Purchase { get; }
 
     public AccountDetailsViewModel Details { get; }
 

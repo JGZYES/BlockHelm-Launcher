@@ -154,12 +154,21 @@ public sealed partial class InstanceModManagementSettingsViewModel
     /// </summary>
     private void RefreshFromLocalMods()
     {
-        // 使用规范化路径复用现有 Item ViewModel，既保持选中状态，也避免刷新时重建整棵可见列表。
-        var selectedStablePath = GetStableModPath(lastSingleSelectedModPath ?? SelectedMod?.FullPath);
+        // 单个状态文件继续使用稳定路径复用；启用和禁用文件并存时改用精确路径，避免两个条目共享同一个 Item。
+        var selectedPath = lastSingleSelectedModPath ?? SelectedMod?.FullPath;
+        var stablePathCounts = localModsViewModel.CurrentMods
+            .GroupBy(mod => GetStableModPath(mod.FullPath), StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(group => group.Key, group => group.Count(), StringComparer.OrdinalIgnoreCase);
         var filteredMods = StableFilteredItemProjection.Synchronize(
             localModsViewModel.CurrentMods,
-            allModsByStablePath,
-            mod => GetStableModPath(mod.FullPath),
+            allModsByProjectionPath,
+            mod =>
+            {
+                var stablePath = GetStableModPath(mod.FullPath);
+                return stablePathCounts[stablePath] > 1
+                    ? mod.FullPath
+                    : stablePath;
+            },
             mod => new ModManagementModItemViewModel(mod),
             static (item, mod) => item.SyncFrom(mod),
             MatchesSearch);
@@ -169,7 +178,7 @@ public sealed partial class InstanceModManagementSettingsViewModel
             selectedModPaths.IntersectWith(filteredMods.Select(mod => mod.FullPath));
 
         // 同步所有缓存项的选择标志，防止离开筛选后看到过期勾选状态。
-        foreach (var item in allModsByStablePath.Values)
+        foreach (var item in allModsByProjectionPath.Values)
             item.IsSelected = IsMultiSelectMode && selectedModPaths.Contains(item.FullPath);
 
         SetVisibleMods(filteredMods);
@@ -189,9 +198,8 @@ public sealed partial class InstanceModManagementSettingsViewModel
             return;
         }
 
-        // 单选模式按稳定路径恢复；原 Mod 消失时回退到当前第一项。
-        var restoredSelection = Mods.FirstOrDefault(mod =>
-            string.Equals(GetStableModPath(mod.FullPath), selectedStablePath, StringComparison.OrdinalIgnoreCase));
+        // 同名双文件存在时优先恢复精确路径；正常启停重命名后再回退稳定路径。
+        var restoredSelection = FindModByPreferredPath(selectedPath);
         SelectMod(restoredSelection ?? Mods.FirstOrDefault());
     }
 
@@ -307,9 +315,7 @@ public sealed partial class InstanceModManagementSettingsViewModel
         selectedModPaths.Clear();
         UpdateSelectedModState();
 
-        var lastSingleSelectedStablePath = GetStableModPath(lastSingleSelectedModPath);
-        var restoredSelection = Mods.FirstOrDefault(mod =>
-            string.Equals(GetStableModPath(mod.FullPath), lastSingleSelectedStablePath, StringComparison.OrdinalIgnoreCase));
+        var restoredSelection = FindModByPreferredPath(lastSingleSelectedModPath);
         SelectMod(restoredSelection ?? Mods.FirstOrDefault());
     }
 
@@ -324,7 +330,7 @@ public sealed partial class InstanceModManagementSettingsViewModel
 
     private void ClearDisplayedMods()
     {
-        allModsByStablePath.Clear();
+        allModsByProjectionPath.Clear();
         SetVisibleMods(Array.Empty<ModManagementModItemViewModel>());
         RefreshVisibleModListItems();
         SelectedMod = null;
@@ -366,6 +372,20 @@ public sealed partial class InstanceModManagementSettingsViewModel
                 string.Equals(GetStableModPath(mod.FullPath), stablePath, StringComparison.OrdinalIgnoreCase));
     }
 
+    private ModManagementModItemViewModel? FindModByPreferredPath(string? preferredPath)
+    {
+        if (string.IsNullOrWhiteSpace(preferredPath))
+            return null;
+
+        return Mods.FirstOrDefault(mod =>
+                   string.Equals(mod.FullPath, preferredPath, StringComparison.OrdinalIgnoreCase))
+               ?? Mods.FirstOrDefault(mod =>
+                   string.Equals(
+                       GetStableModPath(mod.FullPath),
+                       GetStableModPath(preferredPath),
+                       StringComparison.OrdinalIgnoreCase));
+    }
+
     /// <summary>
     /// 执行多选批量启停并保持选择集合与重命名后的稳定路径一致。
     /// </summary>
@@ -387,10 +407,10 @@ public sealed partial class InstanceModManagementSettingsViewModel
         {
             // 批量重命名会产生 watcher 事件；暂时抑制页面回调，最后主动同步一次。
             suppressLocalCollectionEvents = true;
-            int failedCount;
+            LocalModEnabledStateBatchResult result;
             try
             {
-                failedCount = await localModsViewModel.SetModsEnabledAsync(selectedMods, enabled);
+                result = await localModsViewModel.SetModsEnabledAsync(selectedMods, enabled);
             }
             finally
             {
@@ -404,13 +424,18 @@ public sealed partial class InstanceModManagementSettingsViewModel
             RefreshFromLocalMods();
             ReportBatchOperationResult(
                 selectedMods.Count,
-                failedCount,
+                result.FailedCount,
                 enabled
                     ? Strings.Status_SelectedModsEnabledFormat
                     : Strings.Status_SelectedModsDisabledFormat,
                 enabled
                     ? Strings.Status_SelectedModsEnablePartialFailedFormat
                     : Strings.Status_SelectedModsDisablePartialFailedFormat);
+            if (!string.IsNullOrWhiteSpace(result.FirstConflictTargetPath))
+            {
+                floatingMessageService.Show(
+                    FormatModEnabledStateTargetExists(result.FirstConflictTargetPath));
+            }
         }
         catch (Exception exception)
         {
@@ -426,6 +451,11 @@ public sealed partial class InstanceModManagementSettingsViewModel
             RefreshFromLocalMods();
         }
     }
+
+    private static string FormatModEnabledStateTargetExists(string targetPath) =>
+        string.Format(
+            Strings.Status_ModEnabledStateTargetExistsFormat,
+            Path.GetFileName(targetPath));
 
     private void ReportBatchOperationResult(
         int totalCount,

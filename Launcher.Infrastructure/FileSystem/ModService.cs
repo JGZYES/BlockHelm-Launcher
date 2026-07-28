@@ -150,7 +150,10 @@ public sealed class ModService : IModService
             ? GetEnabledModPath(current)
             : GetDisabledModPath(current);
 
-        File.Move(current, targetPath, overwrite: true);
+        if (PathExists(targetPath))
+            throw new ModEnabledStateConflictException(targetPath);
+
+        MoveFileWithoutOverwrite(current, targetPath);
         logger.LogInformation(
             "Local mod enabled state changed. FileName={FileName} Enabled={Enabled}",
             mod.FileName,
@@ -158,6 +161,22 @@ public sealed class ModService : IModService
         logger.LogDebug("Local mod enabled state target. TargetPath={TargetPath}", targetPath);
         return Task.CompletedTask;
     }
+
+    internal static void MoveFileWithoutOverwrite(string sourcePath, string targetPath)
+    {
+        try
+        {
+            File.Move(sourcePath, targetPath);
+        }
+        catch (IOException exception) when (PathExists(targetPath))
+        {
+            // 目标可能在预检查后由 watcher、外部程序或另一进程创建；始终按同名冲突处理。
+            throw new ModEnabledStateConflictException(targetPath, exception);
+        }
+    }
+
+    private static bool PathExists(string path) =>
+        File.Exists(path) || Directory.Exists(path);
 
     public Task DeleteAsync(LocalMod mod, CancellationToken cancellationToken = default)
     {

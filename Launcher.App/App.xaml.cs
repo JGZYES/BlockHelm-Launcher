@@ -130,6 +130,7 @@ public partial class App : System.Windows.Application
             services.AddSingleton<AccountDialogViewModel>();
             services.AddSingleton<AccountAppearanceViewModel>();
             services.AddSingleton<AccountOfflineUuidViewModel>();
+            services.AddSingleton<AccountPurchaseViewModel>();
             services.AddSingleton<AccountSkinModelDialogViewModel>();
             services.AddSingleton<AccountPageViewModel>();
             services.AddSingleton<DownloadTasksPageViewModel>();

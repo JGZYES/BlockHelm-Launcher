@@ -98,6 +98,7 @@ public sealed partial class GameSettingsDetailsViewModel : ObservableObject, IDi
             instanceFolderService,
             filePickerService,
             importPathValidator,
+            floatingMessageService,
             logger: loggerFactory?.CreateLogger<InstanceModManagementSettingsViewModel>());
         ModManagement.DeleteModsRequested += ModManagement_DeleteModsRequested;
         ModManagement.ImportModConflictRequested += ModManagement_ImportModConflictRequested;

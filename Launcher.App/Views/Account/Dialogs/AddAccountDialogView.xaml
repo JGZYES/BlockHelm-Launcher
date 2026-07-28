@@ -36,6 +36,7 @@
             <TextBlock Text="{Binding Dialog.AddAccountDialogTitle}"
                        Style="{StaticResource DialogTitleTextStyle}" />
             <TextBlock Text="{Binding Dialog.AddAccountDialogSubtitle}"
+                       TextWrapping="Wrap"
                        Style="{StaticResource DialogSubtitleTextStyle}" />
         </StackPanel>
 
@@ -258,6 +259,12 @@
         </StackPanel>
 
         <Grid Grid.Row="2">
+            <Button Style="{StaticResource LauncherDialogButtonStyle}"
+                    HorizontalAlignment="Left"
+                    Content="{x:Static res:Strings.Account_BuyMinecraftButton}"
+                    Command="{Binding Purchase.OpenMinecraftPurchasePageCommand}"
+                    Visibility="{Binding Dialog.IsAccountTypeStep, Converter={StaticResource BooleanToMenuTextVisibilityConverter}}" />
+
             <Button Style="{StaticResource LauncherDialogButtonStyle}"
                     HorizontalAlignment="Left"
                     Content="{x:Static res:Strings.Back_Button}"
