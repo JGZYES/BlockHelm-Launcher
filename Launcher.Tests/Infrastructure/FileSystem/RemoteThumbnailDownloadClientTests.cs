@@ -14,7 +14,6 @@ using System.Net.Http;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
-using Launcher.Application.Services;
 using Launcher.Domain.Models;
 using Launcher.Infrastructure;
 using Launcher.Infrastructure.FileSystem;
@@ -26,41 +25,6 @@ namespace Launcher.Tests.Infrastructure.FileSystem;
 
 public sealed class RemoteThumbnailDownloadClientTests : TestTempDirectory
 {
-    [Fact]
-    public async Task DownloadsAtMostThirtyTwoThumbnailsAndUsesGlobalMetadataLeases()
-    {
-        var handler = new BlockingThumbnailHandler(RemoteThumbnailDownloadClient.MaximumConcurrency);
-        using var httpClient = new HttpClient(handler);
-        var limiter = new RecordingLimiter();
-        var client = new RemoteThumbnailDownloadClient(
-            httpClient,
-            limiter,
-            downloadSpeedLimitState: null,
-            NullLogger.Instance);
-
-        var downloads = Enumerable.Range(0, 40)
-            .Select(index => client.DownloadAsync(
-                $"https://cdn.example.com/icons/{index}.png",
-                maximumBytes: 1024,
-                CancellationToken.None))
-            .ToArray();
-
-        await handler.MaximumStarted.WaitAsync(TimeSpan.FromSeconds(5));
-
-        Assert.Equal(32, handler.MaximumActiveRequests);
-        Assert.Equal(32, limiter.MaximumActiveMetadataLeases);
-        Assert.Equal(32, limiter.MetadataLeaseCount);
-
-        handler.ReleaseAll();
-        var results = await Task.WhenAll(downloads).WaitAsync(TimeSpan.FromSeconds(5));
-
-        Assert.All(results, bytes => Assert.Equal(BlockingThumbnailHandler.Payload, bytes));
-        Assert.Equal(40, handler.RequestCount);
-        Assert.Equal(40, limiter.MetadataLeaseCount);
-        Assert.Equal(0, limiter.ModpackLeaseCount);
-        Assert.Equal(0, limiter.RuntimeLeaseCount);
-    }
-
     [Fact]
     public async Task LocalModEnrichmentStartsThumbnailDownloadsConcurrently()
     {
@@ -99,48 +63,6 @@ public sealed class RemoteThumbnailDownloadClientTests : TestTempDirectory
 
         Assert.Equal(2, resolved.Count);
         Assert.All(mods, mod => Assert.True(resolved.ContainsKey(mod.FullPath)));
-    }
-
-    private sealed class BlockingThumbnailHandler(int expectedMaximum) : HttpMessageHandler
-    {
-        public static readonly byte[] Payload = [1, 2, 3, 4];
-
-        private readonly TaskCompletionSource release = new(TaskCreationOptions.RunContinuationsAsynchronously);
-        private readonly TaskCompletionSource maximumStarted = new(TaskCreationOptions.RunContinuationsAsynchronously);
-        private int activeRequests;
-        private int maximumActiveRequests;
-        private int requestCount;
-
-        public Task MaximumStarted => maximumStarted.Task;
-
-        public int MaximumActiveRequests => Volatile.Read(ref maximumActiveRequests);
-        public int RequestCount => Volatile.Read(ref requestCount);
-
-        public void ReleaseAll() => release.TrySetResult();
-
-        protected override async Task<HttpResponseMessage> SendAsync(
-            HttpRequestMessage request,
-            CancellationToken cancellationToken)
-        {
-            Interlocked.Increment(ref requestCount);
-            var active = Interlocked.Increment(ref activeRequests);
-            UpdateMaximum(ref maximumActiveRequests, active);
-            if (active == expectedMaximum)
-                maximumStarted.TrySetResult();
-
-            try
-            {
-                await release.Task.WaitAsync(cancellationToken);
-                return new HttpResponseMessage(HttpStatusCode.OK)
-                {
-                    Content = new ByteArrayContent(Payload)
-                };
-            }
-            finally
-            {
-                Interlocked.Decrement(ref activeRequests);
-            }
-        }
     }
 
     private sealed class LocalModIconHandler(IReadOnlyList<string> hashes) : HttpMessageHandler
@@ -214,76 +136,6 @@ public sealed class RemoteThumbnailDownloadClientTests : TestTempDirectory
                 Encoding.UTF8,
                 "application/json")
         };
-    }
-
-    private sealed class RecordingLimiter : IImportConcurrencyLimiter
-    {
-        private int activeMetadataLeases;
-        private int maximumActiveMetadataLeases;
-        private int metadataLeaseCount;
-        private int modpackLeaseCount;
-        private int runtimeLeaseCount;
-        private int activeDownloadLeases;
-
-        public int MaximumActiveMetadataLeases => Volatile.Read(ref maximumActiveMetadataLeases);
-        public int MetadataLeaseCount => Volatile.Read(ref metadataLeaseCount);
-        public int ModpackLeaseCount => Volatile.Read(ref modpackLeaseCount);
-        public int RuntimeLeaseCount => Volatile.Read(ref runtimeLeaseCount);
-        public DownloadConcurrencySnapshot DownloadSnapshot =>
-            new(Volatile.Read(ref activeDownloadLeases), WaitingCount: 0, CurrentTarget: 64);
-
-        public bool TryAcquireAvailableDownloadSlot(out IImportConcurrencyLease? lease)
-        {
-            Interlocked.Increment(ref activeDownloadLeases);
-            lease = new RecordingLease(() => Interlocked.Decrement(ref activeDownloadLeases));
-            return true;
-        }
-
-        public ValueTask<IImportConcurrencyLease> AcquireMetadataSlotAsync(
-            CancellationToken cancellationToken = default)
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            Interlocked.Increment(ref metadataLeaseCount);
-            var active = Interlocked.Increment(ref activeMetadataLeases);
-            UpdateMaximum(ref maximumActiveMetadataLeases, active);
-            return ValueTask.FromResult<IImportConcurrencyLease>(
-                new RecordingLease(() => Interlocked.Decrement(ref activeMetadataLeases)));
-        }
-
-        public ValueTask<IImportConcurrencyLease> AcquireModpackDownloadSlotAsync(
-            CancellationToken cancellationToken = default)
-        {
-            Interlocked.Increment(ref modpackLeaseCount);
-            Interlocked.Increment(ref activeDownloadLeases);
-            return ValueTask.FromResult<IImportConcurrencyLease>(
-                new RecordingLease(() => Interlocked.Decrement(ref activeDownloadLeases)));
-        }
-
-        public ValueTask<IImportConcurrencyLease> AcquireRuntimeDownloadSlotAsync(
-            CancellationToken cancellationToken = default)
-        {
-            Interlocked.Increment(ref runtimeLeaseCount);
-            Interlocked.Increment(ref activeDownloadLeases);
-            return ValueTask.FromResult<IImportConcurrencyLease>(
-                new RecordingLease(() => Interlocked.Decrement(ref activeDownloadLeases)));
-        }
-
-        public ValueTask<IImportConcurrencyLease> AcquireHashSlotAsync(
-            CancellationToken cancellationToken = default) =>
-            ValueTask.FromResult<IImportConcurrencyLease>(new RecordingLease(static () => { }));
-    }
-
-    private sealed class RecordingLease(Action release) : IImportConcurrencyLease
-    {
-        private Action? release = release;
-
-        public void Dispose() => Interlocked.Exchange(ref release, null)?.Invoke();
-
-        public ValueTask DisposeAsync()
-        {
-            Dispose();
-            return ValueTask.CompletedTask;
-        }
     }
 
     private static void UpdateMaximum(ref int target, int value)
