@@ -377,4 +377,10 @@ public sealed class ResourceCatalogService :
         GameInstance instance,
         CancellationToken cancellationToken = default) =>
         storage.InstallExistsAsync(version, instance, cancellationToken);
+
+    Task<string> IResourceCatalogDestinationWriter.EnsureInstanceContentDirectoryAsync(
+        ResourceProjectKind kind,
+        GameInstance instance,
+        CancellationToken cancellationToken) =>
+        storage.EnsureInstanceContentDirectoryAsync(kind, instance, cancellationToken);
 }

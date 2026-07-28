@@ -10,10 +10,15 @@ using Launcher.Domain.Models;
 namespace Launcher.Infrastructure.Resources;
 
 /// <summary>
-/// Infrastructure-only capability for destinations explicitly confirmed by the user.
+/// Infrastructure-only capability for preparing and writing resource destinations.
 /// </summary>
 internal interface IResourceCatalogDestinationWriter
 {
+    Task<string> EnsureInstanceContentDirectoryAsync(
+        ResourceProjectKind kind,
+        GameInstance instance,
+        CancellationToken cancellationToken);
+
     Task<ResourceProjectDestinationState> CaptureDownloadDestinationAsync(
         ResourceProjectVersion version,
         string destinationPath,

@@ -51,17 +51,18 @@ internal static class ManagedLibraryArtifactResolver
 
         if (library["downloads"] is null)
         {
-            var resolved = TryCreateArtifactFromName(library, classifier: null);
-            if (resolved is not null)
-                yield return resolved;
-
             var classifierKey = ResolveNativeClassifierKey(library);
             if (!string.IsNullOrWhiteSpace(classifierKey))
             {
                 var classifierArtifact = TryCreateArtifactFromName(library, classifierKey);
                 if (classifierArtifact is not null)
                     yield return classifierArtifact;
+                yield break;
             }
+
+            var resolved = TryCreateArtifactFromName(library, classifier: null);
+            if (resolved is not null)
+                yield return resolved;
         }
     }
 

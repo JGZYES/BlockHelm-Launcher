@@ -82,6 +82,11 @@ public interface IResourceProjectInstallationService
 {
     Task CleanupStaleWorkspacesAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
 
+    Task<string> EnsureInstanceContentDirectoryAsync(
+        ResourceProjectKind kind,
+        GameInstance instance,
+        CancellationToken cancellationToken = default);
+
     Task<ResourceProjectInstallationPreparationResult> PrepareAsync(
         ResourceProjectInstallationRequest request,
         CancellationToken cancellationToken = default);

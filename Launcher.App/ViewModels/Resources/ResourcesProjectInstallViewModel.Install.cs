@@ -329,10 +329,11 @@ internal async Task InstallAsync(
         var instance = context.Target.Instance;
         if (instance is null)
             return;
+        var installDirectory = await installationService!
+            .EnsureInstanceContentDirectoryAsync(options.Kind, instance);
         string? destinationPath = null;
         if (options.Kind is not ResourceProjectKind.World)
         {
-            var installDirectory = ResolveInstanceContentDirectory(instance, options.Kind);
             destinationPath = filePickerService?.PickResourceProjectDestination(
                 options.DownloadDirectoryPickerTitle,
                 ResolveFileName(context.Item),
@@ -398,19 +399,6 @@ internal async Task InstallAsync(
         var message = string.Format(options.InstalledFormat, context.Project?.Title ?? context.Item.Title);
         context.Session.Complete(message);
         reportStatus(message);
-    }
-
-    private static string ResolveInstanceContentDirectory(
-        GameInstance instance,
-        ResourceProjectKind kind)
-    {
-        var directoryName = kind switch
-        {
-            ResourceProjectKind.ResourcePack => "resourcepacks",
-            ResourceProjectKind.ShaderPack => "shaderpacks",
-            _ => "mods"
-        };
-        return Path.GetFullPath(Path.Combine(instance.InstanceDirectory, directoryName));
     }
 
     private static bool IsDirectChildPath(string path, string expectedDirectory)

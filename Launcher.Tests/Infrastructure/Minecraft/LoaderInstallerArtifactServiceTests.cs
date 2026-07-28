@@ -134,6 +134,24 @@ public sealed class LoaderInstallerArtifactServiceTests : TestTempDirectory
         Assert.Empty(handler.RequestUris);
     }
 
+    [Fact]
+    public async Task LegacyRuntimeNativeLibraryDoesNotIncludeNonexistentMainArtifact()
+    {
+        var installerPath = await WriteLegacyNativeInstallerAsync();
+        var service = new LoaderInstallerArtifactService(new HttpClient(new TestHandler("native")));
+
+        var plan = await service.ReadPlanAsync(installerPath, CancellationToken.None);
+
+        var library = Assert.Single(plan.RuntimeLibraries);
+        Assert.Equal(
+            OperatingSystem.IsWindows()
+                ? "org/lwjgl/lwjgl/lwjgl-platform/2.9.0/lwjgl-platform-2.9.0-natives-windows.jar"
+                : OperatingSystem.IsMacOS()
+                    ? "org/lwjgl/lwjgl/lwjgl-platform/2.9.0/lwjgl-platform-2.9.0-natives-osx.jar"
+                    : "org/lwjgl/lwjgl/lwjgl-platform/2.9.0/lwjgl-platform-2.9.0-natives-linux.jar",
+            library.Artifact.RelativePath);
+    }
+
     private async Task<string> WriteInstallerAsync(bool includeEmbeddedExternal)
     {
         Directory.CreateDirectory(TempRoot);
@@ -208,6 +226,30 @@ public sealed class LoaderInstallerArtifactServiceTests : TestTempDirectory
             """);
         WriteEntry(archive, "version.json", """{ "libraries": [] }""");
         WriteEntry(archive, "maven/com/example/processor/1.0/processor-1.0.jar", "processor");
+        return installerPath;
+    }
+
+    private async Task<string> WriteLegacyNativeInstallerAsync()
+    {
+        Directory.CreateDirectory(TempRoot);
+        var installerPath = Path.Combine(TempRoot, $"legacy-native-{Guid.NewGuid():N}.jar");
+        await using var stream = new FileStream(installerPath, FileMode.CreateNew, FileAccess.Write, FileShare.None);
+        using var archive = new ZipArchive(stream, ZipArchiveMode.Create, leaveOpen: false);
+        WriteEntry(archive, "install_profile.json", "{}");
+        WriteEntry(archive, "version.json", """
+            {
+              "libraries": [
+                {
+                  "name": "org.lwjgl.lwjgl:lwjgl-platform:2.9.0",
+                  "natives": {
+                    "linux": "natives-linux",
+                    "windows": "natives-windows",
+                    "osx": "natives-osx"
+                  }
+                }
+              ]
+            }
+            """);
         return installerPath;
     }
 

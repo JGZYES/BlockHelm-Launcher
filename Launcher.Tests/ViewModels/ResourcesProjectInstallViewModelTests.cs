@@ -299,14 +299,59 @@ public sealed class ResourcesProjectInstallViewModelTests
         Assert.Equal(Path.Combine(instance.InstanceDirectory, "mods"), picker.LastInitialDirectory);
     }
 
+    [Theory]
+    [InlineData(ResourceProjectKind.Mod, "mods")]
+    [InlineData(ResourceProjectKind.ResourcePack, "resourcepacks")]
+    [InlineData(ResourceProjectKind.ShaderPack, "shaderpacks")]
+    [InlineData(ResourceProjectKind.World, "saves")]
+    public async Task ExistingInstanceEnsuresCorrespondingContentDirectoryBeforeContinuing(
+        ResourceProjectKind kind,
+        string directoryName)
+    {
+        var instance = new GameInstance
+        {
+            Id = "instance",
+            InstanceDirectory = Path.Combine(Path.GetTempPath(), $"resource-instance-{Guid.NewGuid():N}")
+        };
+        var ensuredDirectory = Path.Combine(instance.InstanceDirectory, directoryName);
+        var installation = new RecordingInstallationService
+        {
+            EnsuredDirectory = ensuredDirectory
+        };
+        var picker = new StubFilePickerService
+        {
+            ResourceDestination = Path.Combine(ensuredDirectory, "selected-file")
+        };
+        var viewModel = CreateViewModel(
+            installation,
+            new DownloadTasksPageViewModel(TimeSpan.FromMinutes(1)),
+            _ => { },
+            filePickerService: picker,
+            kind: kind);
+
+        await viewModel.InstallAsync(
+            CreateVersionItem(kind),
+            ResourcesModInstallTargetItemViewModel.FromInstance(instance),
+            null);
+
+        Assert.Equal(kind, installation.EnsuredKind);
+        Assert.Same(instance, installation.EnsuredInstance);
+        if (kind is ResourceProjectKind.World)
+            Assert.Null(picker.LastInitialDirectory);
+        else
+            Assert.Equal(ensuredDirectory, picker.LastInitialDirectory);
+        Assert.Single(installation.ExecutedRequests);
+    }
+
     private static ResourcesProjectInstallViewModel CreateViewModel(
         IResourceProjectInstallationService installation,
         DownloadTasksPageViewModel tasks,
         Action<string> reportStatus,
         IFloatingMessageService? floatingMessageService = null,
-        IFilePickerService? filePickerService = null)
+        IFilePickerService? filePickerService = null,
+        ResourceProjectKind kind = ResourceProjectKind.Mod)
     {
-        var options = CreateOptions();
+        var options = CreateOptions(kind);
         return new ResourcesProjectInstallViewModel(
             options,
             installation,
@@ -339,8 +384,9 @@ public sealed class ResourcesProjectInstallViewModelTests
             InstanceDirectory = instanceId
         }));
 
-    private static ResourcesOnlineProjectPageOptions CreateOptions() => new(
-        Kind: ResourceProjectKind.Mod,
+    private static ResourcesOnlineProjectPageOptions CreateOptions(
+        ResourceProjectKind kind = ResourceProjectKind.Mod) => new(
+        Kind: kind,
         Title: "title",
         FallbackIconKey: "icon",
         ShowsLoaderFilters: true,
@@ -383,8 +429,23 @@ public sealed class ResourcesProjectInstallViewModelTests
         public bool WaitForCancellation { get; init; }
         public bool IntegrityFailure { get; init; }
         public string? TargetPath { get; init; }
+        public string? EnsuredDirectory { get; init; }
+        public ResourceProjectKind? EnsuredKind { get; private set; }
+        public GameInstance? EnsuredInstance { get; private set; }
         public TaskCompletionSource<bool> ExecuteStarted { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
         public List<ResourceProjectInstallationRequest> ExecutedRequests { get; } = [];
+
+        public Task<string> EnsureInstanceContentDirectoryAsync(
+            ResourceProjectKind kind,
+            GameInstance instance,
+            CancellationToken cancellationToken = default)
+        {
+            EnsuredKind = kind;
+            EnsuredInstance = instance;
+            return Task.FromResult(
+                EnsuredDirectory
+                ?? Path.Combine(instance.InstanceDirectory, ResolveContentDirectoryName(kind)));
+        }
 
         public Task<ResourceProjectInstallationPreparationResult> PrepareAsync(
             ResourceProjectInstallationRequest request,
@@ -430,6 +491,12 @@ public sealed class ResourcesProjectInstallViewModelTests
                     return executions.Values.Sum(values => values.Count);
             }
         }
+
+        public Task<string> EnsureInstanceContentDirectoryAsync(
+            ResourceProjectKind kind,
+            GameInstance instance,
+            CancellationToken cancellationToken = default) =>
+            Task.FromResult(Path.Combine(instance.InstanceDirectory, ResolveContentDirectoryName(kind)));
 
         public Task<ResourceProjectInstallationPreparationResult> PrepareAsync(
             ResourceProjectInstallationRequest request,
@@ -495,6 +562,16 @@ public sealed class ResourcesProjectInstallViewModelTests
         private static TaskCompletionSource<bool> CreateSignal() =>
             new(TaskCreationOptions.RunContinuationsAsynchronously);
     }
+
+    private static string ResolveContentDirectoryName(ResourceProjectKind kind) =>
+        kind switch
+        {
+            ResourceProjectKind.Mod => "mods",
+            ResourceProjectKind.ResourcePack => "resourcepacks",
+            ResourceProjectKind.ShaderPack => "shaderpacks",
+            ResourceProjectKind.World => "saves",
+            _ => throw new ArgumentOutOfRangeException(nameof(kind))
+        };
 
     private sealed class RecordingFloatingMessageService : IFloatingMessageService
     {

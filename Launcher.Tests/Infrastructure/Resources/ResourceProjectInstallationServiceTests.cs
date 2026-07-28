@@ -269,6 +269,16 @@ public sealed class ResourceProjectInstallationServiceTests
         public ResourceProjectDestinationState? LastExpectedDestinationState { get; private set; }
         public Dictionary<string, string?> ThumbnailSources { get; } = [];
 
+        public Task<string> EnsureInstanceContentDirectoryAsync(
+            ResourceProjectKind kind,
+            GameInstance instance,
+            CancellationToken cancellationToken)
+        {
+            var directory = Path.Combine(instance.InstanceDirectory, "content");
+            Directory.CreateDirectory(directory);
+            return Task.FromResult(directory);
+        }
+
         public Task<ResourceCatalogSearchResult> SearchModsAsync(ResourceCatalogSearchRequest request, CancellationToken cancellationToken = default) =>
             Task.FromResult(new ResourceCatalogSearchResult());
 

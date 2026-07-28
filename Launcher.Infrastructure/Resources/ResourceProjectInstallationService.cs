@@ -68,6 +68,15 @@ public sealed class ResourceProjectInstallationService : IResourceProjectInstall
         this.logger = logger;
     }
 
+    public Task<string> EnsureInstanceContentDirectoryAsync(
+        ResourceProjectKind kind,
+        GameInstance instance,
+        CancellationToken cancellationToken = default) =>
+        RequireDestinationWriter().EnsureInstanceContentDirectoryAsync(
+            kind,
+            instance,
+            cancellationToken);
+
     public async Task<ResourceProjectInstallationPreparationResult> PrepareAsync(
         ResourceProjectInstallationRequest request,
         CancellationToken cancellationToken = default)

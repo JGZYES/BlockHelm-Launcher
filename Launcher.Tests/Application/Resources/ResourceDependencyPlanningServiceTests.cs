@@ -168,6 +168,12 @@ public sealed class ResourceDependencyPlanningServiceTests
         public List<ResourceProjectInstallationRequest> Requests { get; } = [];
         public List<IProgress<LauncherProgress>?> Progresses { get; } = [];
 
+        public Task<string> EnsureInstanceContentDirectoryAsync(
+            ResourceProjectKind kind,
+            GameInstance instance,
+            CancellationToken cancellationToken = default) =>
+            Task.FromResult(instance.InstanceDirectory);
+
         public Task<ResourceProjectInstallationPreparationResult> PrepareAsync(ResourceProjectInstallationRequest request, CancellationToken cancellationToken = default) =>
             Task.FromResult(new ResourceProjectInstallationPreparationResult(false));
 

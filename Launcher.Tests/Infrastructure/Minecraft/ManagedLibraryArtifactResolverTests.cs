@@ -54,4 +54,29 @@ public sealed class ManagedLibraryArtifactResolverTests
         Assert.StartsWith("https://maven.fabricmc.net/", artifact.Url, StringComparison.Ordinal);
     }
 
+    [Fact]
+    public void ResolvesLegacyNativeLibraryWithoutNonexistentMainArtifact()
+    {
+        var library = JsonNode.Parse("""
+            {
+              "name": "org.lwjgl.lwjgl:lwjgl-platform:2.9.0",
+              "natives": {
+                "linux": "natives-linux",
+                "windows": "natives-windows",
+                "osx": "natives-osx"
+              }
+            }
+            """)!.AsObject();
+
+        var artifact = Assert.Single(ManagedLibraryArtifactResolver.EnumerateDownloads(library));
+
+        Assert.Equal(
+            OperatingSystem.IsWindows()
+                ? "org/lwjgl/lwjgl/lwjgl-platform/2.9.0/lwjgl-platform-2.9.0-natives-windows.jar"
+                : OperatingSystem.IsMacOS()
+                    ? "org/lwjgl/lwjgl/lwjgl-platform/2.9.0/lwjgl-platform-2.9.0-natives-osx.jar"
+                    : "org/lwjgl/lwjgl/lwjgl-platform/2.9.0/lwjgl-platform-2.9.0-natives-linux.jar",
+            artifact.RelativePath);
+    }
+
 }

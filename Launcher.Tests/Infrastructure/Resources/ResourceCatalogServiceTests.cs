@@ -15,6 +15,65 @@ namespace Launcher.Tests.Infrastructure.Resources;
 
 public sealed class ResourceCatalogServiceTests : TestTempDirectory
 {
+    [Theory]
+    [InlineData(ResourceProjectKind.Mod, "mods")]
+    [InlineData(ResourceProjectKind.ResourcePack, "resourcepacks")]
+    [InlineData(ResourceProjectKind.ShaderPack, "shaderpacks")]
+    [InlineData(ResourceProjectKind.World, "saves")]
+    public async Task EnsureInstanceContentDirectoryCreatesCorrespondingDirectory(
+        ResourceProjectKind kind,
+        string directoryName)
+    {
+        var instanceDirectory = Path.Combine(TempRoot, $"instance-{kind}");
+        Directory.CreateDirectory(instanceDirectory);
+        var service = CreateService(new StubHandler(_ => new HttpResponseMessage(HttpStatusCode.OK)));
+
+        var result = await ((IResourceCatalogDestinationWriter)service)
+            .EnsureInstanceContentDirectoryAsync(
+                kind,
+                new GameInstance { Id = "instance", InstanceDirectory = instanceDirectory },
+                CancellationToken.None);
+
+        Assert.Equal(Path.Combine(instanceDirectory, directoryName), result, ignoreCase: true);
+        Assert.True(Directory.Exists(result));
+    }
+
+    [Fact]
+    public async Task EnsureExistingInstanceContentDirectoryPreservesUserFiles()
+    {
+        var instanceDirectory = Path.Combine(TempRoot, "existing-instance");
+        var modsDirectory = Path.Combine(instanceDirectory, "mods");
+        Directory.CreateDirectory(modsDirectory);
+        var userFile = Path.Combine(modsDirectory, "keep.jar");
+        await File.WriteAllTextAsync(userFile, "user-content");
+        var service = CreateService(new StubHandler(_ => new HttpResponseMessage(HttpStatusCode.OK)));
+
+        var result = await ((IResourceCatalogDestinationWriter)service)
+            .EnsureInstanceContentDirectoryAsync(
+                ResourceProjectKind.Mod,
+                new GameInstance { Id = "instance", InstanceDirectory = instanceDirectory },
+                CancellationToken.None);
+
+        Assert.Equal(modsDirectory, result, ignoreCase: true);
+        Assert.Equal("user-content", await File.ReadAllTextAsync(userFile));
+    }
+
+    [Fact]
+    public async Task EnsureInstanceContentDirectoryDoesNotRecreateMissingInstanceRoot()
+    {
+        var instanceDirectory = Path.Combine(TempRoot, "missing-instance");
+        var service = CreateService(new StubHandler(_ => new HttpResponseMessage(HttpStatusCode.OK)));
+
+        await Assert.ThrowsAsync<DirectoryNotFoundException>(() =>
+            ((IResourceCatalogDestinationWriter)service)
+            .EnsureInstanceContentDirectoryAsync(
+                ResourceProjectKind.Mod,
+                new GameInstance { Id = "instance", InstanceDirectory = instanceDirectory },
+                CancellationToken.None));
+
+        Assert.False(Directory.Exists(instanceDirectory));
+    }
+
     [Fact]
     public async Task SearchStartsAllSelectedProvidersConcurrently()
     {

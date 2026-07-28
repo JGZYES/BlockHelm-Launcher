@@ -85,6 +85,43 @@ internal sealed class ResourceProjectStorage
         CancellationToken cancellationToken) =>
         InstallAsync(version, instance, progress: null, cancellationToken);
 
+    public Task<string> EnsureInstanceContentDirectoryAsync(
+        ResourceProjectKind kind,
+        GameInstance instance,
+        CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        if (string.IsNullOrWhiteSpace(instance.InstanceDirectory))
+            throw new InvalidOperationException("The target instance directory is empty.");
+
+        var directoryName = kind switch
+        {
+            ResourceProjectKind.Mod => "mods",
+            ResourceProjectKind.ResourcePack => "resourcepacks",
+            ResourceProjectKind.ShaderPack => "shaderpacks",
+            ResourceProjectKind.World => "saves",
+            _ => throw new ArgumentOutOfRangeException(nameof(kind), kind, "Unsupported instance resource kind.")
+        };
+        var instanceDirectory = Path.GetFullPath(instance.InstanceDirectory);
+        if (!Directory.Exists(instanceDirectory))
+            throw new DirectoryNotFoundException("The target instance directory does not exist.");
+        var contentDirectory = Path.GetFullPath(Path.Combine(instanceDirectory, directoryName));
+        var existed = Directory.Exists(contentDirectory);
+        var ensuredDirectory = MinecraftPathGuard.EnsureSafeDirectory(
+            contentDirectory,
+            instanceDirectory,
+            "Resource project instance content directory");
+        if (!existed)
+        {
+            logger.LogInformation(
+                "Resource project instance content directory created. Kind={Kind} InstanceId={InstanceId}",
+                kind,
+                instance.Id);
+        }
+
+        return Task.FromResult(ensuredDirectory);
+    }
+
     public async Task<string> DownloadAsync(
         ResourceProjectVersion version,
         string targetDirectory,
