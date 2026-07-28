@@ -135,7 +135,8 @@ private async Task<string> InstallCoreAsync(
                 installerJarPath,
                 downloadSourcePreference,
                 downloadSpeedLimitMbPerSecond,
-                cancellationToken).ConfigureAwait(false);
+                cancellationToken,
+                loaderCategory: "Forge").ConfigureAwait(false);
             await installerArtifactService.MaterializePrerequisitesAsync(
                 installerJarPath,
                 installerPlan,

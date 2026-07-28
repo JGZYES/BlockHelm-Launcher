@@ -284,7 +284,8 @@ public sealed class NeoForgeLoaderProvider : ILoaderProvider, IStagedLoaderProvi
                 installerJarPath,
                 downloadSourcePreference,
                 downloadSpeedLimitMbPerSecond,
-                cancellationToken).ConfigureAwait(false);
+                cancellationToken,
+                loaderCategory: "NeoForge").ConfigureAwait(false);
             await installerArtifactService.MaterializePrerequisitesAsync(
                 installerJarPath,
                 installerPlan,
@@ -435,6 +436,15 @@ public sealed class NeoForgeLoaderProvider : ILoaderProvider, IStagedLoaderProvi
         int downloadSpeedLimitMbPerSecond,
         SpeedMeter? speedMeter = null)
     {
+        var expectedSha1 = await LoaderInstallerChecksumResolver.ResolveRequiredSha1Async(
+            httpClient,
+            downloadSpeedLimitState,
+            logger,
+            artifact.Url,
+            downloadSourcePreference,
+            "NeoForge",
+            downloadSpeedLimitMbPerSecond,
+            cancellationToken).ConfigureAwait(false);
         var executor = new MinecraftDownloadRequestExecutor(
             httpClient,
             logger,
@@ -454,7 +464,7 @@ public sealed class NeoForgeLoaderProvider : ILoaderProvider, IStagedLoaderProvi
             downloadSourcePreference,
             categoryHint: "NeoForge",
             destinationPath,
-            expectedSha1: null,
+            expectedSha1,
             expectedSize: null,
             cancellationToken,
             reportAttemptProgress: logScope.BeginSource(),

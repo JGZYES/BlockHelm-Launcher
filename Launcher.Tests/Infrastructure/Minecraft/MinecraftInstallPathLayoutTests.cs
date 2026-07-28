@@ -11,6 +11,7 @@ using System.Net;
 using System.Reflection;
 using System.Security.Cryptography;
 using System.Text;
+using System.Text.Json.Nodes;
 using CmlLib.Core;
 using CmlLib.Core.Files;
 using CmlLib.Core.Installers;
@@ -190,21 +191,67 @@ public sealed class MinecraftInstallPathLayoutTests : TestTempDirectory
     [Fact]
     public async Task ForgePrerequisitePathTraversalIsIgnored()
     {
+        const string minecraftVersion = "1.20.1";
+        const string metadataUrl = "https://piston-meta.mojang.com/v1/packages/test/1.20.1.json";
+        var officialJson = $$"""{"id":"{{minecraftVersion}}","type":"release"}""";
         var shared = Path.Combine(TempRoot, "shared");
         var workspace = Path.Combine(TempRoot, "installer", ".minecraft");
         var escapedSource = CreateFile(Path.Combine("shared", "escaped.jar"), "escaped");
         var installerJar = Path.Combine(TempRoot, "installer.jar");
         CreateInstallerArchive(installerJar, "../escaped.jar", AtomicSharedFilePublisher.ComputeSha1(escapedSource));
+        var handler = new OfficialMetadataHandler(
+            $$"""{"versions":[{"id":"{{minecraftVersion}}","url":"{{metadataUrl}}","sha1":"{{ComputeSha1(officialJson)}}"}]}""",
+            metadataUrl,
+            officialJson);
 
-        await new LoaderInstallerPrerequisiteSeeder().SeedAsync(
+        await new LoaderInstallerPrerequisiteSeeder(new HttpClient(handler), null).SeedAsync(
             shared,
             workspace,
-            "1.20.1",
+            minecraftVersion,
             installerJar,
+            DownloadSourcePreference.Official,
+            downloadSpeedLimitMbPerSecond: 0,
             CancellationToken.None);
 
         Assert.False(File.Exists(Path.Combine(workspace, "escaped.jar")));
         Assert.False(File.Exists(Path.Combine(TempRoot, "installer", "escaped.jar")));
+    }
+
+    [Fact]
+    public async Task LoaderInstallerSeederDownloadsVerifiedOfficialMetadataWhenSharedVersionIsMissing()
+    {
+        const string minecraftVersion = "1.20.1";
+        const string metadataUrl = "https://piston-meta.mojang.com/v1/packages/test/1.20.1.json";
+        var shared = Path.Combine(TempRoot, "shared");
+        var workspace = Path.Combine(TempRoot, "installer", ".minecraft");
+        var officialJson = $$"""{"id":"{{minecraftVersion}}","type":"release"}""";
+        var handler = new OfficialMetadataHandler(
+            $$"""{"versions":[{"id":"{{minecraftVersion}}","url":"{{metadataUrl}}","sha1":"{{ComputeSha1(officialJson)}}"}]}""",
+            metadataUrl,
+            officialJson);
+        var seeder = new LoaderInstallerPrerequisiteSeeder(new HttpClient(handler), null);
+
+        await seeder.SeedAsync(
+            shared,
+            workspace,
+            minecraftVersion,
+            Path.Combine(TempRoot, "missing-installer.jar"),
+            DownloadSourcePreference.Official,
+            downloadSpeedLimitMbPerSecond: 0,
+            CancellationToken.None);
+
+        Assert.False(Directory.Exists(Path.Combine(shared, "versions", minecraftVersion)));
+        Assert.Equal(
+            minecraftVersion,
+            JsonNode.Parse(await File.ReadAllTextAsync(Path.Combine(
+                workspace,
+                "versions",
+                minecraftVersion,
+                $"{minecraftVersion}.json")))!["id"]!.GetValue<string>());
+        Assert.Contains(
+            handler.RequestUris,
+            uri => uri.AbsolutePath == "/mc/game/version_manifest_v2.json");
+        Assert.Contains(handler.RequestUris, uri => uri.AbsoluteUri == metadataUrl);
     }
 
     [Fact]
@@ -304,6 +351,188 @@ public sealed class MinecraftInstallPathLayoutTests : TestTempDirectory
             $"{minecraftVersion}.json")));
     }
 
+    [Fact]
+    public async Task LoaderInstallerSeederRejectsManifestWithoutMetadataSha1()
+    {
+        const string minecraftVersion = "26.2";
+        const string metadataUrl = "https://piston-meta.mojang.com/v1/packages/test/26.2.json";
+        var shared = Path.Combine(TempRoot, "shared");
+        var workspace = Path.Combine(TempRoot, "installer", ".minecraft");
+        var handler = new OfficialMetadataHandler(
+            $$"""{"versions":[{"id":"{{minecraftVersion}}","url":"{{metadataUrl}}"}]}""",
+            metadataUrl,
+            $$"""{"id":"{{minecraftVersion}}"}""");
+        var seeder = new LoaderInstallerPrerequisiteSeeder(new HttpClient(handler), null);
+
+        await Assert.ThrowsAnyAsync<Exception>(() => seeder.SeedAsync(
+            shared,
+            workspace,
+            minecraftVersion,
+            Path.Combine(TempRoot, "missing-installer.jar"),
+            DownloadSourcePreference.Official,
+            downloadSpeedLimitMbPerSecond: 0,
+            CancellationToken.None));
+
+        Assert.DoesNotContain(handler.RequestUris, uri => uri.AbsoluteUri == metadataUrl);
+        Assert.False(Directory.Exists(Path.Combine(workspace, "versions", minecraftVersion)));
+    }
+
+    [Fact]
+    public async Task LoaderInstallerSeederRejectsMetadataWithDifferentVersionId()
+    {
+        const string minecraftVersion = "26.2";
+        const string metadataUrl = "https://piston-meta.mojang.com/v1/packages/test/26.2.json";
+        const string wrongMetadata = """{"id":"fabric-loader-26.2"}""";
+        var shared = Path.Combine(TempRoot, "shared");
+        var workspace = Path.Combine(TempRoot, "installer", ".minecraft");
+        var handler = new OfficialMetadataHandler(
+            $$"""{"versions":[{"id":"{{minecraftVersion}}","url":"{{metadataUrl}}","sha1":"{{ComputeSha1(wrongMetadata)}}"}]}""",
+            metadataUrl,
+            wrongMetadata);
+        var seeder = new LoaderInstallerPrerequisiteSeeder(new HttpClient(handler), null);
+
+        await Assert.ThrowsAnyAsync<Exception>(() => seeder.SeedAsync(
+            shared,
+            workspace,
+            minecraftVersion,
+            Path.Combine(TempRoot, "missing-installer.jar"),
+            DownloadSourcePreference.Official,
+            downloadSpeedLimitMbPerSecond: 0,
+            CancellationToken.None));
+
+        Assert.False(Directory.Exists(Path.Combine(workspace, "versions", minecraftVersion)));
+    }
+
+    [Fact]
+    public async Task LoaderInstallerSeederDoesNotReuseClientJarWithoutOfficialHashAndSize()
+    {
+        const string minecraftVersion = "1.20.1";
+        const string metadataUrl = "https://piston-meta.mojang.com/v1/packages/test/1.20.1.json";
+        var shared = Path.Combine(TempRoot, "shared");
+        var workspace = Path.Combine(TempRoot, "installer", ".minecraft");
+        CreateFile(
+            Path.Combine("shared", "versions", minecraftVersion, $"{minecraftVersion}.jar"),
+            "unverified shared jar");
+        var officialJson = $"{{\"id\":\"{minecraftVersion}\",\"downloads\":{{\"client\":{{}}}}}}";
+        var handler = new OfficialMetadataHandler(
+            $$"""{"versions":[{"id":"{{minecraftVersion}}","url":"{{metadataUrl}}","sha1":"{{ComputeSha1(officialJson)}}"}]}""",
+            metadataUrl,
+            officialJson);
+        var seeder = new LoaderInstallerPrerequisiteSeeder(new HttpClient(handler), null);
+
+        await seeder.SeedAsync(
+            shared,
+            workspace,
+            minecraftVersion,
+            Path.Combine(TempRoot, "missing-installer.jar"),
+            DownloadSourcePreference.Official,
+            downloadSpeedLimitMbPerSecond: 0,
+            CancellationToken.None);
+
+        Assert.False(File.Exists(Path.Combine(
+            workspace,
+            "versions",
+            minecraftVersion,
+            $"{minecraftVersion}.jar")));
+    }
+
+    [Fact]
+    public async Task LoaderInstallerSeederReusesClientJarOnlyWhenOfficialHashAndSizeMatch()
+    {
+        const string minecraftVersion = "1.20.1";
+        const string metadataUrl = "https://piston-meta.mojang.com/v1/packages/test/1.20.1.json";
+        const string jarContent = "verified shared jar";
+        var shared = Path.Combine(TempRoot, "shared");
+        var workspace = Path.Combine(TempRoot, "installer", ".minecraft");
+        CreateFile(
+            Path.Combine("shared", "versions", minecraftVersion, $"{minecraftVersion}.jar"),
+            jarContent);
+        var officialJson = $$"""
+            {
+              "id":"{{minecraftVersion}}",
+              "downloads":{
+                "client":{
+                  "sha1":"{{ComputeSha1(jarContent)}}",
+                  "size":{{Encoding.UTF8.GetByteCount(jarContent)}}
+                }
+              }
+            }
+            """;
+        var handler = new OfficialMetadataHandler(
+            $$"""{"versions":[{"id":"{{minecraftVersion}}","url":"{{metadataUrl}}","sha1":"{{ComputeSha1(officialJson)}}"}]}""",
+            metadataUrl,
+            officialJson);
+        var seeder = new LoaderInstallerPrerequisiteSeeder(new HttpClient(handler), null);
+
+        await seeder.SeedAsync(
+            shared,
+            workspace,
+            minecraftVersion,
+            Path.Combine(TempRoot, "missing-installer.jar"),
+            DownloadSourcePreference.Official,
+            downloadSpeedLimitMbPerSecond: 0,
+            CancellationToken.None);
+
+        Assert.Equal(
+            jarContent,
+            await File.ReadAllTextAsync(Path.Combine(
+                workspace,
+                "versions",
+                minecraftVersion,
+                $"{minecraftVersion}.jar")));
+    }
+
+    [Fact]
+    public async Task LoaderInstallerSeederPropagatesCancellationBeforeMetadataDownload()
+    {
+        const string minecraftVersion = "1.20.1";
+        const string metadataUrl = "https://piston-meta.mojang.com/v1/packages/test/1.20.1.json";
+        var handler = new OfficialMetadataHandler(
+            """{"versions":[]}""",
+            metadataUrl,
+            """{"id":"1.20.1"}""");
+        var seeder = new LoaderInstallerPrerequisiteSeeder(new HttpClient(handler), null);
+        using var cancellation = new CancellationTokenSource();
+        cancellation.Cancel();
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => seeder.SeedAsync(
+            Path.Combine(TempRoot, "shared"),
+            Path.Combine(TempRoot, "installer", ".minecraft"),
+            minecraftVersion,
+            Path.Combine(TempRoot, "missing-installer.jar"),
+            DownloadSourcePreference.Official,
+            downloadSpeedLimitMbPerSecond: 0,
+            cancellation.Token));
+
+        Assert.Empty(handler.RequestUris);
+    }
+
+    [Fact]
+    public async Task LoaderInstallerSeederFailsClosedWhenMetadataRequestFails()
+    {
+        const string minecraftVersion = "1.20.1";
+        const string metadataUrl = "https://piston-meta.mojang.com/v1/packages/test/1.20.1.json";
+        var officialJson = $$"""{"id":"{{minecraftVersion}}"}""";
+        var handler = new OfficialMetadataHandler(
+            $$"""{"versions":[{"id":"{{minecraftVersion}}","url":"{{metadataUrl}}","sha1":"{{ComputeSha1(officialJson)}}"}]}""",
+            metadataUrl,
+            officialJson,
+            metadataStatusCode: HttpStatusCode.BadRequest);
+        var workspace = Path.Combine(TempRoot, "installer", ".minecraft");
+        var seeder = new LoaderInstallerPrerequisiteSeeder(new HttpClient(handler), null);
+
+        await Assert.ThrowsAnyAsync<Exception>(() => seeder.SeedAsync(
+            Path.Combine(TempRoot, "shared"),
+            workspace,
+            minecraftVersion,
+            Path.Combine(TempRoot, "missing-installer.jar"),
+            DownloadSourcePreference.Official,
+            downloadSpeedLimitMbPerSecond: 0,
+            CancellationToken.None));
+
+        Assert.False(Directory.Exists(Path.Combine(workspace, "versions", minecraftVersion)));
+    }
+
     private string CreateFile(string relativePath, string content)
     {
         var path = Path.Combine(TempRoot, relativePath);
@@ -363,7 +592,8 @@ public sealed class MinecraftInstallPathLayoutTests : TestTempDirectory
     private sealed class OfficialMetadataHandler(
         string manifestJson,
         string metadataUrl,
-        string metadataJson) : HttpMessageHandler
+        string metadataJson,
+        HttpStatusCode metadataStatusCode = HttpStatusCode.OK) : HttpMessageHandler
     {
         public List<Uri> RequestUris { get; } = [];
 
@@ -378,7 +608,10 @@ public sealed class MinecraftInstallPathLayoutTests : TestTempDirectory
                 var path when path == new Uri(metadataUrl).AbsolutePath => metadataJson,
                 _ => throw new InvalidOperationException($"Unexpected request: {request.RequestUri}")
             };
-            return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
+            var statusCode = request.RequestUri.AbsolutePath == new Uri(metadataUrl).AbsolutePath
+                ? metadataStatusCode
+                : HttpStatusCode.OK;
+            return Task.FromResult(new HttpResponseMessage(statusCode)
             {
                 RequestMessage = request,
                 Content = new StringContent(content)

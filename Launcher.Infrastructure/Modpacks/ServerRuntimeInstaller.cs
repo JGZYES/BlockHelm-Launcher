@@ -312,10 +312,15 @@ internal sealed class ServerRuntimeInstaller : IServerRuntimeInstaller
         try
         {
             var installerPath = Path.Combine(tempDirectory, "installer.jar");
-            var sha1Text = await TryDownloadTextAsync(artifact.Url + ".sha1", preference, speedLimit, cancellationToken)
-                .ConfigureAwait(false);
-            var expectedSha1 = NormalizeSha1(sha1Text)
-                ?? throw new InvalidDataException($"{artifact.Category} installer checksum metadata is unavailable or invalid.");
+            var expectedSha1 = await LoaderInstallerChecksumResolver.ResolveRequiredSha1Async(
+                httpClient,
+                downloadSpeedLimitState,
+                logger,
+                artifact.Url,
+                preference,
+                artifact.Category,
+                speedLimit,
+                cancellationToken).ConfigureAwait(false);
             await DownloadArtifactAsync(
                 artifact.Url,
                 installerPath,
@@ -423,35 +428,6 @@ internal sealed class ServerRuntimeInstaller : IServerRuntimeInstaller
             logger,
             DownloadBandwidthLimiter.Create(speedLimit, downloadSpeedLimitState),
             category: category);
-
-    private async Task<string?> TryDownloadTextAsync(
-        string url,
-        DownloadSourcePreference preference,
-        int speedLimit,
-        CancellationToken cancellationToken)
-    {
-        try
-        {
-            var executor = CreateExecutor(speedLimit, DownloadConcurrencyCategory.Metadata);
-            return await executor.ExecuteAsync(
-                url,
-                preference,
-                "ThirdParty",
-                async (context, token) => await context.Response.Content.ReadAsStringAsync(token).ConfigureAwait(false),
-                cancellationToken).ConfigureAwait(false);
-        }
-        catch (Exception exception) when (exception is not OperationCanceledException)
-        {
-            logger.LogDebug(exception, "Loader installer SHA1 metadata was unavailable.");
-            return null;
-        }
-    }
-
-    private static string? NormalizeSha1(string? value)
-    {
-        var candidate = value?.Trim().Split(' ', StringSplitOptions.RemoveEmptyEntries).FirstOrDefault();
-        return candidate is { Length: 40 } && candidate.All(Uri.IsHexDigit) ? candidate : null;
-    }
 
     internal static ForgeLikeServerInstallerArtifact ResolveForgeLikeInstallerArtifact(PreparedModpack modpack)
     {

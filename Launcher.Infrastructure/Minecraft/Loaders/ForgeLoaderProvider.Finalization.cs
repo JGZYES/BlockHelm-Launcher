@@ -44,6 +44,15 @@ private async Task DownloadInstallerAsync(
         int downloadSpeedLimitMbPerSecond = 0,
         SpeedMeter? speedMeter = null)
     {
+        var expectedSha1 = await LoaderInstallerChecksumResolver.ResolveRequiredSha1Async(
+            httpClient,
+            downloadSpeedLimitState,
+            logger,
+            installerUrl.AbsoluteUri,
+            downloadSourcePreference,
+            "Forge",
+            downloadSpeedLimitMbPerSecond,
+            cancellationToken).ConfigureAwait(false);
         var executor = new MinecraftDownloadRequestExecutor(
             httpClient,
             logger,
@@ -62,7 +71,7 @@ private async Task DownloadInstallerAsync(
             downloadSourcePreference,
             categoryHint: "Forge",
             destinationPath,
-            expectedSha1: null,
+            expectedSha1,
             expectedSize: null,
             cancellationToken,
             reportAttemptProgress: logScope.BeginSource(),

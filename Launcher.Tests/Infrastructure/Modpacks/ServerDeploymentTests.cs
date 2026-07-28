@@ -150,6 +150,57 @@ public sealed class ServerDeploymentTests : TestTempDirectory
         Assert.False(runner.WasRun);
     }
 
+    [Fact]
+    public async Task ForgeLikeRuntimeDoesNotDownloadOrExecuteInstallerWithoutChecksumMetadata()
+    {
+        var target = Path.Combine(TempRoot, "forge-missing-checksum");
+        var installerBytes = CreateForgeServerInstaller();
+        var handler = new ForgeServerRuntimeHandler(installerBytes, checksumUnavailable: true);
+        var runner = new ScriptedForgeServerInstallerRunner(directory =>
+            WriteModernForgeServerEntrypoint(directory, writeProcessorOutput: true));
+        var installer = new ServerRuntimeInstaller(
+            new HttpClient(handler),
+            new FixedSettingsService(),
+            new FixedLoaderJavaRuntimeResolver(),
+            runner);
+
+        var exception = await Assert.ThrowsAsync<InvalidDataException>(() => installer.InstallAsync(
+            CreateForgeServerModpack(),
+            target));
+
+        Assert.Contains("checksum", exception.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.False(runner.WasRun);
+        Assert.DoesNotContain(
+            handler.RequestedUrls,
+            url => url.EndsWith("-installer.jar", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task ForgeLikeRuntimeDoesNotExecuteInstallerWhenChecksumDoesNotMatch()
+    {
+        var target = Path.Combine(TempRoot, "forge-mismatched-checksum");
+        var installerBytes = CreateForgeServerInstaller();
+        var handler = new ForgeServerRuntimeHandler(
+            installerBytes,
+            checksumOverride: "0000000000000000000000000000000000000000");
+        var runner = new ScriptedForgeServerInstallerRunner(directory =>
+            WriteModernForgeServerEntrypoint(directory, writeProcessorOutput: true));
+        var installer = new ServerRuntimeInstaller(
+            new HttpClient(handler),
+            new FixedSettingsService(),
+            new FixedLoaderJavaRuntimeResolver(),
+            runner);
+
+        await Assert.ThrowsAnyAsync<Exception>(() => installer.InstallAsync(
+            CreateForgeServerModpack(),
+            target));
+
+        Assert.False(runner.WasRun);
+        Assert.Contains(
+            handler.RequestedUrls,
+            url => url.EndsWith("-installer.jar", StringComparison.Ordinal));
+    }
+
     private static void AddEntry(ZipArchive archive, string path, string content)
     {
         var entry = archive.CreateEntry(path);
@@ -349,7 +400,8 @@ public sealed class ServerDeploymentTests : TestTempDirectory
 
     private sealed class ForgeServerRuntimeHandler(
         byte[] installerBytes,
-        string? checksumOverride = null) : HttpMessageHandler
+        string? checksumOverride = null,
+        bool checksumUnavailable = false) : HttpMessageHandler
     {
         private static readonly byte[] ServerBytes = Encoding.UTF8.GetBytes("server-jar");
         private readonly string installerSha1 = Convert.ToHexString(SHA1.HashData(installerBytes)).ToLowerInvariant();
@@ -363,6 +415,15 @@ public sealed class ServerDeploymentTests : TestTempDirectory
         {
             var url = request.RequestUri!.AbsoluteUri;
             RequestedUrls.Add(url);
+            if (checksumUnavailable
+                && url.EndsWith("-installer.jar.sha1", StringComparison.Ordinal))
+            {
+                return Task.FromResult(new HttpResponseMessage(HttpStatusCode.NotFound)
+                {
+                    RequestMessage = request
+                });
+            }
+
             HttpContent content = url switch
             {
                 "https://piston-meta.mojang.com/mc/game/version_manifest_v2.json" => new StringContent(

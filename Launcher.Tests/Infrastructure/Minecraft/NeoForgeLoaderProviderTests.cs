@@ -40,13 +40,15 @@ public sealed class NeoForgeLoaderProviderTests : TestTempDirectory
         var expectedJavaPath = Path.Combine(TempRoot, "Selected Java", "bin", "java.exe");
         string? receivedJavaPath = null;
         var javaRuntimeResolver = new FixedJavaRuntimeResolver(expectedJavaPath);
+        var handler = new NeoForgeHttpHandler();
         var provider = CreateProvider(
             new ScriptedForgeInstallerRunner((gameDirectory, javaPath, _) =>
             {
                 receivedJavaPath = javaPath;
                 return CreateSandboxNeoForgeInstallAsync(gameDirectory, "neoforge-20.4.237", "1.20.4", "20.4.237");
             }),
-            javaRuntimeResolver: javaRuntimeResolver);
+            javaRuntimeResolver: javaRuntimeResolver,
+            handler: handler);
 
         await provider.InstallAsync(
             "1.20.4",
@@ -60,6 +62,103 @@ public sealed class NeoForgeLoaderProviderTests : TestTempDirectory
         Assert.Equal(DownloadSourcePreference.Official, javaRuntimeResolver.LastRequest?.DownloadSourcePreference);
         Assert.Equal(LoaderKind.NeoForge, javaRuntimeResolver.LastRequest?.Loader);
         Assert.Equal("20.4.237", javaRuntimeResolver.LastRequest?.LoaderVersion);
+        Assert.Contains(
+            handler.RequestUris,
+            uri => uri.AbsoluteUri.EndsWith(
+                "neoforge-20.4.237-installer.jar.sha1",
+                StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task NeoForgeLoaderProviderDoesNotDownloadOrRunInstallerWhenChecksumIsInvalid()
+    {
+        var minecraftDirectory = Path.Combine(TempRoot, ".minecraft");
+        await CreateVanillaVersionAsync(minecraftDirectory, "1.20.4");
+        var runnerStarted = false;
+        var handler = new NeoForgeHttpHandler(installerChecksumOverride: "not-a-sha1");
+        var provider = CreateProvider(
+            new ScriptedForgeInstallerRunner((_, _, _) =>
+            {
+                runnerStarted = true;
+                return Task.CompletedTask;
+            }),
+            handler: handler);
+
+        await Assert.ThrowsAsync<InvalidDataException>(() => provider.InstallAsync(
+            "1.20.4",
+            minecraftDirectory,
+            "1.20.4-neoforge-20.4.237",
+            "20.4.237",
+            progress: null));
+
+        Assert.False(runnerStarted);
+        Assert.DoesNotContain(
+            handler.RequestUris,
+            uri => uri.AbsoluteUri.EndsWith("installer.jar", StringComparison.Ordinal));
+        AssertNoInstallerSessions("launcher-neoforge");
+    }
+
+    [Fact]
+    public async Task NeoForgeLoaderProviderDoesNotRunOrPublishInstallerWithMismatchedChecksum()
+    {
+        const string finalVersionName = "1.20.4-neoforge-20.4.237";
+        var minecraftDirectory = Path.Combine(TempRoot, ".minecraft");
+        await CreateVanillaVersionAsync(minecraftDirectory, "1.20.4");
+        var runnerStarted = false;
+        var handler = new NeoForgeHttpHandler(
+            installerChecksumOverride: "0000000000000000000000000000000000000000");
+        var provider = CreateProvider(
+            new ScriptedForgeInstallerRunner((_, _, _) =>
+            {
+                runnerStarted = true;
+                return Task.CompletedTask;
+            }),
+            handler: handler);
+
+        await Assert.ThrowsAnyAsync<Exception>(() => provider.InstallAsync(
+            "1.20.4",
+            minecraftDirectory,
+            finalVersionName,
+            "20.4.237",
+            progress: null));
+
+        Assert.False(runnerStarted);
+        Assert.Contains(
+            handler.RequestUris,
+            uri => uri.AbsoluteUri.EndsWith("installer.jar", StringComparison.Ordinal));
+        Assert.False(Directory.Exists(Path.Combine(minecraftDirectory, "versions", finalVersionName)));
+        AssertNoInstallerSessions("launcher-neoforge");
+    }
+
+    [Fact]
+    public async Task NeoForgeLoaderProviderDoesNotRunOrPublishWhenOfficialBaseMetadataFails()
+    {
+        const string finalVersionName = "1.20.4-neoforge-20.4.237";
+        var minecraftDirectory = Path.Combine(TempRoot, ".minecraft");
+        var runnerStarted = false;
+        var handler = new NeoForgeHttpHandler(
+            versionMetadataSha1Override: "0000000000000000000000000000000000000000");
+        var provider = CreateProvider(
+            new ScriptedForgeInstallerRunner((_, _, _) =>
+            {
+                runnerStarted = true;
+                return Task.CompletedTask;
+            }),
+            handler: handler);
+
+        await Assert.ThrowsAnyAsync<Exception>(() => provider.InstallAsync(
+            "1.20.4",
+            minecraftDirectory,
+            finalVersionName,
+            "20.4.237",
+            progress: null));
+
+        Assert.False(runnerStarted);
+        Assert.Contains(
+            handler.RequestUris,
+            uri => uri.AbsoluteUri == "https://piston-meta.mojang.com/v1/packages/test/1.20.4.json");
+        Assert.False(Directory.Exists(Path.Combine(minecraftDirectory, "versions", finalVersionName)));
+        AssertNoInstallerSessions("launcher-neoforge");
     }
 
     [Fact]
@@ -120,11 +219,11 @@ public sealed class NeoForgeLoaderProviderTests : TestTempDirectory
     public async Task NeoForgeLoaderProviderInstallDoesNotCreateRealVanillaBaseDirectoryWhenMissing()
     {
         var minecraftDirectory = Path.Combine(TempRoot, ".minecraft");
-
-        var provider = CreateProvider(new ScriptedForgeInstallerRunner((gameDirectory, _, _) =>
-        {
-            return CreateSandboxNeoForgeInstallAsync(gameDirectory, "neoforge-20.4.237", "1.20.4", "20.4.237");
-        }));
+        var handler = new NeoForgeHttpHandler();
+        var provider = CreateProvider(
+            new ScriptedForgeInstallerRunner((gameDirectory, _, _) =>
+                CreateSandboxNeoForgeInstallAsync(gameDirectory, "neoforge-20.4.237", "1.20.4", "20.4.237")),
+            handler: handler);
 
         var finalVersionName = await provider.InstallAsync(
             "1.20.4",
@@ -137,6 +236,9 @@ public sealed class NeoForgeLoaderProviderTests : TestTempDirectory
         Assert.False(Directory.Exists(Path.Combine(minecraftDirectory, "versions", "1.20.4")));
         Assert.False(Directory.Exists(Path.Combine(minecraftDirectory, "versions", "neoforge-20.4.237")));
         Assert.True(Directory.Exists(Path.Combine(minecraftDirectory, "versions", "Imported NeoForge Pack")));
+        Assert.Contains(
+            handler.RequestUris,
+            uri => uri.AbsoluteUri == "https://piston-meta.mojang.com/v1/packages/test/1.20.4.json");
     }
 
     [Fact]
@@ -170,16 +272,28 @@ public sealed class NeoForgeLoaderProviderTests : TestTempDirectory
         const string loaderVersion = "47.1.106";
         const string legacyCoordinate = "1.20.1-47.1.106";
         var minecraftDirectory = Path.Combine(TempRoot, ".minecraft");
-        await CreateVanillaVersionAsync(minecraftDirectory, minecraftVersion);
         var handler = new LegacyNeoForge1201HttpHandler();
+        var runnerStartedAfterVerifiedMetadata = false;
         var provider = new NeoForgeLoaderProvider(
             new HttpClient(handler),
-            new ScriptedForgeInstallerRunner((gameDirectory, _, _) =>
-                CreateLegacy1201SandboxInstallAsync(
+            new ScriptedForgeInstallerRunner(async (gameDirectory, _, _) =>
+            {
+                var baseJsonPath = Path.Combine(
+                    gameDirectory,
+                    "versions",
+                    minecraftVersion,
+                    $"{minecraftVersion}.json");
+                Assert.True(File.Exists(baseJsonPath));
+                Assert.Equal(
+                    minecraftVersion,
+                    JsonNode.Parse(await File.ReadAllTextAsync(baseJsonPath))!["id"]!.GetValue<string>());
+                runnerStartedAfterVerifiedMetadata = true;
+                await CreateLegacy1201SandboxInstallAsync(
                     gameDirectory,
                     minecraftVersion,
                     loaderVersion,
-                    legacyCoordinate)),
+                    legacyCoordinate);
+            }),
             new NoOpFinalVersionInstaller(),
             TempRoot,
             javaRuntimeResolver: new FixedJavaRuntimeResolver());
@@ -192,15 +306,24 @@ public sealed class NeoForgeLoaderProviderTests : TestTempDirectory
             progress: null);
 
         Assert.Equal("Legacy NeoForge Pack", installedName);
+        Assert.True(runnerStartedAfterVerifiedMetadata);
         Assert.Contains(
             handler.RequestUris,
             uri => uri.AbsoluteUri
                 == "https://maven.neoforged.net/releases/net/neoforged/forge/1.20.1-47.1.106/forge-1.20.1-47.1.106-installer.jar");
+        Assert.Contains(
+            handler.RequestUris,
+            uri => uri.AbsoluteUri
+                == "https://maven.neoforged.net/releases/net/neoforged/forge/1.20.1-47.1.106/forge-1.20.1-47.1.106-installer.jar.sha1");
         Assert.DoesNotContain(
             handler.RequestUris,
             uri => uri.AbsoluteUri.Contains(
                 "/net/neoforged/neoforge/47.1.106/",
                 StringComparison.OrdinalIgnoreCase));
+        Assert.Contains(
+            handler.RequestUris,
+            uri => uri.AbsoluteUri == "https://piston-meta.mojang.com/v1/packages/test/1.20.1.json");
+        Assert.False(Directory.Exists(Path.Combine(minecraftDirectory, "versions", minecraftVersion)));
 
         var versionJson = JsonNode.Parse(await File.ReadAllTextAsync(Path.Combine(
             minecraftDirectory,
@@ -216,14 +339,21 @@ public sealed class NeoForgeLoaderProviderTests : TestTempDirectory
     private NeoForgeLoaderProvider CreateProvider(
         IForgeInstallerRunner? runner = null,
         IFinalVersionInstaller? finalVersionInstaller = null,
-        ILoaderInstallerJavaRuntimeResolver? javaRuntimeResolver = null)
+        ILoaderInstallerJavaRuntimeResolver? javaRuntimeResolver = null,
+        NeoForgeHttpHandler? handler = null)
     {
         return new NeoForgeLoaderProvider(
-            new HttpClient(new NeoForgeHttpHandler()),
+            new HttpClient(handler ?? new NeoForgeHttpHandler()),
             runner ?? new NoOpForgeInstallerRunner(),
             finalVersionInstaller ?? new NoOpFinalVersionInstaller(),
             TempRoot,
             javaRuntimeResolver: javaRuntimeResolver ?? new FixedJavaRuntimeResolver());
+    }
+
+    private void AssertNoInstallerSessions(string directoryName)
+    {
+        var root = Path.Combine(TempRoot, directoryName);
+        Assert.True(!Directory.Exists(root) || Directory.GetDirectories(root).Length == 0);
     }
 
     private static async Task CreateSandboxNeoForgeInstallAsync(
@@ -419,6 +549,16 @@ public sealed class NeoForgeLoaderProviderTests : TestTempDirectory
     private sealed class NeoForgeHttpHandler : HttpMessageHandler
     {
         private const string OfficialVersionJson = """{"id":"1.20.4","type":"release","mainClass":"net.minecraft.client.main.Main"}""";
+        private readonly string? installerChecksumOverride;
+        private readonly string? versionMetadataSha1Override;
+
+        public NeoForgeHttpHandler(
+            string? installerChecksumOverride = null,
+            string? versionMetadataSha1Override = null)
+        {
+            this.installerChecksumOverride = installerChecksumOverride;
+            this.versionMetadataSha1Override = versionMetadataSha1Override;
+        }
 
         public List<Uri> RequestUris { get; } = [];
 
@@ -429,8 +569,9 @@ public sealed class NeoForgeLoaderProviderTests : TestTempDirectory
                 .Replace("https://bmclapi2.bangbang93.com/maven/", "https://maven.neoforged.net/releases/", StringComparison.OrdinalIgnoreCase);
             if (uri == "https://piston-meta.mojang.com/mc/game/version_manifest_v2.json")
             {
-                var sha1 = Convert.ToHexString(SHA1.HashData(Encoding.UTF8.GetBytes(OfficialVersionJson)))
-                    .ToLowerInvariant();
+                var sha1 = versionMetadataSha1Override
+                    ?? Convert.ToHexString(SHA1.HashData(Encoding.UTF8.GetBytes(OfficialVersionJson)))
+                        .ToLowerInvariant();
                 return Task.FromResult(CreateTextResponse(
                     request,
                     $$"""{"versions":[{"id":"1.20.4","url":"https://piston-meta.mojang.com/v1/packages/test/1.20.4.json","sha1":"{{sha1}}"}]}"""));
@@ -459,6 +600,13 @@ public sealed class NeoForgeLoaderProviderTests : TestTempDirectory
                     """));
             }
 
+            if (uri == "https://maven.neoforged.net/releases/net/neoforged/neoforge/20.4.237/neoforge-20.4.237-installer.jar.sha1")
+            {
+                var installerBytes = CreateInstallerBytes();
+                var sha1 = installerChecksumOverride
+                    ?? Convert.ToHexString(SHA1.HashData(installerBytes)).ToLowerInvariant();
+                return Task.FromResult(CreateTextResponse(request, sha1));
+            }
             if (uri == "https://maven.neoforged.net/releases/net/neoforged/neoforge/20.4.237/neoforge-20.4.237-installer.jar")
                 return Task.FromResult(CreateBinaryResponse(request, CreateInstallerBytes()));
             if (uri == "https://maven.neoforged.net/releases/net/neoforged/neoforge/20.4.237/neoforge-20.4.237-universal.jar")
@@ -514,6 +662,14 @@ public sealed class NeoForgeLoaderProviderTests : TestTempDirectory
 
             if (uri == "https://piston-meta.mojang.com/v1/packages/test/1.20.1.json")
                 return Task.FromResult(CreateTextResponse(request, OfficialVersionJson));
+            if (uri
+                == "https://maven.neoforged.net/releases/net/neoforged/forge/1.20.1-47.1.106/forge-1.20.1-47.1.106-installer.jar.sha1")
+            {
+                var sha1 = Convert.ToHexString(SHA1.HashData(CreateLegacy1201InstallerBytes()))
+                    .ToLowerInvariant();
+                return Task.FromResult(CreateTextResponse(request, sha1));
+            }
+
             if (uri
                 == "https://maven.neoforged.net/releases/net/neoforged/forge/1.20.1-47.1.106/forge-1.20.1-47.1.106-installer.jar")
             {
