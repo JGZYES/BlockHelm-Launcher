@@ -85,15 +85,15 @@
                                FontSize="12"
                                TextWrapping="Wrap" />
 
-                    <ComboBox Margin="0,14,0,0"
+                    <controls:AnimatedComboBox Margin="0,14,0,0"
                               Height="32"
                               MinWidth="220"
                               HorizontalAlignment="Left"
                               ItemsSource="{Binding AvailableLoaderOptions}"
-                              SelectedItem="{Binding SelectedLoaderOption}"
+                              SelectedItem="{Binding SelectedLoaderOption, Mode=TwoWay}"
                               IsEnabled="{Binding CanUseVanillaLoaderUpgrade}">
-                        <ComboBox.Style>
-                            <Style TargetType="ComboBox" BasedOn="{StaticResource LauncherDialogComboBoxStyle}">
+                        <controls:AnimatedComboBox.Style>
+                            <Style TargetType="controls:AnimatedComboBox" BasedOn="{StaticResource LauncherComboBoxStyle}">
                                 <Setter Property="Visibility" Value="Collapsed" />
                                 <Style.Triggers>
                                     <DataTrigger Binding="{Binding IsVanillaInstance}" Value="True">
@@ -101,17 +101,17 @@
                                     </DataTrigger>
                                 </Style.Triggers>
                             </Style>
-                        </ComboBox.Style>
-                        <ComboBox.ItemTemplate>
+                        </controls:AnimatedComboBox.Style>
+                        <controls:AnimatedComboBox.ItemTemplate>
                             <DataTemplate DataType="{x:Type services:VanillaUpgradeLoaderOption}">
                                 <StackPanel Orientation="Horizontal">
                                     <TextBlock Text="{Binding Loader}" />
-                                    <TextBlock Text=" - " Foreground="{DynamicResource Brush.66808080}" />
+                                    <TextBlock Text=" - " Foreground="{DynamicResource Brush.8FFFFFFF}" />
                                     <TextBlock Text="{Binding DisplayVersion}" />
                                 </StackPanel>
                             </DataTemplate>
-                        </ComboBox.ItemTemplate>
-                    </ComboBox>
+                        </controls:AnimatedComboBox.ItemTemplate>
+                    </controls:AnimatedComboBox>
 
                     <Button Margin="0,14,0,0"
                             HorizontalAlignment="Left"
