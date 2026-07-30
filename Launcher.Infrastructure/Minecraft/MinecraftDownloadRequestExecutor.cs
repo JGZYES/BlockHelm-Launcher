@@ -37,7 +37,7 @@ namespace Launcher.Infrastructure.Minecraft;
 /// </summary>
 internal sealed class MinecraftDownloadRequestExecutor
 {
-    internal const long MinimumSegmentedDownloadSize = 8L * 1024 * 1024;
+    internal const long MinimumSegmentedDownloadSize = 4L * 1024 * 1024;
     internal const long SegmentedSplitThreshold = 256L * 1024;
     internal static readonly TimeSpan SegmentedExpansionScanInterval = TimeSpan.FromMilliseconds(50);
 

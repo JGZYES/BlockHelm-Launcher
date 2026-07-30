@@ -536,6 +536,14 @@ public static class Strings
     public static string GameSettings_GeneralInstanceDirectorySection => Get(nameof(GameSettings_GeneralInstanceDirectorySection));
     public static string GameSettings_GeneralOpenInstanceDirectoryButton => Get(nameof(GameSettings_GeneralOpenInstanceDirectoryButton));
     public static string GameSettings_GeneralCreatedAtSection => Get(nameof(GameSettings_GeneralCreatedAtSection));
+    public static string GameSettings_GeneralLoaderUpgradeSection => Get(nameof(GameSettings_GeneralLoaderUpgradeSection));
+    public static string GameSettings_GeneralLoaderUpgradeHint => Get(nameof(GameSettings_GeneralLoaderUpgradeHint));
+    public static string GameSettings_GeneralLoaderUpgradeButton => Get(nameof(GameSettings_GeneralLoaderUpgradeButton));
+    public static string GameSettings_GeneralLoaderUpgradeAlreadyModded => Get(nameof(GameSettings_GeneralLoaderUpgradeAlreadyModded));
+    public static string GameSettings_GeneralLoaderUpgradeNoVersions => Get(nameof(GameSettings_GeneralLoaderUpgradeNoVersions));
+    public static string GameSettings_GeneralLoaderUpgradeInProgress => Get(nameof(GameSettings_GeneralLoaderUpgradeInProgress));
+    public static string GameSettings_GeneralLoaderUpgradeSucceededFormat => Get(nameof(GameSettings_GeneralLoaderUpgradeSucceededFormat));
+    public static string GameSettings_GeneralLoaderUpgradeFailedFormat => Get(nameof(GameSettings_GeneralLoaderUpgradeFailedFormat));
     public static string GameSettings_DeleteGameButton => Get(nameof(GameSettings_DeleteGameButton));
     public static string GameSettings_BackupInfoSection => Get(nameof(GameSettings_BackupInfoSection));
     public static string GameSettings_BackupListSection => Get(nameof(GameSettings_BackupListSection));
@@ -1143,6 +1151,7 @@ public static class Strings
     public static string Status_InstallCompletingFiles => Get(nameof(Status_InstallCompletingFiles));
     public static string Status_InstallingVanillaFormat => Get(nameof(Status_InstallingVanillaFormat));
     public static string Status_InstallingLoaderFormat => Get(nameof(Status_InstallingLoaderFormat));
+    public static string Status_VanillaLoaderUpgradeRunningFormat => Get(nameof(Status_VanillaLoaderUpgradeRunningFormat));
     public static string Status_InstanceInstalledFormat => Get(nameof(Status_InstanceInstalledFormat));
     public static string Status_InstallFailed => Get(nameof(Status_InstallFailed));
     public static string Status_ModpackPreparingArchive => Get(nameof(Status_ModpackPreparingArchive));

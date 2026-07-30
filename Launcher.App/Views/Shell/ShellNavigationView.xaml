@@ -1,4 +1,4 @@
-﻿<!--
+<!--
   BlockHelm Launcher
   Copyright (C) 2026 Quan Zhou
 
@@ -118,6 +118,36 @@
                                           Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType={x:Type Button}}}"
                                           HorizontalAlignment="Center"
                                           VerticalAlignment="Center" />
+
+                        <Border x:Name="DownloadTaskBadge"
+                                Width="Auto"
+                                Height="16"
+                                MinWidth="16"
+                                HorizontalAlignment="Right"
+                                VerticalAlignment="Top"
+                                Margin="0,2,2,0"
+                                Padding="4,0"
+                                CornerRadius="8"
+                                Background="{DynamicResource Brush.Accent}"
+                                IsHitTestVisible="False">
+                            <Border.Style>
+                                <Style TargetType="Border">
+                                    <Setter Property="Visibility" Value="Collapsed" />
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding DataContext.HasRunningDownloadTasks, ElementName=Root}" Value="True">
+                                            <Setter Property="Visibility" Value="Visible" />
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </Border.Style>
+                            <TextBlock Text="{Binding DataContext.DownloadTaskBadgeText, ElementName=Root}"
+                                       Foreground="White"
+                                       FontSize="10"
+                                       FontWeight="Bold"
+                                       HorizontalAlignment="Center"
+                                       VerticalAlignment="Center"
+                                       LineHeight="16" />
+                        </Border>
                     </Grid>
 
                     <TextBlock Grid.Column="1"

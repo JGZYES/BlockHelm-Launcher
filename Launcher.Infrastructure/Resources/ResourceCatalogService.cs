@@ -17,8 +17,11 @@
  * SPDX-License-Identifier: GPL-3.0-only
  */
 
+using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Net.Http;
+using System.Security.Cryptography;
+using System.Text;
 using Launcher.Application.Services;
 using Launcher.Domain.Models;
 using Launcher.Infrastructure.CurseForge;
@@ -35,11 +38,18 @@ public sealed class ResourceCatalogService :
     IResourceCatalogDestinationWriter,
     IResourceThumbnailService
 {
+    private static readonly TimeSpan SearchCacheLifetime = TimeSpan.FromSeconds(20);
+    private static readonly TimeSpan VersionsCacheLifetime = TimeSpan.FromSeconds(45);
+    private static readonly TimeSpan ProjectCacheLifetime = TimeSpan.FromMinutes(5);
+
     private readonly IReadOnlyDictionary<ResourceProjectSource, IResourceProviderClient> providers;
     private readonly ResourceProjectStorage storage;
     private readonly ResourceThumbnailCacheService thumbnailCache;
     private readonly McresBhlClient mcresBhlClient;
     private readonly ILogger<ResourceCatalogService> logger;
+    private readonly ConcurrentDictionary<string, CacheEntry<ResourceCatalogSearchResult>> searchCache = new(StringComparer.Ordinal);
+    private readonly ConcurrentDictionary<string, CacheEntry<ResourceProjectVersionsResult>> versionsCache = new(StringComparer.Ordinal);
+    private readonly ConcurrentDictionary<string, CacheEntry<ResourceProject?>> projectCache = new(StringComparer.Ordinal);
 
     public ResourceCatalogService(
         HttpClient? httpClient = null,
@@ -97,17 +107,6 @@ public sealed class ResourceCatalogService :
         CancellationToken cancellationToken = default) =>
         thumbnailCache.GetOrCreateThumbnailSourceAsync(project, cancellationToken);
 
-    public Task<ResourceProject?> GetProjectAsync(
-        ResourceProjectReference reference,
-        CancellationToken cancellationToken = default)
-    {
-        ArgumentNullException.ThrowIfNull(reference);
-        return providers.TryGetValue(reference.Source, out var provider)
-            && provider.Supports(reference.Kind)
-            ? provider.GetProjectAsync(reference, cancellationToken)
-            : Task.FromResult<ResourceProject?>(null);
-    }
-
     public Task<ResourceProjectRelatedWebsite?> GetRelatedWebsiteAsync(
         ResourceProjectReference reference,
         CancellationToken cancellationToken = default) =>
@@ -129,62 +128,6 @@ public sealed class ResourceCatalogService :
             Offset = request.Offset,
             PageSize = request.PageSize
         }, cancellationToken);
-    }
-
-    public async Task<ResourceCatalogSearchResult> SearchProjectsAsync(
-        ResourceCatalogSearchRequest request,
-        CancellationToken cancellationToken = default)
-    {
-        logger.LogDebug(
-            "Searching resource projects. Kind={Kind} Query={Query} Source={Source} Offset={Offset} PageSize={PageSize}",
-            request.Kind,
-            request.Query,
-            request.Source,
-            request.Offset,
-            request.PageSize);
-
-        var totalStopwatch = Stopwatch.StartNew();
-        var selectedProviders = request.Source is { } source
-            ? providers.TryGetValue(source, out var selectedProvider) ? [selectedProvider] : []
-            : providers.Values.ToArray();
-        var supportedProviders = selectedProviders
-            .Where(value => value.Supports(request.Kind))
-            .ToArray();
-        var projects = new List<ResourceProject>();
-        var hasMore = false;
-        var curseForgeUnavailable = false;
-        var curseForgeApiKeyMissing = false;
-
-        var providerResults = await Task.WhenAll(supportedProviders.Select(provider =>
-            SearchProviderAsync(provider, request, cancellationToken))).ConfigureAwait(false);
-        foreach (var (providerSource, result) in providerResults)
-        {
-            projects.AddRange(result.Projects);
-            hasMore |= result.HasMore;
-            if (providerSource is ResourceProjectSource.CurseForge)
-            {
-                curseForgeUnavailable |= result.IsUnavailable;
-                curseForgeApiKeyMissing |= result.IsApiKeyMissing;
-            }
-        }
-
-        var searchResult = new ResourceCatalogSearchResult
-        {
-            Projects = projects
-                .OrderByDescending(project => project.Downloads)
-                .ThenBy(project => project.Title, StringComparer.CurrentCultureIgnoreCase)
-                .ToList(),
-            IsCurseForgeUnavailable = curseForgeUnavailable,
-            IsCurseForgeApiKeyMissing = curseForgeApiKeyMissing,
-            HasMore = hasMore
-        };
-        logger.LogInformation(
-            "Resource project search completed. Kind={Kind} ProviderCount={ProviderCount} ResultCount={ResultCount} ElapsedMilliseconds={ElapsedMilliseconds}",
-            request.Kind,
-            supportedProviders.Length,
-            searchResult.Projects.Count,
-            totalStopwatch.ElapsedMilliseconds);
-        return searchResult;
     }
 
     private async Task<(ResourceProjectSource Source, ResourceProviderSearchResult Result)> SearchProviderAsync(
@@ -218,22 +161,6 @@ public sealed class ResourceCatalogService :
                 stopwatch.ElapsedMilliseconds);
             throw;
         }
-    }
-
-    public async Task<ResourceProjectVersionsResult> GetProjectVersionsAsync(
-        ResourceProjectVersionsRequest request,
-        CancellationToken cancellationToken = default)
-    {
-        if (request.Kind is ResourceProjectKind.Mod
-            && !request.IncludeAllVersions
-            && request.Loader is LoaderKind.Vanilla)
-        {
-            return new ResourceProjectVersionsResult();
-        }
-
-        return providers.TryGetValue(request.Source, out var provider)
-            ? await provider.GetVersionsAsync(request, cancellationToken).ConfigureAwait(false)
-            : new ResourceProjectVersionsResult();
     }
 
     public async Task<ResourceProjectDependenciesResult> GetProjectDependenciesAsync(
@@ -383,4 +310,165 @@ public sealed class ResourceCatalogService :
         GameInstance instance,
         CancellationToken cancellationToken) =>
         storage.EnsureInstanceContentDirectoryAsync(kind, instance, cancellationToken);
+
+    public Task<ResourceProject?> GetProjectAsync(
+        ResourceProjectReference reference,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(reference);
+        if (!providers.TryGetValue(reference.Source, out var provider) || !provider.Supports(reference.Kind))
+            return Task.FromResult<ResourceProject?>(null);
+
+        var cacheKey = $"proj:{reference.Source}:{reference.Kind}:{reference.ProjectId ?? string.Empty}";
+        return GetOrAddCachedAsync(projectCache, cacheKey, ProjectCacheLifetime,
+            () => provider.GetProjectAsync(reference, cancellationToken),
+            static v => v is not null, cancellationToken);
+    }
+
+    public async Task<ResourceCatalogSearchResult> SearchProjectsAsync(
+        ResourceCatalogSearchRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        logger.LogDebug(
+            "Searching resource projects. Kind={Kind} Query={Query} Source={Source} Offset={Offset} PageSize={PageSize}",
+            request.Kind,
+            request.Query,
+            request.Source,
+            request.Offset,
+            request.PageSize);
+
+        var totalStopwatch = Stopwatch.StartNew();
+        var cacheKey = BuildSearchCacheKey(request);
+        if (TryGetCached(searchCache, cacheKey, SearchCacheLifetime, out var cached))
+        {
+            logger.LogInformation(
+                "Resource project search served from cache. Kind={Kind} ProviderCount={ProviderCount} ResultCount={ResultCount}",
+                request.Kind,
+                request.Source is null ? providers.Count : 1,
+                cached.Projects.Count);
+            return cached;
+        }
+
+        var selectedProviders = request.Source is { } source
+            ? providers.TryGetValue(source, out var selectedProvider) ? [selectedProvider] : []
+            : providers.Values.ToArray();
+        var supportedProviders = selectedProviders
+            .Where(value => value.Supports(request.Kind))
+            .ToArray();
+        var projects = new List<ResourceProject>();
+        var hasMore = false;
+        var curseForgeUnavailable = false;
+        var curseForgeApiKeyMissing = false;
+
+        var providerResults = await Task.WhenAll(supportedProviders.Select(provider =>
+            SearchProviderAsync(provider, request, cancellationToken))).ConfigureAwait(false);
+        foreach (var (providerSource, result) in providerResults)
+        {
+            projects.AddRange(result.Projects);
+            hasMore |= result.HasMore;
+            if (providerSource is ResourceProjectSource.CurseForge)
+            {
+                curseForgeUnavailable |= result.IsUnavailable;
+                curseForgeApiKeyMissing |= result.IsApiKeyMissing;
+            }
+        }
+
+        var searchResult = new ResourceCatalogSearchResult
+        {
+            Projects = projects
+                .OrderByDescending(project => project.Downloads)
+                .ThenBy(project => project.Title, StringComparer.CurrentCultureIgnoreCase)
+                .ToList(),
+            IsCurseForgeUnavailable = curseForgeUnavailable,
+            IsCurseForgeApiKeyMissing = curseForgeApiKeyMissing,
+            HasMore = hasMore
+        };
+        searchCache[cacheKey] = new CacheEntry<ResourceCatalogSearchResult>(searchResult, DateTimeOffset.UtcNow);
+        logger.LogInformation(
+            "Resource project search completed. Kind={Kind} ProviderCount={ProviderCount} ResultCount={ResultCount} ElapsedMilliseconds={ElapsedMilliseconds}",
+            request.Kind,
+            supportedProviders.Length,
+            searchResult.Projects.Count,
+            totalStopwatch.ElapsedMilliseconds);
+        return searchResult;
+    }
+
+    public Task<ResourceProjectVersionsResult> GetProjectVersionsAsync(
+        ResourceProjectVersionsRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        if (request.Kind is ResourceProjectKind.Mod
+            && !request.IncludeAllVersions
+            && request.Loader is LoaderKind.Vanilla)
+        {
+            return Task.FromResult(new ResourceProjectVersionsResult());
+        }
+
+        if (!providers.TryGetValue(request.Source, out var provider))
+            return Task.FromResult(new ResourceProjectVersionsResult());
+
+        var cacheKey = BuildVersionsCacheKey(request);
+        return GetOrAddCachedAsync(versionsCache, cacheKey, VersionsCacheLifetime,
+            () => provider.GetVersionsAsync(request, cancellationToken),
+            static _ => true, cancellationToken);
+    }
+
+    private static bool TryGetCached<T>(
+        ConcurrentDictionary<string, CacheEntry<T>> cache,
+        string key,
+        TimeSpan lifetime,
+        out T value)
+    {
+        if (cache.TryGetValue(key, out var entry)
+            && DateTimeOffset.UtcNow - entry.CreatedAt <= lifetime)
+        {
+            value = entry.Value;
+            return true;
+        }
+
+        value = default!;
+        return false;
+    }
+
+    private static async Task<T> GetOrAddCachedAsync<T>(
+        ConcurrentDictionary<string, CacheEntry<T>> cache,
+        string key,
+        TimeSpan lifetime,
+        Func<Task<T>> factory,
+        Func<T, bool> shouldCache,
+        CancellationToken cancellationToken)
+        where T : class?
+    {
+        if (TryGetCached(cache, key, lifetime, out var cached))
+            return cached;
+
+        var value = await factory().ConfigureAwait(false);
+        cancellationToken.ThrowIfCancellationRequested();
+        if (shouldCache(value))
+            cache[key] = new CacheEntry<T>(value, DateTimeOffset.UtcNow);
+        return value;
+    }
+
+    private static string BuildSearchCacheKey(ResourceCatalogSearchRequest r)
+    {
+        var versionKey = r.MinecraftVersions is { Count: > 0 } list
+            ? string.Join(",", list)
+            : r.MinecraftVersion ?? string.Empty;
+        var raw = $"s:{r.Kind}|{r.Query ?? string.Empty}|{r.Source}|{r.Offset}|{r.PageSize}|{r.Loader}|{r.Category}|{versionKey}";
+        return ToShortHash(raw);
+    }
+
+    private static string BuildVersionsCacheKey(ResourceProjectVersionsRequest r)
+    {
+        var raw = $"v:{r.Source}|{r.ProjectId}|{r.Kind}|{r.MinecraftVersion}|{r.Loader}|{r.IncludeAllVersions}|{r.Offset}|{r.PageSize}";
+        return ToShortHash(raw);
+    }
+
+    private static string ToShortHash(string value)
+    {
+        var bytes = SHA256.HashData(Encoding.UTF8.GetBytes(value));
+        return Convert.ToHexString(bytes.AsSpan(0, 12)).ToLowerInvariant();
+    }
+
+    private readonly record struct CacheEntry<T>(T Value, DateTimeOffset CreatedAt);
 }

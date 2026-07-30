@@ -22,6 +22,7 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:behaviors="clr-namespace:Launcher.App.Behaviors"
              xmlns:controls="clr-namespace:Launcher.App.Controls"
+             xmlns:services="clr-namespace:Launcher.Application.Services;assembly=Launcher.Application"
              xmlns:res="clr-namespace:Launcher.App.Resources"
              Focusable="False">
     <StackPanel>
@@ -72,6 +73,61 @@
                              MinLines="1"
                              Style="{StaticResource LauncherDialogWrappingTextBoxStyle}"
                              Text="{Binding DescriptionText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                </StackPanel>
+            </GroupBox>
+
+            <GroupBox Margin="0,26,0,0"
+                      Header="{x:Static res:Strings.GameSettings_GeneralLoaderUpgradeSection}"
+                      Style="{StaticResource LauncherContentSectionStyle}">
+                <StackPanel>
+                    <TextBlock Text="{Binding VanillaLoaderUpgradeStatusText}"
+                               Foreground="{DynamicResource Brush.8FFFFFFF}"
+                               FontSize="12"
+                               TextWrapping="Wrap" />
+
+                    <ComboBox Margin="0,14,0,0"
+                              Height="32"
+                              MinWidth="220"
+                              HorizontalAlignment="Left"
+                              ItemsSource="{Binding AvailableLoaderOptions}"
+                              SelectedItem="{Binding SelectedLoaderOption}"
+                              IsEnabled="{Binding CanUseVanillaLoaderUpgrade}">
+                        <ComboBox.Style>
+                            <Style TargetType="ComboBox" BasedOn="{StaticResource LauncherDialogComboBoxStyle}">
+                                <Setter Property="Visibility" Value="Collapsed" />
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding IsVanillaInstance}" Value="True">
+                                        <Setter Property="Visibility" Value="Visible" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </ComboBox.Style>
+                        <ComboBox.ItemTemplate>
+                            <DataTemplate DataType="{x:Type services:VanillaUpgradeLoaderOption}">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Text="{Binding Loader}" />
+                                    <TextBlock Text=" - " Foreground="{DynamicResource Brush.66808080}" />
+                                    <TextBlock Text="{Binding DisplayVersion}" />
+                                </StackPanel>
+                            </DataTemplate>
+                        </ComboBox.ItemTemplate>
+                    </ComboBox>
+
+                    <Button Margin="0,14,0,0"
+                            HorizontalAlignment="Left"
+                            Content="{x:Static res:Strings.GameSettings_GeneralLoaderUpgradeButton}"
+                            Command="{Binding StartVanillaLoaderUpgradeCommand}">
+                        <Button.Style>
+                            <Style TargetType="Button" BasedOn="{StaticResource LauncherPrimaryDialogButtonStyle}">
+                                <Setter Property="Visibility" Value="Collapsed" />
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding IsVanillaInstance}" Value="True">
+                                        <Setter Property="Visibility" Value="Visible" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </Button.Style>
+                    </Button>
                 </StackPanel>
             </GroupBox>
 

@@ -145,6 +145,7 @@ public sealed partial class MainViewModel : ObservableObject
         statusService.MessageReported += message => StatusMessage = message;
         floatingMessageService.MessageRequested += ShowFloatingMessage;
         AccountPage.PropertyChanged += AccountPage_PropertyChanged;
+        DownloadTasksPage.PropertyChanged += DownloadTasksPage_PropertyChanged;
 
         UpdateNavigationSelection();
     }
@@ -211,5 +212,37 @@ public sealed partial class MainViewModel : ObservableObject
         UpdateNavigationSelection();
         UpdateAccountNavigationAvatar();
         hasInitialized = true;
+    }
+
+    private int runningDownloadTaskCount;
+
+    public int RunningDownloadTaskCount
+    {
+        get => runningDownloadTaskCount;
+        private set
+        {
+            if (SetProperty(ref runningDownloadTaskCount, value))
+            {
+                OnPropertyChanged(nameof(HasRunningDownloadTasks));
+                OnPropertyChanged(nameof(DownloadTaskBadgeText));
+            }
+        }
+    }
+
+    public bool HasRunningDownloadTasks => RunningDownloadTaskCount > 0;
+
+    public string DownloadTaskBadgeText => RunningDownloadTaskCount switch
+    {
+        <= 0 => string.Empty,
+        > 99 => "99+",
+        _ => RunningDownloadTaskCount.ToString()
+    };
+
+    private void DownloadTasksPage_PropertyChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName is nameof(DownloadTasksPageViewModel.RunningTaskCount))
+        {
+            RunningDownloadTaskCount = DownloadTasksPage.RunningTaskCount;
+        }
     }
 }

@@ -43,7 +43,7 @@ internal sealed class CurseForgeResourceClient(
     private const int WorldsClassId = 17;
     private const int ModpacksClassId = 4471;
     private const int ShaderPacksClassId = 6552;
-    private const int MaxConcurrentVersionSearches = 4;
+    private const int MaxConcurrentVersionSearches = 8;
     // 分类目录跨搜索复用；锁只保护缓存任务的创建，不在网络等待期间持有。
     private readonly object categoryGate = new();
     private readonly Dictionary<ResourceProjectKind, Task<IReadOnlyList<CurseForgeCategory>>> categoryTasks = [];

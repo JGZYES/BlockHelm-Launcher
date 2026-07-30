@@ -29,7 +29,7 @@ namespace Launcher.Infrastructure.Minecraft;
 
 internal sealed class ManagedVersionRepairDownloadBatch
 {
-    private const int MaxConcurrency = 8;
+    private const int MaxConcurrency = 16;
     private static readonly StringComparer PathComparer = OperatingSystem.IsWindows()
         ? StringComparer.OrdinalIgnoreCase
         : StringComparer.Ordinal;

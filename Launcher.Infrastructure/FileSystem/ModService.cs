@@ -48,11 +48,15 @@ public sealed class ModService : IModService
     private static readonly Regex TomlVersionRegex = new(
         "^[\\t ]*version[\\t ]*=[\\t ]*(?:\"(?<value>[^\"]+)\"|'(?<value>[^']+)')",
         RegexOptions.IgnoreCase | RegexOptions.Multiline | RegexOptions.CultureInvariant);
+    private static readonly Regex TomlLogoFileRegex = new(
+        "^[\\t ]*logoFile[\\t ]*=[\\t ]*(?:\"(?<value>[^\"]+)\"|'(?<value>[^']+)')",
+        RegexOptions.IgnoreCase | RegexOptions.Multiline | RegexOptions.CultureInvariant);
 
     private readonly LauncherPathProvider pathProvider;
     private readonly ILogger<ModService> logger;
     private readonly IUserFileDeletionService userFileDeletionService;
     private readonly string legacyIconCacheDirectory;
+    private readonly string embeddedIconCacheDirectory;
     private int legacyIconCacheCleanupStarted;
 
     public ModService(
@@ -64,6 +68,8 @@ public sealed class ModService : IModService
         this.logger = logger ?? NullLogger<ModService>.Instance;
         this.userFileDeletionService = userFileDeletionService ?? new UserFileDeletionService();
         legacyIconCacheDirectory = Path.Combine(this.pathProvider.DefaultDataDirectory, "cache", "mods", "icons");
+        // 内嵌图标缓存独立于 legacy 目录，避免被 CleanupLegacyIconCacheDirectory 删除；与远程图标缓存(cache/mods/remote-icons)分离。
+        embeddedIconCacheDirectory = Path.Combine(this.pathProvider.DefaultDataDirectory, "cache", "mods", "embedded-icons");
     }
 
     public Task<IReadOnlyList<LocalMod>> GetModsAsync(GameInstance instance, CancellationToken cancellationToken = default)
@@ -215,16 +221,40 @@ public sealed class ModService : IModService
     private ResolvedModMetadata TryResolveMetadata(FileInfo jarFile)
     {
         // JAR 可能包含多个声明文件，按 Loader 专用格式到旧 mcmod.info 的顺序回退。
+        string? displayName = null;
+        string? loader = null;
+        string? modId = null;
+        string? version = null;
+        string? iconEntryName = null;
+
         try
         {
-            using var archive = ZipFile.OpenRead(jarFile.FullName);
-            var declaration = TryFindMetadataDeclaration(archive);
-            return new ResolvedModMetadata(
-                declaration?.DisplayName,
-                declaration?.Loader,
-                declaration?.ModId,
-                declaration?.Version,
-                null);
+            // 元数据解析与图标入口识别共用一次归档读取；图标缓存写入在归档释放后执行，避免并发只读打开。
+            using (var archive = ZipFile.OpenRead(jarFile.FullName))
+            {
+                var declaration = TryFindMetadataDeclaration(archive);
+                if (declaration is not null)
+                {
+                    displayName = declaration.DisplayName;
+                    loader = declaration.Loader;
+                    modId = declaration.ModId;
+                    version = declaration.Version;
+                    iconEntryName = declaration.IconEntryName;
+                }
+
+                // 各 Loader 未声明图标时，回退到 jar 根 pack.png（部分打包为资源包格式或自带预览图）。
+                if (string.IsNullOrWhiteSpace(iconEntryName)
+                    && archive.GetEntry("pack.png") is not null)
+                {
+                    iconEntryName = "pack.png";
+                }
+            }
+
+            var iconSource = string.IsNullOrWhiteSpace(iconEntryName)
+                ? null
+                : EmbeddedArchiveIconCache.TryCacheIcon(jarFile, iconEntryName!, embeddedIconCacheDirectory, logger);
+
+            return new ResolvedModMetadata(displayName, loader, modId, version, iconSource);
         }
         catch (JsonException exception)
         {
@@ -287,7 +317,8 @@ public sealed class ModService : IModService
         var displayName = TryReadJsonString(root?["name"]);
         var modId = TryReadJsonString(root?["id"]);
         var version = TryReadJsonString(root?["version"]);
-        return new MetadataDeclaration(entry.FullName, "fabric", displayName, modId, version);
+        var iconEntryName = TryReadJsonString(root?["icon"]);
+        return new MetadataDeclaration(entry.FullName, "fabric", displayName, modId, version, iconEntryName);
     }
 
     private static MetadataDeclaration? TryFindQuiltMetadataDeclaration(ZipArchive archive)
@@ -303,7 +334,9 @@ public sealed class ModService : IModService
                     ?? TryReadJsonString(root?["id"]);
         var version = TryReadJsonString(root?["quilt_loader"]?["version"])
                       ?? TryReadJsonString(root?["version"]);
-        return new MetadataDeclaration(entry.FullName, "quilt", displayName, modId, version);
+        var iconEntryName = TryReadJsonString(root?["quilt_loader"]?["metadata"]?["icon"])
+                            ?? TryReadJsonString(root?["quilt_loader"]?["icon"]);
+        return new MetadataDeclaration(entry.FullName, "quilt", displayName, modId, version, iconEntryName);
     }
 
     private static MetadataDeclaration? TryFindNeoForgeTomlMetadataDeclaration(ZipArchive archive)
@@ -330,7 +363,8 @@ public sealed class ModService : IModService
         var displayName = TryReadTomlValue(content, TomlDisplayNameRegex);
         var modId = TryReadTomlValue(content, TomlModIdRegex);
         var version = TryReadTomlValue(content, TomlVersionRegex);
-        return new MetadataDeclaration(entry.FullName, loader, displayName, modId, version);
+        var iconEntryName = TryReadTomlValue(content, TomlLogoFileRegex);
+        return new MetadataDeclaration(entry.FullName, loader, displayName, modId, version, iconEntryName);
     }
 
     private static MetadataDeclaration? TryFindMcmodInfoMetadataDeclaration(ZipArchive archive)
@@ -490,7 +524,8 @@ public sealed class ModService : IModService
         string? Loader,
         string? DisplayName,
         string? ModId,
-        string? Version);
+        string? Version,
+        string? IconEntryName = null);
 
     private sealed record ResolvedModMetadata(
         string? DisplayName,

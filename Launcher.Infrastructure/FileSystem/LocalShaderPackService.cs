@@ -28,15 +28,22 @@ namespace Launcher.Infrastructure.FileSystem;
 public sealed class LocalShaderPackService : ILocalShaderPackService
 {
     private const string SupportedArchiveExtension = ".zip";
+    private const string ShaderPackIconEntryName = "pack.png";
+    private readonly LauncherPathProvider pathProvider;
     private readonly ILogger<LocalShaderPackService> logger;
     private readonly IUserFileDeletionService userFileDeletionService;
+    private readonly string iconCacheDirectory;
 
     public LocalShaderPackService(
         ILogger<LocalShaderPackService>? logger = null,
-        IUserFileDeletionService? userFileDeletionService = null)
+        IUserFileDeletionService? userFileDeletionService = null,
+        LauncherPathProvider? pathProvider = null)
     {
+        this.pathProvider = pathProvider ?? new LauncherPathProvider();
         this.logger = logger ?? NullLogger<LocalShaderPackService>.Instance;
         this.userFileDeletionService = userFileDeletionService ?? new UserFileDeletionService();
+        // 光影包图标缓存独立于资源包目录，避免互相清理；缓存键含归档修改信息，包更新后自然失效。
+        iconCacheDirectory = Path.Combine(this.pathProvider.DefaultDataDirectory, "cache", "shaderpacks", "icons");
     }
 
     public Task<IReadOnlyList<LocalShaderPack>> GetShaderPacksAsync(
@@ -211,7 +218,7 @@ public sealed class LocalShaderPackService : ILocalShaderPackService
         }
     }
 
-    private static LocalShaderPack ToLocalShaderPack(string path)
+    private LocalShaderPack ToLocalShaderPack(string path)
     {
         var file = new FileInfo(path);
         return new LocalShaderPack
@@ -219,6 +226,8 @@ public sealed class LocalShaderPackService : ILocalShaderPackService
             Name = Path.GetFileNameWithoutExtension(file.Name),
             FileName = file.Name,
             FullPath = file.FullName,
+            // 光影包（Iris/OptiFine）标准图标位于 zip 根目录 pack.png；找不到时返回 null，UI 回退默认图标。
+            IconSource = EmbeddedArchiveIconCache.TryCacheIcon(file, ShaderPackIconEntryName, iconCacheDirectory, logger),
             CreatedAt = new DateTimeOffset(file.CreationTimeUtc)
         };
     }
