@@ -211,6 +211,7 @@ public sealed partial class InstanceGeneralSettingsViewModel : GameSettingsDetai
     partial void OnIsLoadingAvailableLoadersChanged(bool value)
     {
         OnPropertyChanged(nameof(CanUseVanillaLoaderUpgrade));
+        OnPropertyChanged(nameof(CanStartVanillaLoaderUpgrade));
         OnPropertyChanged(nameof(CanRetryAvailableLoaders));
         OnPropertyChanged(nameof(VanillaLoaderUpgradeStatusText));
     }
@@ -218,6 +219,7 @@ public sealed partial class InstanceGeneralSettingsViewModel : GameSettingsDetai
     partial void OnAvailableLoadersLoadErrorChanged(string value)
     {
         OnPropertyChanged(nameof(VanillaLoaderUpgradeStatusText));
+        OnPropertyChanged(nameof(CanStartVanillaLoaderUpgrade));
     }
 
     [RelayCommand]
