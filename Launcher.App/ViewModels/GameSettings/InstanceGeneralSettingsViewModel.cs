@@ -19,6 +19,7 @@
 
 using System.Collections.ObjectModel;
 using System.ComponentModel;
+using System.Windows.Input;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Launcher.App.Resources;
@@ -97,8 +98,16 @@ public sealed partial class InstanceGeneralSettingsViewModel : GameSettingsDetai
 
     public bool IsVanillaInstance => selectedInstance?.Instance.Loader == LoaderKind.Vanilla;
 
+    private static bool IsKnownLoader(LoaderKind loader) =>
+        loader == LoaderKind.Vanilla
+        || loader == LoaderKind.Fabric
+        || loader == LoaderKind.Forge
+        || loader == LoaderKind.NeoForge
+        || loader == LoaderKind.Quilt;
+
     public bool CanUseVanillaLoaderUpgrade =>
-        IsVanillaInstance
+        selectedInstance is not null
+        && IsKnownLoader(selectedInstance.Instance.Loader)
         && vanillaLoaderUpgradeService is not null
         && !IsVanillaLoaderUpgradeInProgress
         && !IsLoadingAvailableLoaders;
@@ -107,8 +116,8 @@ public sealed partial class InstanceGeneralSettingsViewModel : GameSettingsDetai
     {
         get
         {
-            if (!IsVanillaInstance)
-                return Strings.GameSettings_GeneralLoaderUpgradeAlreadyModded;
+            if (selectedInstance is null || !IsKnownLoader(selectedInstance.Instance.Loader))
+                return Strings.GameSettings_GeneralLoaderUpgradeNoVersions;
             if (IsLoadingAvailableLoaders)
                 return Strings.GameSettings_GeneralLoaderUpgradeLoading;
             if (!string.IsNullOrEmpty(AvailableLoadersLoadError))
@@ -117,15 +126,14 @@ public sealed partial class InstanceGeneralSettingsViewModel : GameSettingsDetai
                 return Strings.GameSettings_GeneralLoaderUpgradeInProgress;
             if (AvailableLoaderOptions.Count == 0)
                 return Strings.GameSettings_GeneralLoaderUpgradeNoVersions;
-            return Strings.GameSettings_GeneralLoaderUpgradeHint;
+            return IsVanillaInstance
+                ? Strings.GameSettings_GeneralLoaderUpgradeHint
+                : Strings.GameSettings_GeneralLoaderUpgradeHintModded;
         }
     }
 
     public bool CanRetryAvailableLoaders =>
-        IsVanillaInstance
-        && vanillaLoaderUpgradeService is not null
-        && !IsLoadingAvailableLoaders
-        && !IsVanillaLoaderUpgradeInProgress;
+        CanUseVanillaLoaderUpgrade;
 
     public ObservableCollection<VanillaUpgradeLoaderOption> AvailableLoaderOptions { get; } = [];
 
@@ -162,8 +170,11 @@ public sealed partial class InstanceGeneralSettingsViewModel : GameSettingsDetai
         OnPropertyChanged(nameof(CanRetryAvailableLoaders));
         OnPropertyChanged(nameof(VanillaLoaderUpgradeStatusText));
         OnPropertyChanged(nameof(CanStartVanillaLoaderUpgrade));
+        CommandManager.InvalidateRequerySuggested();
 
-        if (vanillaLoaderUpgradeService is not null && value?.Instance.Loader == LoaderKind.Vanilla)
+        if (vanillaLoaderUpgradeService is not null
+            && value is not null
+            && IsKnownLoader(value.Instance.Loader))
         {
             IsLoadingAvailableLoaders = true;
             _ = RefreshAvailableLoaderOptionsAsync(value.Instance);
@@ -206,6 +217,7 @@ public sealed partial class InstanceGeneralSettingsViewModel : GameSettingsDetai
         OnPropertyChanged(nameof(CanStartVanillaLoaderUpgrade));
         OnPropertyChanged(nameof(CanRetryAvailableLoaders));
         OnPropertyChanged(nameof(VanillaLoaderUpgradeStatusText));
+        CommandManager.InvalidateRequerySuggested();
     }
 
     partial void OnIsLoadingAvailableLoadersChanged(bool value)
@@ -214,12 +226,14 @@ public sealed partial class InstanceGeneralSettingsViewModel : GameSettingsDetai
         OnPropertyChanged(nameof(CanStartVanillaLoaderUpgrade));
         OnPropertyChanged(nameof(CanRetryAvailableLoaders));
         OnPropertyChanged(nameof(VanillaLoaderUpgradeStatusText));
+        CommandManager.InvalidateRequerySuggested();
     }
 
     partial void OnAvailableLoadersLoadErrorChanged(string value)
     {
         OnPropertyChanged(nameof(VanillaLoaderUpgradeStatusText));
         OnPropertyChanged(nameof(CanStartVanillaLoaderUpgrade));
+        CommandManager.InvalidateRequerySuggested();
     }
 
     [RelayCommand]
@@ -354,6 +368,7 @@ public sealed partial class InstanceGeneralSettingsViewModel : GameSettingsDetai
                 OnPropertyChanged(nameof(VanillaLoaderUpgradeStatusText));
                 OnPropertyChanged(nameof(CanStartVanillaLoaderUpgrade));
                 OnPropertyChanged(nameof(CanRetryAvailableLoaders));
+                CommandManager.InvalidateRequerySuggested();
             });
         }
         catch (Exception exception)
@@ -373,6 +388,7 @@ public sealed partial class InstanceGeneralSettingsViewModel : GameSettingsDetai
                 OnPropertyChanged(nameof(VanillaLoaderUpgradeStatusText));
                 OnPropertyChanged(nameof(CanStartVanillaLoaderUpgrade));
                 OnPropertyChanged(nameof(CanRetryAvailableLoaders));
+                CommandManager.InvalidateRequerySuggested();
             });
         }
     }

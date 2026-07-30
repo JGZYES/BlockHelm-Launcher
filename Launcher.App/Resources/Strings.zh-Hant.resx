@@ -2317,6 +2317,9 @@
   <data name="GameSettings_GeneralLoaderUpgradeSucceededFormat" xml:space="preserve">
     <value>已成功切換到 {0}。</value>
   </data>
+  <data name="GameSettings_GeneralLoaderUpgradeHintModded" xml:space="preserve">
+    <value>已安裝 Mod 載入器，可直接切換到其他載入器，升級完成後保留實例資料。</value>
+  </data>
   <data name="GameSettings_GeneralLoaderUpgradeFailedFormat" xml:space="preserve">
     <value>切換載入器失敗：{0}</value>
   </data>

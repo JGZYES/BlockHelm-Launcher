@@ -789,6 +789,7 @@
   <data name="GameSettings_GeneralLoaderUpgradeSelectFirst" xml:space="preserve"><value>请先选择一个加载器</value></data>
   <data name="GameSettings_GeneralLoaderUpgradeServiceUnavailable" xml:space="preserve"><value>加载器升级服务暂不可用</value></data>
   <data name="GameSettings_GeneralLoaderUpgradeSucceededFormat" xml:space="preserve"><value>已成功切换到 {0}。</value></data>
+  <data name="GameSettings_GeneralLoaderUpgradeHintModded" xml:space="preserve"><value>已安装 Mod 加载器，可直接切换到其他加载器，升级完成后保留实例数据。</value></data>
   <data name="GameSettings_GeneralLoaderUpgradeFailedFormat" xml:space="preserve"><value>切换加载器失败：{0}</value></data>
   <data name="GameSettings_DeleteGameButton" xml:space="preserve"><value>删除游戏</value></data>
   <data name="GameSettings_BackupInfoSection" xml:space="preserve"><value>备份概览</value></data>

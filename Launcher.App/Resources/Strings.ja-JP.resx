@@ -2317,6 +2317,9 @@
   <data name="GameSettings_GeneralLoaderUpgradeSucceededFormat" xml:space="preserve">
     <value>{0} への切り替えに成功しました。</value>
   </data>
+  <data name="GameSettings_GeneralLoaderUpgradeHintModded" xml:space="preserve">
+    <value>Mod ローダーが既にインストールされています。別のローダーに切り替えることができます（インスタンスデータは保持されます）。</value>
+  </data>
   <data name="GameSettings_GeneralLoaderUpgradeFailedFormat" xml:space="preserve">
     <value>ローダーの切り替えに失敗しました：{0}</value>
   </data>

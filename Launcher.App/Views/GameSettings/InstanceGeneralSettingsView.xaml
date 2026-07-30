@@ -95,7 +95,7 @@
                             <Style TargetType="controls:AnimatedComboBox" BasedOn="{StaticResource LauncherComboBoxStyle}">
                                 <Setter Property="Visibility" Value="Collapsed" />
                                 <Style.Triggers>
-                                    <DataTrigger Binding="{Binding IsVanillaInstance}" Value="True">
+                                    <DataTrigger Binding="{Binding CanUseVanillaLoaderUpgrade}" Value="True">
                                         <Setter Property="Visibility" Value="Visible" />
                                     </DataTrigger>
                                 </Style.Triggers>
@@ -127,7 +127,7 @@
                                 <Style TargetType="Border">
                                     <Setter Property="Visibility" Value="Collapsed" />
                                     <Style.Triggers>
-                                        <DataTrigger Binding="{Binding IsVanillaInstance}" Value="True">
+                                        <DataTrigger Binding="{Binding CanUseVanillaLoaderUpgrade}" Value="True">
                                             <Setter Property="Visibility" Value="Visible" />
                                         </DataTrigger>
                                     </Style.Triggers>

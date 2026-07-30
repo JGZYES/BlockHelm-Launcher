@@ -2317,6 +2317,9 @@ Longer content wraps automatically.</value>
   <data name="GameSettings_GeneralLoaderUpgradeSucceededFormat" xml:space="preserve">
     <value>Successfully switched to {0}.</value>
   </data>
+  <data name="GameSettings_GeneralLoaderUpgradeHintModded" xml:space="preserve">
+    <value>This instance already has a mod loader installed. You can switch to another loader and keep your instance data.</value>
+  </data>
   <data name="GameSettings_GeneralLoaderUpgradeFailedFormat" xml:space="preserve">
     <value>Failed to switch loader: {0}</value>
   </data>

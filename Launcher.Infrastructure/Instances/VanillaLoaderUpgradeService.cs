@@ -115,10 +115,14 @@ internal sealed class VanillaLoaderUpgradeService : IVanillaLoaderUpgradeService
     {
         ArgumentNullException.ThrowIfNull(instance);
         ArgumentNullException.ThrowIfNull(loaderOption);
-        if (instance.Loader != LoaderKind.Vanilla)
+        if (instance.Loader != LoaderKind.Vanilla
+            && instance.Loader != LoaderKind.Fabric
+            && instance.Loader != LoaderKind.Forge
+            && instance.Loader != LoaderKind.NeoForge
+            && instance.Loader != LoaderKind.Quilt)
         {
             throw new InvalidOperationException(
-                $"Vanilla loader upgrade is only allowed for vanilla instances. Current loader={instance.Loader}");
+                $"Loader upgrade is not supported for loader '{instance.Loader}'.");
         }
         if (!loaderProviders.TryGetValue(loaderOption.Loader, out var provider))
         {
