@@ -2308,6 +2308,12 @@
   <data name="GameSettings_GeneralLoaderUpgradeRetryButton" xml:space="preserve">
     <value>重新獲取</value>
   </data>
+  <data name="GameSettings_GeneralLoaderUpgradeSelectFirst" xml:space="preserve">
+    <value>請先選擇一個載入器</value>
+  </data>
+  <data name="GameSettings_GeneralLoaderUpgradeServiceUnavailable" xml:space="preserve">
+    <value>載入器升級服務暫不可用</value>
+  </data>
   <data name="GameSettings_GeneralLoaderUpgradeSucceededFormat" xml:space="preserve">
     <value>已成功切換到 {0}。</value>
   </data>

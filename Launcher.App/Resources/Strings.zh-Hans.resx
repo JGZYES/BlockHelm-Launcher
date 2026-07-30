@@ -786,6 +786,8 @@
   <data name="GameSettings_GeneralLoaderUpgradeLoading" xml:space="preserve"><value>正在获取此版本可用的加载器...</value></data>
   <data name="GameSettings_GeneralLoaderUpgradeLoadFailedFormat" xml:space="preserve"><value>加载可用加载器失败：{0}</value></data>
   <data name="GameSettings_GeneralLoaderUpgradeRetryButton" xml:space="preserve"><value>重新获取</value></data>
+  <data name="GameSettings_GeneralLoaderUpgradeSelectFirst" xml:space="preserve"><value>请先选择一个加载器</value></data>
+  <data name="GameSettings_GeneralLoaderUpgradeServiceUnavailable" xml:space="preserve"><value>加载器升级服务暂不可用</value></data>
   <data name="GameSettings_GeneralLoaderUpgradeSucceededFormat" xml:space="preserve"><value>已成功切换到 {0}。</value></data>
   <data name="GameSettings_GeneralLoaderUpgradeFailedFormat" xml:space="preserve"><value>切换加载器失败：{0}</value></data>
   <data name="GameSettings_DeleteGameButton" xml:space="preserve"><value>删除游戏</value></data>

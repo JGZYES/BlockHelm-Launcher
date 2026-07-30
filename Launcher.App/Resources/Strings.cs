@@ -545,6 +545,8 @@ public static class Strings
     public static string GameSettings_GeneralLoaderUpgradeLoading => Get(nameof(GameSettings_GeneralLoaderUpgradeLoading));
     public static string GameSettings_GeneralLoaderUpgradeLoadFailedFormat => Get(nameof(GameSettings_GeneralLoaderUpgradeLoadFailedFormat));
     public static string GameSettings_GeneralLoaderUpgradeRetryButton => Get(nameof(GameSettings_GeneralLoaderUpgradeRetryButton));
+    public static string GameSettings_GeneralLoaderUpgradeSelectFirst => Get(nameof(GameSettings_GeneralLoaderUpgradeSelectFirst));
+    public static string GameSettings_GeneralLoaderUpgradeServiceUnavailable => Get(nameof(GameSettings_GeneralLoaderUpgradeServiceUnavailable));
     public static string GameSettings_GeneralLoaderUpgradeSucceededFormat => Get(nameof(GameSettings_GeneralLoaderUpgradeSucceededFormat));
     public static string GameSettings_GeneralLoaderUpgradeFailedFormat => Get(nameof(GameSettings_GeneralLoaderUpgradeFailedFormat));
     public static string GameSettings_DeleteGameButton => Get(nameof(GameSettings_DeleteGameButton));

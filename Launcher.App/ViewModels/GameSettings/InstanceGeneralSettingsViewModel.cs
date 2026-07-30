@@ -256,13 +256,23 @@ public sealed partial class InstanceGeneralSettingsViewModel : GameSettingsDetai
     [RelayCommand(CanExecute = nameof(CanStartVanillaLoaderUpgrade))]
     private async Task StartVanillaLoaderUpgradeAsync(CancellationToken cancellationToken)
     {
-        if (!CanStartVanillaLoaderUpgrade
-            || selectedInstance is null
-            || SelectedLoaderOption is null
-            || vanillaLoaderUpgradeService is null)
+        if (selectedInstance is null)
+            return;
+
+        if (SelectedLoaderOption is null)
         {
+            floatingMessageService.Show(Strings.GameSettings_GeneralLoaderUpgradeSelectFirst);
             return;
         }
+
+        if (vanillaLoaderUpgradeService is null)
+        {
+            floatingMessageService.Show(Strings.GameSettings_GeneralLoaderUpgradeServiceUnavailable);
+            return;
+        }
+
+        if (IsVanillaLoaderUpgradeInProgress)
+            return;
 
         var option = SelectedLoaderOption;
         var instanceItem = selectedInstance;

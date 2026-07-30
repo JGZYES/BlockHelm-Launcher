@@ -122,12 +122,9 @@
                     </controls:AnimatedComboBox>
 
                     <StackPanel Orientation="Horizontal">
-                        <Button Margin="0,14,12,0"
-                                HorizontalAlignment="Left"
-                                Content="{x:Static res:Strings.GameSettings_GeneralLoaderUpgradeButton}"
-                                Command="{Binding StartVanillaLoaderUpgradeCommand}">
-                            <Button.Style>
-                                <Style TargetType="Button" BasedOn="{StaticResource LauncherPrimaryDialogButtonStyle}">
+                        <Border Margin="0,14,12,0">
+                            <Border.Style>
+                                <Style TargetType="Border">
                                     <Setter Property="Visibility" Value="Collapsed" />
                                     <Style.Triggers>
                                         <DataTrigger Binding="{Binding IsVanillaInstance}" Value="True">
@@ -135,27 +132,29 @@
                                         </DataTrigger>
                                     </Style.Triggers>
                                 </Style>
-                            </Button.Style>
-                        </Button>
+                            </Border.Style>
+                            <Button HorizontalAlignment="Left"
+                                    Content="{x:Static res:Strings.GameSettings_GeneralLoaderUpgradeButton}"
+                                    Command="{Binding StartVanillaLoaderUpgradeCommand}"
+                                    Style="{StaticResource LauncherPrimaryDialogButtonStyle}" />
+                        </Border>
 
-                        <Button Margin="0,14,0,0"
-                                HorizontalAlignment="Left"
-                                Content="{x:Static res:Strings.GameSettings_GeneralLoaderUpgradeRetryButton}"
-                                Command="{Binding ReloadAvailableLoadersCommand}">
-                            <Button.Style>
-                                <Style TargetType="Button" BasedOn="{StaticResource SecondaryMenuButtonStyle}">
+                        <Border Margin="0,14,0,0">
+                            <Border.Style>
+                                <Style TargetType="Border">
                                     <Setter Property="Visibility" Value="Collapsed" />
                                     <Style.Triggers>
-                                        <MultiDataTrigger>
-                                            <MultiDataTrigger.Conditions>
-                                                <Condition Binding="{Binding CanRetryAvailableLoaders}" Value="True" />
-                                            </MultiDataTrigger.Conditions>
+                                        <DataTrigger Binding="{Binding CanRetryAvailableLoaders}" Value="True">
                                             <Setter Property="Visibility" Value="Visible" />
-                                        </MultiDataTrigger>
+                                        </DataTrigger>
                                     </Style.Triggers>
                                 </Style>
-                            </Button.Style>
-                        </Button>
+                            </Border.Style>
+                            <Button HorizontalAlignment="Left"
+                                    Content="{x:Static res:Strings.GameSettings_GeneralLoaderUpgradeRetryButton}"
+                                    Command="{Binding ReloadAvailableLoadersCommand}"
+                                    Style="{StaticResource SecondaryMenuButtonStyle}" />
+                        </Border>
                     </StackPanel>
                 </StackPanel>
             </GroupBox>

@@ -2308,6 +2308,12 @@ Longer content wraps automatically.</value>
   <data name="GameSettings_GeneralLoaderUpgradeRetryButton" xml:space="preserve">
     <value>Retry</value>
   </data>
+  <data name="GameSettings_GeneralLoaderUpgradeSelectFirst" xml:space="preserve">
+    <value>Please select a loader first</value>
+  </data>
+  <data name="GameSettings_GeneralLoaderUpgradeServiceUnavailable" xml:space="preserve">
+    <value>Loader upgrade service is currently unavailable</value>
+  </data>
   <data name="GameSettings_GeneralLoaderUpgradeSucceededFormat" xml:space="preserve">
     <value>Successfully switched to {0}.</value>
   </data>

@@ -2308,6 +2308,12 @@
   <data name="GameSettings_GeneralLoaderUpgradeRetryButton" xml:space="preserve">
     <value>再取得</value>
   </data>
+  <data name="GameSettings_GeneralLoaderUpgradeSelectFirst" xml:space="preserve">
+    <value>先にローダーを選択してください</value>
+  </data>
+  <data name="GameSettings_GeneralLoaderUpgradeServiceUnavailable" xml:space="preserve">
+    <value>ローダーアップグレードサービスが利用できません</value>
+  </data>
   <data name="GameSettings_GeneralLoaderUpgradeSucceededFormat" xml:space="preserve">
     <value>{0} への切り替えに成功しました。</value>
   </data>
