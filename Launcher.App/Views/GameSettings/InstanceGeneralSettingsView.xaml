@@ -136,6 +136,7 @@
                             <Button HorizontalAlignment="Left"
                                     Content="{x:Static res:Strings.GameSettings_GeneralLoaderUpgradeButton}"
                                     Command="{Binding StartVanillaLoaderUpgradeCommand}"
+                                    IsEnabled="{Binding CanStartVanillaLoaderUpgrade}"
                                     Style="{StaticResource LauncherPrimaryDialogButtonStyle}" />
                         </Border>
 

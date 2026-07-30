@@ -267,7 +267,7 @@ public sealed partial class InstanceGeneralSettingsViewModel : GameSettingsDetai
             DeleteInstanceRequested?.Invoke(selectedInstance);
     }
 
-    [RelayCommand(CanExecute = nameof(CanStartVanillaLoaderUpgrade))]
+    [RelayCommand]
     private async Task StartVanillaLoaderUpgradeAsync(CancellationToken cancellationToken)
     {
         if (selectedInstance is null)
