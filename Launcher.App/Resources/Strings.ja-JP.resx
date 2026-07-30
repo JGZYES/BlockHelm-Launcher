@@ -2299,6 +2299,15 @@
   <data name="GameSettings_GeneralLoaderUpgradeInProgress" xml:space="preserve">
     <value>選択したローダーをインストール中...</value>
   </data>
+  <data name="GameSettings_GeneralLoaderUpgradeLoading" xml:space="preserve">
+    <value>このバージョンで利用可能なローダーを取得中...</value>
+  </data>
+  <data name="GameSettings_GeneralLoaderUpgradeLoadFailedFormat" xml:space="preserve">
+    <value>利用可能なローダーの取得に失敗しました：{0}</value>
+  </data>
+  <data name="GameSettings_GeneralLoaderUpgradeRetryButton" xml:space="preserve">
+    <value>再取得</value>
+  </data>
   <data name="GameSettings_GeneralLoaderUpgradeSucceededFormat" xml:space="preserve">
     <value>{0} への切り替えに成功しました。</value>
   </data>

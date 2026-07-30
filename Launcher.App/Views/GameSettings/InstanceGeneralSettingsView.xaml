@@ -85,49 +85,76 @@
                                FontSize="12"
                                TextWrapping="Wrap" />
 
-                    <controls:AnimatedComboBox Margin="0,14,0,0"
-                              Height="32"
+                    <StackPanel>
+                        <TextBlock Margin="0,0,0,8"
+                                   Text="{Binding VanillaLoaderUpgradeStatusText}"
+                                   Foreground="{DynamicResource Brush.8FFFFFFF}"
+                                   TextWrapping="Wrap" />
+
+                        <controls:AnimatedComboBox Height="32"
                               MinWidth="220"
                               HorizontalAlignment="Left"
                               ItemsSource="{Binding AvailableLoaderOptions}"
                               SelectedItem="{Binding SelectedLoaderOption, Mode=TwoWay}"
                               IsEnabled="{Binding CanUseVanillaLoaderUpgrade}">
-                        <controls:AnimatedComboBox.Style>
-                            <Style TargetType="controls:AnimatedComboBox" BasedOn="{StaticResource LauncherComboBoxStyle}">
-                                <Setter Property="Visibility" Value="Collapsed" />
-                                <Style.Triggers>
-                                    <DataTrigger Binding="{Binding IsVanillaInstance}" Value="True">
-                                        <Setter Property="Visibility" Value="Visible" />
-                                    </DataTrigger>
-                                </Style.Triggers>
-                            </Style>
-                        </controls:AnimatedComboBox.Style>
-                        <controls:AnimatedComboBox.ItemTemplate>
-                            <DataTemplate DataType="{x:Type services:VanillaUpgradeLoaderOption}">
-                                <StackPanel Orientation="Horizontal">
-                                    <TextBlock Text="{Binding Loader}" />
-                                    <TextBlock Text=" - " Foreground="{DynamicResource Brush.8FFFFFFF}" />
-                                    <TextBlock Text="{Binding DisplayVersion}" />
-                                </StackPanel>
-                            </DataTemplate>
-                        </controls:AnimatedComboBox.ItemTemplate>
-                    </controls:AnimatedComboBox>
+                            <controls:AnimatedComboBox.Style>
+                                <Style TargetType="controls:AnimatedComboBox" BasedOn="{StaticResource LauncherComboBoxStyle}">
+                                    <Setter Property="Visibility" Value="Collapsed" />
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding IsVanillaInstance}" Value="True">
+                                            <Setter Property="Visibility" Value="Visible" />
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </controls:AnimatedComboBox.Style>
+                            <controls:AnimatedComboBox.ItemTemplate>
+                                <DataTemplate DataType="{x:Type services:VanillaUpgradeLoaderOption}">
+                                    <StackPanel Orientation="Horizontal">
+                                        <TextBlock Text="{Binding Loader}" />
+                                        <TextBlock Text=" - " Foreground="{DynamicResource Brush.8FFFFFFF}" />
+                                        <TextBlock Text="{Binding DisplayVersion}" />
+                                    </StackPanel>
+                                </DataTemplate>
+                            </controls:AnimatedComboBox.ItemTemplate>
+                        </controls:AnimatedComboBox>
 
-                    <Button Margin="0,14,0,0"
-                            HorizontalAlignment="Left"
-                            Content="{x:Static res:Strings.GameSettings_GeneralLoaderUpgradeButton}"
-                            Command="{Binding StartVanillaLoaderUpgradeCommand}">
-                        <Button.Style>
-                            <Style TargetType="Button" BasedOn="{StaticResource LauncherPrimaryDialogButtonStyle}">
-                                <Setter Property="Visibility" Value="Collapsed" />
-                                <Style.Triggers>
-                                    <DataTrigger Binding="{Binding IsVanillaInstance}" Value="True">
-                                        <Setter Property="Visibility" Value="Visible" />
-                                    </DataTrigger>
-                                </Style.Triggers>
-                            </Style>
-                        </Button.Style>
-                    </Button>
+                        <StackPanel Orientation="Horizontal">
+                            <Button Margin="0,14,12,0"
+                                    HorizontalAlignment="Left"
+                                    Content="{x:Static res:Strings.GameSettings_GeneralLoaderUpgradeButton}"
+                                    Command="{Binding StartVanillaLoaderUpgradeCommand}">
+                                <Button.Style>
+                                    <Style TargetType="Button" BasedOn="{StaticResource LauncherPrimaryDialogButtonStyle}">
+                                        <Setter Property="Visibility" Value="Collapsed" />
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding IsVanillaInstance}" Value="True">
+                                                <Setter Property="Visibility" Value="Visible" />
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </Button.Style>
+                            </Button>
+
+                            <Button Margin="0,14,0,0"
+                                    HorizontalAlignment="Left"
+                                    Content="{x:Static res:Strings.GameSettings_GeneralLoaderUpgradeRetryButton}"
+                                    Command="{Binding ReloadAvailableLoadersCommand}">
+                                <Button.Style>
+                                    <Style TargetType="Button" BasedOn="{StaticResource SecondaryMenuButtonStyle}">
+                                        <Setter Property="Visibility" Value="Collapsed" />
+                                        <Style.Triggers>
+                                            <MultiDataTrigger>
+                                                <MultiDataTrigger.Conditions>
+                                                    <Condition Binding="{Binding CanRetryAvailableLoaders}" Value="True" />
+                                                </MultiDataTrigger.Conditions>
+                                                <Setter Property="Visibility" Value="Visible" />
+                                            </MultiDataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </Button.Style>
+                            </Button>
+                        </StackPanel>
+                    </StackPanel>
                 </StackPanel>
             </GroupBox>
 

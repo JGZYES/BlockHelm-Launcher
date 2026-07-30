@@ -2299,6 +2299,15 @@ Longer content wraps automatically.</value>
   <data name="GameSettings_GeneralLoaderUpgradeInProgress" xml:space="preserve">
     <value>Installing the selected loader...</value>
   </data>
+  <data name="GameSettings_GeneralLoaderUpgradeLoading" xml:space="preserve">
+    <value>Loading available loaders for this version...</value>
+  </data>
+  <data name="GameSettings_GeneralLoaderUpgradeLoadFailedFormat" xml:space="preserve">
+    <value>Failed to load available loaders: {0}</value>
+  </data>
+  <data name="GameSettings_GeneralLoaderUpgradeRetryButton" xml:space="preserve">
+    <value>Retry</value>
+  </data>
   <data name="GameSettings_GeneralLoaderUpgradeSucceededFormat" xml:space="preserve">
     <value>Successfully switched to {0}.</value>
   </data>

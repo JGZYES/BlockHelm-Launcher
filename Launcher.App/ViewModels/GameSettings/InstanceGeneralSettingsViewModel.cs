@@ -55,6 +55,12 @@ public sealed partial class InstanceGeneralSettingsViewModel : GameSettingsDetai
     [ObservableProperty]
     private bool isVanillaLoaderUpgradeInProgress;
 
+    [ObservableProperty]
+    private bool isLoadingAvailableLoaders;
+
+    [ObservableProperty]
+    private string availableLoadersLoadError = string.Empty;
+
     internal InstanceGeneralSettingsViewModel(
         GameSettingsEditDialogViewModel editDialog,
         IInstanceFolderService instanceFolderService,
@@ -92,7 +98,10 @@ public sealed partial class InstanceGeneralSettingsViewModel : GameSettingsDetai
     public bool IsVanillaInstance => selectedInstance?.Instance.Loader == LoaderKind.Vanilla;
 
     public bool CanUseVanillaLoaderUpgrade =>
-        IsVanillaInstance && vanillaLoaderUpgradeService is not null && !IsVanillaLoaderUpgradeInProgress;
+        IsVanillaInstance
+        && vanillaLoaderUpgradeService is not null
+        && !IsVanillaLoaderUpgradeInProgress
+        && !IsLoadingAvailableLoaders;
 
     public string VanillaLoaderUpgradeStatusText
     {
@@ -100,13 +109,23 @@ public sealed partial class InstanceGeneralSettingsViewModel : GameSettingsDetai
         {
             if (!IsVanillaInstance)
                 return Strings.GameSettings_GeneralLoaderUpgradeAlreadyModded;
-            if (AvailableLoaderOptions.Count == 0)
-                return Strings.GameSettings_GeneralLoaderUpgradeNoVersions;
+            if (IsLoadingAvailableLoaders)
+                return Strings.GameSettings_GeneralLoaderUpgradeLoading;
+            if (!string.IsNullOrEmpty(AvailableLoadersLoadError))
+                return AvailableLoadersLoadError;
             if (IsVanillaLoaderUpgradeInProgress)
                 return Strings.GameSettings_GeneralLoaderUpgradeInProgress;
+            if (AvailableLoaderOptions.Count == 0)
+                return Strings.GameSettings_GeneralLoaderUpgradeNoVersions;
             return Strings.GameSettings_GeneralLoaderUpgradeHint;
         }
     }
+
+    public bool CanRetryAvailableLoaders =>
+        IsVanillaInstance
+        && vanillaLoaderUpgradeService is not null
+        && !IsLoadingAvailableLoaders
+        && !IsVanillaLoaderUpgradeInProgress;
 
     public ObservableCollection<VanillaUpgradeLoaderOption> AvailableLoaderOptions { get; } = [];
 
@@ -137,13 +156,16 @@ public sealed partial class InstanceGeneralSettingsViewModel : GameSettingsDetai
         LoadDescriptionFromInstance();
         SelectedLoaderOption = null;
         AvailableLoaderOptions.Clear();
+        AvailableLoadersLoadError = string.Empty;
         OnPropertyChanged(nameof(IsVanillaInstance));
         OnPropertyChanged(nameof(CanUseVanillaLoaderUpgrade));
+        OnPropertyChanged(nameof(CanRetryAvailableLoaders));
         OnPropertyChanged(nameof(VanillaLoaderUpgradeStatusText));
         OnPropertyChanged(nameof(CanStartVanillaLoaderUpgrade));
 
         if (vanillaLoaderUpgradeService is not null && value?.Instance.Loader == LoaderKind.Vanilla)
         {
+            IsLoadingAvailableLoaders = true;
             _ = RefreshAvailableLoaderOptionsAsync(value.Instance);
         }
     }
@@ -182,6 +204,19 @@ public sealed partial class InstanceGeneralSettingsViewModel : GameSettingsDetai
     {
         OnPropertyChanged(nameof(CanUseVanillaLoaderUpgrade));
         OnPropertyChanged(nameof(CanStartVanillaLoaderUpgrade));
+        OnPropertyChanged(nameof(CanRetryAvailableLoaders));
+        OnPropertyChanged(nameof(VanillaLoaderUpgradeStatusText));
+    }
+
+    partial void OnIsLoadingAvailableLoadersChanged(bool value)
+    {
+        OnPropertyChanged(nameof(CanUseVanillaLoaderUpgrade));
+        OnPropertyChanged(nameof(CanRetryAvailableLoaders));
+        OnPropertyChanged(nameof(VanillaLoaderUpgradeStatusText));
+    }
+
+    partial void OnAvailableLoadersLoadErrorChanged(string value)
+    {
         OnPropertyChanged(nameof(VanillaLoaderUpgradeStatusText));
     }
 
@@ -284,6 +319,9 @@ public sealed partial class InstanceGeneralSettingsViewModel : GameSettingsDetai
         if (vanillaLoaderUpgradeService is null)
             return;
 
+        AvailableLoadersLoadError = string.Empty;
+        IsLoadingAvailableLoaders = true;
+
         try
         {
             var settings = settingsService is null ? new LauncherSettings() : await settingsService.LoadAsync().ConfigureAwait(false);
@@ -300,8 +338,10 @@ public sealed partial class InstanceGeneralSettingsViewModel : GameSettingsDetai
                     AvailableLoaderOptions.Add(option);
 
                 SelectedLoaderOption = options.Count == 0 ? null : options[0];
+                IsLoadingAvailableLoaders = false;
                 OnPropertyChanged(nameof(VanillaLoaderUpgradeStatusText));
                 OnPropertyChanged(nameof(CanStartVanillaLoaderUpgrade));
+                OnPropertyChanged(nameof(CanRetryAvailableLoaders));
             });
         }
         catch (Exception exception)
@@ -313,9 +353,27 @@ public sealed partial class InstanceGeneralSettingsViewModel : GameSettingsDetai
             uiDispatcher.Invoke(() =>
             {
                 AvailableLoaderOptions.Clear();
+                SelectedLoaderOption = null;
+                AvailableLoadersLoadError = string.Format(
+                    Strings.GameSettings_GeneralLoaderUpgradeLoadFailedFormat,
+                    exception.Message);
+                IsLoadingAvailableLoaders = false;
                 OnPropertyChanged(nameof(VanillaLoaderUpgradeStatusText));
+                OnPropertyChanged(nameof(CanStartVanillaLoaderUpgrade));
+                OnPropertyChanged(nameof(CanRetryAvailableLoaders));
             });
         }
+    }
+
+    [RelayCommand(CanExecute = nameof(CanRetryAvailableLoaders))]
+    private void ReloadAvailableLoaders()
+    {
+        if (selectedInstance is null || vanillaLoaderUpgradeService is null)
+            return;
+
+        AvailableLoadersLoadError = string.Empty;
+        IsLoadingAvailableLoaders = true;
+        _ = RefreshAvailableLoaderOptionsAsync(selectedInstance.Instance);
     }
 
     private void SelectedInstance_PropertyChanged(object? sender, PropertyChangedEventArgs e)
