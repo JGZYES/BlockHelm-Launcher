@@ -347,6 +347,8 @@ public static class Strings
     public static string Settings_UpdateChannelBetaTitle => Get(nameof(Settings_UpdateChannelBetaTitle));
     public static string Settings_ReferenceProjectsSection => Get(nameof(Settings_ReferenceProjectsSection));
     public static string Settings_LegalSection => Get(nameof(Settings_LegalSection));
+    public static string Settings_DerivativeWorkDeclarationTitle => Get(nameof(Settings_DerivativeWorkDeclarationTitle));
+    public static string Settings_DerivativeWorkDeclaration => Get(nameof(Settings_DerivativeWorkDeclaration));
     public static string Settings_CopyrightNotice => Get(nameof(Settings_CopyrightNotice));
     public static string Settings_CopyrightNoticeDescription => Get(nameof(Settings_CopyrightNoticeDescription));
     public static string Settings_OpenSourceLicense => Get(nameof(Settings_OpenSourceLicense));

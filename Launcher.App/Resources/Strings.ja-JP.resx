@@ -3618,6 +3618,8 @@
   <data name="FilePicker_ServerInstallDirectoryTitle" xml:space="preserve"><value>サーバーの保存先を選択</value></data>
   <data name="Status_ServerDistributionRestricted" xml:space="preserve"><value>作者がサードパーティのダウンロードを制限しているため、このサーバーパックを取得できません。</value></data>
   <data name="Settings_LegalSection" xml:space="preserve"><value>著作権および法的通知</value></data>
+  <data name="Settings_DerivativeWorkDeclarationTitle" xml:space="preserve"><value>二次創作声明</value></data>
+  <data name="Settings_DerivativeWorkDeclaration" xml:space="preserve"><value>本プロジェクトは JGZ_YES による二次創作であり、原作者のコードに基づき改変・拡張を行っています。原作者リポジトリ: https://github.com/zqq-699/BlockHelm-Launcher</value></data>
   <data name="Settings_CopyrightNotice" xml:space="preserve"><value>著作権表示</value></data>
   <data name="Settings_CopyrightNoticeDescription" xml:space="preserve"><value>Copyright © 2026 BlockHelm Launcher 開発者</value></data>
   <data name="Settings_OpenSourceLicense" xml:space="preserve"><value>オープンソースライセンス</value></data>

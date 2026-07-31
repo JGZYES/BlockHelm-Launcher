@@ -35,6 +35,9 @@ public sealed partial class JavaRuntimeDiscoveryService : IJavaRuntimeDiscoveryS
     private const string UnknownArchitecture = "unknown";
     private static readonly Regex VersionRegex = new("\"(?<version>[0-9]+(?:\\.[0-9]+)*(?:[_+\\-][0-9A-Za-z.\\-]+)?)\"", RegexOptions.Compiled);
 
+    // BlockHelm 自行管理的 Java 目录
+    private readonly string? managedJavaDirectory;
+
     public async Task<IReadOnlyList<JavaRuntimeInfo>> DiscoverAsync(
         string? minecraftDirectory,
         CancellationToken cancellationToken = default)
@@ -43,6 +46,10 @@ public sealed partial class JavaRuntimeDiscoveryService : IJavaRuntimeDiscoveryS
         return await Task.Run(async () =>
         {
             var candidates = CollectCandidatePaths(minecraftDirectory).ToList();
+
+            // 添加 BlockHelm 自行管理的 Java 目录扫描
+            candidates.AddRange(CollectManagedJavaCandidates());
+
             candidates.AddRange(await CollectImportedCandidatesAsync(cancellationToken));
             var distinctCandidates = CollapseDuplicateCandidates(candidates);
             var runtimes = new List<JavaRuntimeInfo>();
@@ -58,6 +65,38 @@ public sealed partial class JavaRuntimeDiscoveryService : IJavaRuntimeDiscoveryS
                 .ThenBy(runtime => runtime.ExecutablePath, StringComparer.OrdinalIgnoreCase)
                 .ToList();
         }, cancellationToken);
+    }
+
+    /// <summary>
+    /// 扫描 BlockHelm 自行管理的 Java 安装目录
+    /// </summary>
+    private IEnumerable<JavaRuntimeCandidate> CollectManagedJavaCandidates()
+    {
+        if (string.IsNullOrWhiteSpace(managedJavaDirectory) || !Directory.Exists(managedJavaDirectory))
+            return [];
+
+        var candidates = new List<JavaRuntimeCandidate>();
+        var seenPaths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        try
+        {
+            foreach (var javaExePath in Directory.EnumerateFiles(managedJavaDirectory, "java.exe", SearchOption.AllDirectories))
+            {
+                var normalizedPath = NormalizePath(javaExePath);
+                if (!seenPaths.Add(normalizedPath))
+                    continue;
+
+                candidates.Add(new JavaRuntimeCandidate(
+                    normalizedPath,
+                    "BlockHelmManaged",
+                    NormalizePath(ResolveJavaExecutableIdentityPath(normalizedPath))));
+            }
+        }
+        catch
+        {
+        }
+
+        return candidates;
     }
 
     public async Task<JavaRuntimeInfo> DiscoverExecutableAsync(

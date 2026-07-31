@@ -270,10 +270,32 @@ public sealed class RemoteManifestLauncherUpdateService : ILauncherUpdateService
 public sealed record LauncherUpdateManifestSource(string Name, string UrlTemplate, int Priority)
 {
     public static IReadOnlyList<LauncherUpdateManifestSource> DefaultSources { get; } =
-    [
-        new("gitee", LauncherProjectLinks.GiteeUpdateManifestUrlTemplate, 1),
-        new("github", LauncherProjectLinks.GitHubUpdateManifestUrlTemplate, 2)
-    ];
+        BuildDefaultSources();
+
+    /// <summary>
+    /// 构建默认更新源列表：gitee 优先 → GitHub 代理 → GitHub 直连兜底。
+    /// 代理源用于加速 raw.githubusercontent.com 的国内访问。
+    /// </summary>
+    private static IReadOnlyList<LauncherUpdateManifestSource> BuildDefaultSources()
+    {
+        var sources = new List<LauncherUpdateManifestSource>
+        {
+            new("gitee", LauncherProjectLinks.GiteeUpdateManifestUrlTemplate, 1)
+        };
+
+        // 添加 GitHub 代理源（优先级介于 gitee 和 github 直连之间）
+        var priority = 2;
+        foreach (var prefix in LauncherProjectLinks.GitHubRawProxyPrefixes)
+        {
+            var proxyTemplate = prefix + LauncherProjectLinks.GitHubUpdateManifestUrlTemplate;
+            var proxyName = "github-proxy-" + new Uri(prefix).Host;
+            sources.Add(new LauncherUpdateManifestSource(proxyName, proxyTemplate, priority++));
+        }
+
+        // GitHub 直连作为最后 fallback
+        sources.Add(new LauncherUpdateManifestSource("github", LauncherProjectLinks.GitHubUpdateManifestUrlTemplate, priority));
+        return sources;
+    }
 
     public string CreateManifestUrl(string channel) => string.Format(
         System.Globalization.CultureInfo.InvariantCulture, UrlTemplate, channel);

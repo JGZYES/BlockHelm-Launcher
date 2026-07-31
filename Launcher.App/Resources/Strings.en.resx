@@ -3618,6 +3618,8 @@ The current game folder will be backed up first.</value>
   <data name="FilePicker_ServerInstallDirectoryTitle" xml:space="preserve"><value>Choose server location</value></data>
   <data name="Status_ServerDistributionRestricted" xml:space="preserve"><value>The author restricts third-party downloads, so this server pack cannot be downloaded.</value></data>
   <data name="Settings_LegalSection" xml:space="preserve"><value>Copyright and Legal Notices</value></data>
+  <data name="Settings_DerivativeWorkDeclarationTitle" xml:space="preserve"><value>Derivative Work Notice</value></data>
+  <data name="Settings_DerivativeWorkDeclaration" xml:space="preserve"><value>This project is a derivative work by JGZ_YES, modified and extended from the original author's code. Original repository: https://github.com/zqq-699/BlockHelm-Launcher</value></data>
   <data name="Settings_CopyrightNotice" xml:space="preserve"><value>Copyright Notice</value></data>
   <data name="Settings_CopyrightNoticeDescription" xml:space="preserve"><value>Copyright © 2026 BlockHelm Launcher Developer</value></data>
   <data name="Settings_OpenSourceLicense" xml:space="preserve"><value>Open Source License</value></data>

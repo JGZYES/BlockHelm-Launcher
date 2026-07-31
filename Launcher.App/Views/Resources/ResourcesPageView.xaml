@@ -123,8 +123,20 @@
 
                                     <StackPanel Grid.Column="1"
                                                 Margin="6,0,0,0">
-                                        <TextBlock Text="{Binding Title}"
-                                                   Style="{StaticResource DownloadLoaderOptionTitleTextStyle}" />
+                                        <StackPanel Orientation="Horizontal">
+                                            <TextBlock Text="{Binding Title}"
+                                                       Style="{StaticResource DownloadLoaderOptionTitleTextStyle}" />
+                                            <Border Margin="6,0,0,0"
+                                                    Padding="6,1,6,1"
+                                                    CornerRadius="8"
+                                                    Background="#FF3B82F6"
+                                                    Visibility="{Binding HasBadge, Converter={StaticResource BooleanToMenuTextVisibilityConverter}}">
+                                                <TextBlock Text="{Binding Badge}"
+                                                           FontSize="10"
+                                                           Foreground="White"
+                                                           VerticalAlignment="Center" />
+                                            </Border>
+                                        </StackPanel>
                                         <TextBlock Text="{Binding Subtitle}"
                                                    Style="{StaticResource DownloadLoaderOptionSubtitleTextStyle}" />
                                     </StackPanel>

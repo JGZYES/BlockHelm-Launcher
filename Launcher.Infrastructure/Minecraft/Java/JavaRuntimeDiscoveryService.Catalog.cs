@@ -38,6 +38,10 @@ public sealed partial class JavaRuntimeDiscoveryService
         importedRuntimeCatalogPath = Path.Combine(
             resolvedPathProvider.DefaultDataDirectory,
             ImportedRuntimeCatalogFileName);
+        managedJavaDirectory = Path.Combine(
+            resolvedPathProvider.DefaultDataDirectory,
+            "java",
+            "managed");
         this.logger = logger ?? NullLogger<JavaRuntimeDiscoveryService>.Instance;
     }
 

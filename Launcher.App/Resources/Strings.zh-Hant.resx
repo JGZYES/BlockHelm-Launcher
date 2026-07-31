@@ -3618,6 +3618,8 @@
   <data name="FilePicker_ServerInstallDirectoryTitle" xml:space="preserve"><value>選擇伺服端儲存位置</value></data>
   <data name="Status_ServerDistributionRestricted" xml:space="preserve"><value>作者限制了第三方下載，無法取得此伺服端包。</value></data>
   <data name="Settings_LegalSection" xml:space="preserve"><value>版權及法律聲明</value></data>
+  <data name="Settings_DerivativeWorkDeclarationTitle" xml:space="preserve"><value>二次改編聲明</value></data>
+  <data name="Settings_DerivativeWorkDeclaration" xml:space="preserve"><value>本專案由 JGZ_YES 進行二次改編，基於原作者程式碼進行修改與擴展。原作者專案倉庫：https://github.com/zqq-699/BlockHelm-Launcher</value></data>
   <data name="Settings_CopyrightNotice" xml:space="preserve"><value>版權聲明</value></data>
   <data name="Settings_CopyrightNoticeDescription" xml:space="preserve"><value>Copyright © 2026 BlockHelm Launcher 開發者</value></data>
   <data name="Settings_OpenSourceLicense" xml:space="preserve"><value>開放原始碼授權條款</value></data>

@@ -28,6 +28,37 @@
             <ResourceDictionary.MergedDictionaries>
                 <ResourceDictionary Source="/BlockHelm_Launcher_x64;component/Views/Settings/SettingsSectionResources.xaml" />
             </ResourceDictionary.MergedDictionaries>
+            <Style x:Key="AvatarToolTip" TargetType="ToolTip">
+                <Setter Property="Background" Value="Transparent" />
+                <Setter Property="BorderThickness" Value="0" />
+                <Setter Property="Padding" Value="0" />
+                <Setter Property="Template">
+                    <Setter.Value>
+                        <ControlTemplate TargetType="ToolTip">
+                            <Border CornerRadius="8"
+                                    Padding="14,10"
+                                    Background="{DynamicResource Brush.Surface.Popup}"
+                                    BorderBrush="{DynamicResource Brush.Surface.WindowBorder}"
+                                    BorderThickness="1"
+                                    SnapsToDevicePixels="True">
+                                <Border.Effect>
+                                    <DropShadowEffect Color="#80000000" BlurRadius="20" ShadowDepth="3" Opacity="0.25" />
+                                </Border.Effect>
+                                <ContentPresenter />
+                            </Border>
+                        </ControlTemplate>
+                    </Setter.Value>
+                </Setter>
+            </Style>
+            <Style x:Key="AvatarToolTipTitle" TargetType="TextBlock">
+                <Setter Property="Foreground" Value="{DynamicResource Brush.Text.Primary}" />
+                <Setter Property="FontSize" Value="13" />
+                <Setter Property="FontWeight" Value="SemiBold" />
+            </Style>
+            <Style x:Key="AvatarToolTipDesc" TargetType="TextBlock">
+                <Setter Property="Foreground" Value="{DynamicResource Brush.Text.Secondary}" />
+                <Setter Property="FontSize" Value="12" />
+            </Style>
         </ResourceDictionary>
     </UserControl.Resources>
 
@@ -54,6 +85,52 @@
                        FontWeight="SemiBold"
                        TextTrimming="CharacterEllipsis" />
 
+            <Grid Margin="0,14,0,0">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+
+                <Border Grid.Column="0"
+                        Width="48"
+                        Height="48"
+                        CornerRadius="24"
+                        ClipToBounds="True"
+                        Cursor="Hand"
+                        MouseLeftButtonDown="Avatar_MouseLeftButtonDown">
+                    <Border.Clip>
+                        <EllipseGeometry RadiusX="24" RadiusY="24" Center="24,24" />
+                    </Border.Clip>
+                    <Border.ToolTip>
+                        <ToolTip Style="{StaticResource AvatarToolTip}" Placement="Top">
+                            <StackPanel>
+                                <TextBlock Style="{StaticResource AvatarToolTipTitle}"
+                                           Text="二次开发作者：JGZ_YES" />
+                                <TextBlock Style="{StaticResource AvatarToolTipDesc}"
+                                           Margin="0,3,0,0"
+                                           Text="点击头像查看 GitHub 主页" />
+                            </StackPanel>
+                        </ToolTip>
+                    </Border.ToolTip>
+                    <Image Source="/BlockHelm_Launcher_x64;component/Assets/Icons/avatar/avatar.jpg"
+                           Stretch="UniformToFill" />
+                </Border>
+
+                <StackPanel Grid.Column="1"
+                            Margin="10,0,0,0"
+                            VerticalAlignment="Center">
+                    <TextBlock Text="JGZ_YES"
+                               Foreground="{DynamicResource Brush.Text.Primary}"
+                               FontSize="14"
+                               FontWeight="SemiBold" />
+                    <TextBlock Text="二次开发作者"
+                               Foreground="{DynamicResource Brush.Text.Secondary}"
+                               FontSize="12"
+                               Margin="0,2,0,0" />
+                </StackPanel>
+            </Grid>
+
             <WrapPanel Margin="0,16,0,0">
                 <Button Margin="0,0,10,10"
                         Content="{x:Static res:Strings.Settings_ViewGithubRepositoryButton}"
@@ -67,6 +144,17 @@
                         Style="{StaticResource LauncherPrimaryDialogButtonStyle}" />
             </WrapPanel>
         </StackPanel>
+
+        <GroupBox Margin="0,28,0,0"
+                  Header="{x:Static res:Strings.Settings_DerivativeWorkDeclarationTitle}"
+                  Style="{StaticResource LauncherContentSectionStyle}">
+            <Border Style="{StaticResource SectionFieldSurfaceStyle}">
+                <TextBlock Text="{x:Static res:Strings.Settings_DerivativeWorkDeclaration}"
+                           Foreground="{DynamicResource Brush.Text.Primary}"
+                           FontSize="13"
+                           TextWrapping="Wrap" />
+            </Border>
+        </GroupBox>
 
         <GroupBox Margin="0,28,0,0"
                   Header="{x:Static res:Strings.Settings_UpdateSection}"

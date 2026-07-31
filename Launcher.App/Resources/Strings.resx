@@ -1290,6 +1290,8 @@
   <data name="FilePicker_ServerInstallDirectoryTitle" xml:space="preserve"><value>选择服务端保存位置</value></data>
   <data name="Status_ServerDistributionRestricted" xml:space="preserve"><value>作者限制了第三方下载，无法获取此服务端包。</value></data>
   <data name="Settings_LegalSection" xml:space="preserve"><value>版权及法律声明</value></data>
+  <data name="Settings_DerivativeWorkDeclarationTitle" xml:space="preserve"><value>二次改编声明</value></data>
+  <data name="Settings_DerivativeWorkDeclaration" xml:space="preserve"><value>本项目由 JGZ_YES 进行二次改编，基于原作者代码进行修改与扩展。原项目仓库：https://github.com/zqq-699/BlockHelm-Launcher</value></data>
   <data name="Settings_CopyrightNotice" xml:space="preserve"><value>版权声明</value></data>
   <data name="Settings_CopyrightNoticeDescription" xml:space="preserve"><value>Copyright © 2026 BlockHelm Launcher 开发者</value></data>
   <data name="Settings_OpenSourceLicense" xml:space="preserve"><value>开源协议</value></data>

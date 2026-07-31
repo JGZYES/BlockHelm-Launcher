@@ -17,6 +17,7 @@
  * SPDX-License-Identifier: GPL-3.0-only
  */
 
+using System.Diagnostics;
 using System.Windows;
 using System.Windows.Controls;
 
@@ -32,5 +33,20 @@ public partial class InfoSettingsView : UserControl
     private void CheckUpdatesButton_OnRequestBringIntoView(object sender, RequestBringIntoViewEventArgs e)
     {
         e.Handled = true;
+    }
+
+    private void Avatar_MouseLeftButtonDown(object sender, System.Windows.Input.MouseButtonEventArgs e)
+    {
+        try
+        {
+            Process.Start(new ProcessStartInfo
+            {
+                FileName = "https://github.com/JGZYES",
+                UseShellExecute = true
+            });
+        }
+        catch
+        {
+        }
     }
 }

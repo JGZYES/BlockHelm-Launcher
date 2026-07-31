@@ -35,4 +35,47 @@ public static class LauncherProjectLinks
     public const string GiteeRepositoryUrl = "https://gitee.com/" + GitHubOwner + "/" + GitHubRepositoryName;
     public const string GiteeUpdateManifestUrlTemplate = GiteeRepositoryUrl + "/raw/update-manifests/update/{0}/latest.json";
     public const string GitHubUpdateManifestUrlTemplate = "https://raw.githubusercontent.com/" + GitHubOwner + "/" + GitHubRepositoryName + "/update-manifests/update/{0}/latest.json";
+
+    /// <summary>
+    /// GitHub raw 内容的国内代理前缀（用于检查更新时加速 raw.githubusercontent.com）。
+    /// 代理格式为 前缀 + 完整原始 URL。
+    /// </summary>
+    public static readonly string[] GitHubRawProxyPrefixes =
+    [
+        "https://ghfast.top/",
+        "https://gh-proxy.com/",
+        "https://mirror.ghproxy.com/",
+        "https://github.moeyy.xyz/"
+    ];
+
+    /// <summary>
+    /// GitHub 下载文件的国内代理前缀（用于更新包下载加速）。
+    /// </summary>
+    public static readonly string[] GitHubDownloadProxyPrefixes =
+    [
+        "https://ghfast.top/",
+        "https://gh-proxy.com/",
+        "https://mirror.ghproxy.com/",
+        "https://github.moeyy.xyz/"
+    ];
+
+    /// <summary>
+    /// 为 GitHub raw URL 生成所有代理 URL（含原始 URL 作为 fallback）。
+    /// </summary>
+    public static IEnumerable<string> GetGitHubRawUrlsWithProxies(string rawGitHubUrl)
+    {
+        foreach (var prefix in GitHubRawProxyPrefixes)
+            yield return prefix + rawGitHubUrl;
+        yield return rawGitHubUrl;
+    }
+
+    /// <summary>
+    /// 为 GitHub 下载 URL 生成所有代理 URL（含原始 URL 作为 fallback）。
+    /// </summary>
+    public static IEnumerable<string> GetGitHubDownloadUrlsWithProxies(string githubUrl)
+    {
+        foreach (var prefix in GitHubDownloadProxyPrefixes)
+            yield return prefix + githubUrl;
+        yield return githubUrl;
+    }
 }

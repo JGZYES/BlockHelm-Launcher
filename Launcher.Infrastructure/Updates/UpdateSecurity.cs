@@ -1,6 +1,7 @@
 using System.IO;
 using System.Net;
 using System.Net.Http;
+using Launcher.Application;
 
 namespace Launcher.Infrastructure.Updates;
 
@@ -108,14 +109,57 @@ internal static class OfficialUpdateHttp
         ValidateHttps(uri);
         var valid = kind switch
         {
-            OfficialUpdateUriKind.Manifest => uri.Host.Equals("gitee.com", StringComparison.OrdinalIgnoreCase)
-                || uri.Host.Equals("raw.githubusercontent.com", StringComparison.OrdinalIgnoreCase),
-            OfficialUpdateUriKind.Executable => uri.Host.Equals("gitee.com", StringComparison.OrdinalIgnoreCase)
-                || uri.Host.Equals("github.com", StringComparison.OrdinalIgnoreCase),
+            OfficialUpdateUriKind.Manifest => IsApprovedManifestHost(uri),
+            OfficialUpdateUriKind.Executable => IsApprovedExecutableHost(uri),
             _ => false
         };
         if (!valid)
             throw new UpdateSecurityException("The update URL is not an approved official source.");
+    }
+
+    /// <summary>
+    /// Manifest 来源允许的 host：gitee、raw.githubusercontent.com 以及配置的 GitHub 代理。
+    /// 代理 URL 形式为 https://proxy-host/https://raw.githubusercontent.com/...
+    /// </summary>
+    private static bool IsApprovedManifestHost(Uri uri)
+    {
+        if (uri.Host.Equals("gitee.com", StringComparison.OrdinalIgnoreCase)
+            || uri.Host.Equals("raw.githubusercontent.com", StringComparison.OrdinalIgnoreCase))
+            return true;
+
+        return IsConfiguredGitHubProxy(uri);
+    }
+
+    /// <summary>
+    /// 可执行文件下载来源允许的 host：gitee、github.com 以及配置的 GitHub 代理。
+    /// </summary>
+    private static bool IsApprovedExecutableHost(Uri uri)
+    {
+        if (uri.Host.Equals("gitee.com", StringComparison.OrdinalIgnoreCase)
+            || uri.Host.Equals("github.com", StringComparison.OrdinalIgnoreCase))
+            return true;
+
+        return IsConfiguredGitHubProxy(uri);
+    }
+
+    /// <summary>
+    /// 检查 URI 是否使用了配置中的 GitHub 代理前缀。
+    /// </summary>
+    private static bool IsConfiguredGitHubProxy(Uri uri)
+    {
+        foreach (var prefix in LauncherProjectLinks.GitHubRawProxyPrefixes)
+        {
+            if (Uri.TryCreate(prefix, UriKind.Absolute, out var prefixUri)
+                && uri.Host.Equals(prefixUri.Host, StringComparison.OrdinalIgnoreCase))
+                return true;
+        }
+        foreach (var prefix in LauncherProjectLinks.GitHubDownloadProxyPrefixes)
+        {
+            if (Uri.TryCreate(prefix, UriKind.Absolute, out var prefixUri)
+                && uri.Host.Equals(prefixUri.Host, StringComparison.OrdinalIgnoreCase))
+                return true;
+        }
+        return false;
     }
 
     private static void ValidateRedirectUri(Uri uri) => ValidateHttps(uri);

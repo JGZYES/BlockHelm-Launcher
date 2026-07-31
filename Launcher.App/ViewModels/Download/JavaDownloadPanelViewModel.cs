@@ -65,17 +65,19 @@ public sealed partial class JavaDownloadPanelViewModel : ObservableObject
 
     public JavaDownloadPanelViewModel()
     {
+        // 国内推荐优先：Eclipse Temurin 通过国内镜像（ParlzMirror）下载
+        VendorOptions.Add(new JavaVendorOption(
+            JavaVendorNames.EclipseTemurin,
+            "Eclipse Temurin",
+            "Adoptium 社区维护的 OpenJDK 发行版，国内镜像加速",
+            icon: "\uE950",
+            iconSource: null,
+            badge: "国内推荐"));
+
         VendorOptions.Add(new JavaVendorOption(
             JavaVendorNames.Mojang,
             "Mojang 官方 JDK",
             "Minecraft 官方随附的 Java 运行时",
-            icon: "\uE950",
-            iconSource: null));
-
-        VendorOptions.Add(new JavaVendorOption(
-            JavaVendorNames.EclipseTemurin,
-            "Eclipse Temurin",
-            "Adoptium 社区维护的 OpenJDK 发行版",
             icon: "\uE950",
             iconSource: null));
 
@@ -319,13 +321,20 @@ public sealed partial class JavaDownloadPanelViewModel : ObservableObject
 
 public sealed partial class JavaVendorOption : ObservableObject
 {
-    public JavaVendorOption(string id, string title, string subtitle, string icon, string? iconSource = null)
+    public JavaVendorOption(
+        string id,
+        string title,
+        string subtitle,
+        string icon,
+        string? iconSource = null,
+        string? badge = null)
     {
         Id = id;
         Title = title;
         Subtitle = subtitle;
         Icon = icon;
         IconSource = iconSource;
+        Badge = badge;
     }
 
     public string Id { get; }
@@ -333,6 +342,10 @@ public sealed partial class JavaVendorOption : ObservableObject
     public string Subtitle { get; }
     public string Icon { get; }
     public string? IconSource { get; }
+    public string? Badge { get; }
+
+    /// <summary>是否有徽章（用于 XAML 可见性绑定）</summary>
+    public bool HasBadge => !string.IsNullOrWhiteSpace(Badge);
 
     [ObservableProperty]
     private bool isSelected;

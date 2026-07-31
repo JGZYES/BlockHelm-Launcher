@@ -47,11 +47,27 @@ public sealed class JavaDownloadService : IJavaDownloadService
         "https://mirrors.ustc.edu.cn",
     ];
 
-    // Eclipse Temurin 支持的版本
-    private static readonly string[] TemurinSupportedVersions = ["8", "11", "17", "21", "24", "25"];
+    // Eclipse Temurin 支持的版本（ParlzMirror 支持 8/11/17/18/19/20/21/25）
+    private static readonly string[] TemurinSupportedVersions = ["8", "11", "17", "18", "19", "20", "21", "25"];
 
     // Microsoft Build of OpenJDK 支持的版本
     private static readonly string[] MsOpenJdkSupportedVersions = ["8", "11", "13", "16", "17", "21"];
+
+    /// <summary>
+    /// ParlzMirror (AliOSS) 预签名 URL 模板
+    /// 注意：签名基于版本 8 的 URL 生成，对其他版本可能无效
+    /// 同时提供不带签名的路径 URL 作为 fallback（若 bucket 公开可读）
+    /// </summary>
+    private const string ParlzMirrorHost = "https://mirrors-sunset.oss-cn-shenzhen.aliyuncs.com";
+    private const string ParlzMirrorPathTemplate = "/Java/BHL/Adoptium/OpenJDK{version}U.zip";
+    private const string ParlzMirrorSignedQuery =
+        "?X-Amz-Algorithm=AWS4-HMAC-SHA256" +
+        "&X-Amz-Credential=LTAI5tAWWZZ7QSomCCQUNd64%2F20260731%2Falist%2Fs3%2Faws4_request" +
+        "&X-Amz-Date=20260731T130202Z" +
+        "&X-Amz-Expires=14400" +
+        "&X-Amz-SignedHeaders=host" +
+        "&response-content-disposition=attachment%3B%20filename%2A%3DUTF-8%27%27OpenJDK{version}U.zip" +
+        "&X-Amz-Signature=0f174a597d48ff29dabb915ec50ab2d2eafceb0845feeec064df22e3808df681";
 
     public event EventHandler<JavaDownloadProgressEventArgs>? DownloadProgressChanged;
 
@@ -503,6 +519,22 @@ public sealed class JavaDownloadService : IJavaDownloadService
         if (string.IsNullOrEmpty(officialUrl))
             return urls;
 
+        // 如果是 ParlzMirror (AliOSS) URL，添加不带签名的 URL 作为 fallback
+        if (officialUrl.Contains("mirrors-sunset.oss-cn-shenzhen.aliyuncs.com", StringComparison.OrdinalIgnoreCase))
+        {
+            // 1. 带签名的 URL（原始）
+            urls.Add(officialUrl);
+
+            // 2. 不带签名的 URL（若 bucket 公开可读）
+            if (!string.IsNullOrEmpty(distribution.MirrorDownloadUrl)
+                && distribution.MirrorDownloadUrl != officialUrl)
+            {
+                urls.Add(distribution.MirrorDownloadUrl);
+            }
+
+            return urls;
+        }
+
         // 如果是 GitHub URL，添加多个国内加速镜像（按优先级排序）
         if (officialUrl.Contains("github.com", StringComparison.OrdinalIgnoreCase))
         {
@@ -620,9 +652,9 @@ public sealed class JavaDownloadService : IJavaDownloadService
         return results;
     }
 
-    // --- Eclipse Temurin / Adoptium ---
+    // --- Eclipse Temurin / Adoptium (via ParlzMirror) ---
 
-    private async Task<List<JavaDistributionInfo>> GetTemurinDistributionsAsync(
+    private Task<List<JavaDistributionInfo>> GetTemurinDistributionsAsync(
         string? version, string arch, string plat, CancellationToken ct)
     {
         var versions = TemurinSupportedVersions.AsEnumerable();
@@ -633,23 +665,36 @@ public sealed class JavaDownloadService : IJavaDownloadService
 
         foreach (var ver in versions)
         {
-            try
-            {
-                var dist = await FetchTemurinLatestAsync(ver, arch, plat, ct, isMojang: false);
-                if (dist is not null)
-                    results.Add(dist);
-            }
-            catch (OperationCanceledException)
-            {
-                break;
-            }
-            catch (Exception ex)
-            {
-                logger.LogDebug(ex, "Failed to fetch Temurin {Version}", ver);
-            }
+            results.Add(BuildTemurinFromParlzMirror(ver, arch, plat));
         }
 
-        return results;
+        return Task.FromResult(results);
+    }
+
+    /// <summary>
+    /// 使用 ParlzMirror (AliOSS) 构建 Temurin 发行版信息，无需调用 Adoptium API
+    /// </summary>
+    private JavaDistributionInfo BuildTemurinFromParlzMirror(string version, string arch, string plat)
+    {
+        var path = ParlzMirrorPathTemplate.Replace("{version}", version, StringComparison.Ordinal);
+        var query = ParlzMirrorSignedQuery.Replace("{version}", version, StringComparison.Ordinal);
+        var downloadUrl = ParlzMirrorHost + path + query;
+
+        // 不带签名的 URL（若 bucket 公开可读时作为 fallback）
+        var unsignedUrl = ParlzMirrorHost + path;
+
+        return new JavaDistributionInfo
+        {
+            Id = $"temurin-{version}",
+            Name = $"Eclipse Temurin JDK {version}",
+            Vendor = JavaVendorNames.EclipseTemurin,
+            Version = version,
+            Architecture = arch,
+            Platform = plat,
+            DownloadUrl = downloadUrl,
+            MirrorDownloadUrl = unsignedUrl,
+            PackageType = "zip"
+        };
     }
 
     private async Task<JavaDistributionInfo?> FetchTemurinLatestAsync(
