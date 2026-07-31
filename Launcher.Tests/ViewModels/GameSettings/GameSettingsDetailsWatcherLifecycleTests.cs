@@ -157,7 +157,7 @@ public sealed class GameSettingsDetailsWatcherLifecycleTests : TestTempDirectory
         var statusService = Stub<IStatusService>();
         var resolvedModService = modService ?? Stub<IModService>();
         var launchSettingsModService = Stub<IModService>();
-        var localMods = new LocalModsViewModel(resolvedModService, statusService, monitor);
+        var localMods = new LocalModsViewModel(resolvedModService, null, statusService, monitor);
         var localSaves = new LocalSavesViewModel(saveService ?? Stub<ILocalSaveService>(), statusService, monitor);
         var localResourcePacks = new LocalResourcePacksViewModel(
             Stub<ILocalResourcePackService>(),
@@ -182,10 +182,12 @@ public sealed class GameSettingsDetailsWatcherLifecycleTests : TestTempDirectory
             localResourcePacks,
             localShaderPacks,
             Stub<IJavaRuntimeDiscoveryService>(),
+            Stub<IJavaDownloadService>(),
             Stub<IFilePickerService>(),
             Stub<IInstanceContentImportPathValidator>(),
             Stub<IFloatingMessageService>(),
-            ImmediateUiDispatcher.Instance);
+            ImmediateUiDispatcher.Instance,
+            Stub<IPlayTimeTracker>());
     }
 
     private static GameSettingsInstanceItem CreateInstanceItem(string? instanceDirectory = null) => new(

@@ -147,6 +147,8 @@ public sealed partial class GameSettingsPageViewModel : ObservableObject
 
     public bool IsShaderPackManagementDetailsStep => IsDetailsSection("shaders");
 
+    public bool IsPlayTimeDetailsStep => IsDetailsSection("playtime");
+
     public bool IsBackupManagementDetailsStep => IsDetailsSection("backup");
 
     public bool IsExportDetailsStep => IsDetailsSection("export");
@@ -516,6 +518,7 @@ public sealed partial class GameSettingsPageViewModel : ObservableObject
         OnPropertyChanged(nameof(IsSaveManagementDetailsStep));
         OnPropertyChanged(nameof(IsResourcePackManagementDetailsStep));
         OnPropertyChanged(nameof(IsShaderPackManagementDetailsStep));
+        OnPropertyChanged(nameof(IsPlayTimeDetailsStep));
         OnPropertyChanged(nameof(IsBackupManagementDetailsStep));
         OnPropertyChanged(nameof(IsExportDetailsStep));
         OnPropertyChanged(nameof(IsTopResourceManagementDetailsStep));

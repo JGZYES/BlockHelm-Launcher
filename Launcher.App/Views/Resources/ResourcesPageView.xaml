@@ -24,6 +24,7 @@
              xmlns:views="clr-namespace:Launcher.App.Views.Resources"
              xmlns:resources="clr-namespace:Launcher.App.ViewModels.Resources"
              xmlns:res="clr-namespace:Launcher.App.Resources"
+             xmlns:download="clr-namespace:Launcher.App.ViewModels.Download"
              x:Name="Root"
              Focusable="False">
     <UserControl.Resources>
@@ -70,6 +71,185 @@
         <DataTemplate DataType="{x:Type resources:ResourcesModpacksPageViewModel}">
             <views:ResourcesModPageView />
         </DataTemplate>
+
+        <DataTemplate DataType="{x:Type resources:ResourcesJavaPageViewModel}">
+            <Grid MaxWidth="{StaticResource DetailPageContentMaxWidth}"
+                  HorizontalAlignment="Stretch">
+
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="*" />
+                    <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
+
+                <!-- 步骤一：厂商选择 -->
+                <Grid Grid.Row="0"
+                      Margin="0,64,12,0"
+                      Visibility="{Binding JavaDownload.IsVendorStep, Converter={StaticResource BooleanToMenuTextVisibilityConverter}}">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="*" />
+                    </Grid.RowDefinitions>
+
+                    <TextBlock Grid.Row="0"
+                               Margin="0,0,0,6"
+                               Text="选择厂商"
+                               Style="{StaticResource DownloadInstanceOptionLabelTextStyle}" />
+
+                    <ListBox Grid.Row="1"
+                             ItemsSource="{Binding JavaDownload.VendorOptions}"
+                             SelectedItem="{Binding JavaDownload.SelectedVendor, Mode=TwoWay}"
+                             SelectionMode="Single">
+                        <ListBox.Style>
+                            <Style TargetType="ListBox" BasedOn="{StaticResource DialogChoiceListStyle}">
+                                <Setter Property="Margin" Value="0" />
+                                <Setter Property="Padding" Value="0" />
+                            </Style>
+                        </ListBox.Style>
+                        <ListBox.ItemTemplate>
+                            <DataTemplate>
+                                <Grid Margin="0,1">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="40" />
+                                        <ColumnDefinition Width="*" />
+                                    </Grid.ColumnDefinitions>
+
+                                    <TextBlock Grid.Column="0"
+                                               Text="&#xE950;"
+                                               FontFamily="{DynamicResource LauncherIconFontFamily}"
+                                               FontSize="22"
+                                               Foreground="{DynamicResource LauncherTextSecondaryBrush}"
+                                               TextAlignment="Center"
+                                               VerticalAlignment="Center" />
+
+                                    <StackPanel Grid.Column="1"
+                                                Margin="6,0,0,0">
+                                        <TextBlock Text="{Binding Title}"
+                                                   Style="{StaticResource DownloadLoaderOptionTitleTextStyle}" />
+                                        <TextBlock Text="{Binding Subtitle}"
+                                                   Style="{StaticResource DownloadLoaderOptionSubtitleTextStyle}" />
+                                    </StackPanel>
+                                </Grid>
+                            </DataTemplate>
+                        </ListBox.ItemTemplate>
+                    </ListBox>
+                </Grid>
+
+                <!-- 步骤二：版本选择 -->
+                <Grid Grid.Row="0"
+                      Margin="0,64,12,0"
+                      Visibility="{Binding JavaDownload.IsVersionStep, Converter={StaticResource BooleanToMenuTextVisibilityConverter}}">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="*" />
+                    </Grid.RowDefinitions>
+
+                    <!-- 返回按钮 + 厂商标题 -->
+                    <StackPanel Grid.Row="0"
+                                Orientation="Horizontal"
+                                Margin="0,0,0,6">
+                        <Button Command="{Binding JavaDownload.BackToVendorCommand}"
+                                Style="{StaticResource LauncherDialogButtonStyle}"
+                                Content="返回"
+                                Margin="0,0,8,0" />
+                        <TextBlock Text="{Binding JavaDownload.SelectedVendor.Title}"
+                                   Foreground="{DynamicResource LauncherTextPrimaryBrush}"
+                                   FontWeight="SemiBold"
+                                   FontSize="14"
+                                   VerticalAlignment="Center" />
+                    </StackPanel>
+
+                    <!-- 版本列表（独立滚动） -->
+                    <ListBox Grid.Row="1"
+                             ItemsSource="{Binding JavaDownload.AvailableVersions}"
+                             SelectedItem="{Binding JavaDownload.SelectedVersion, Mode=TwoWay}"
+                             SelectionMode="Single"
+                             VirtualizingPanel.IsVirtualizing="True"
+                             VirtualizingPanel.VirtualizationMode="Recycling"
+                             VirtualizingPanel.ScrollUnit="Pixel"
+                             ScrollViewer.CanContentScroll="True"
+                             Visibility="{Binding JavaDownload.HasLoadedDistributions, Converter={StaticResource BooleanToMenuTextVisibilityConverter}}">
+                        <ListBox.Style>
+                            <Style TargetType="ListBox" BasedOn="{StaticResource DialogChoiceListStyle}">
+                                <Setter Property="Margin" Value="0" />
+                                <Setter Property="Padding" Value="0" />
+                            </Style>
+                        </ListBox.Style>
+                        <ListBox.ItemTemplate>
+                            <DataTemplate>
+                                <Grid Margin="0,1">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="40" />
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+
+                                    <TextBlock Grid.Column="0"
+                                               Text="&#xE950;"
+                                               FontFamily="{DynamicResource LauncherIconFontFamily}"
+                                               FontSize="22"
+                                               Foreground="{DynamicResource LauncherTextSecondaryBrush}"
+                                               TextAlignment="Center"
+                                               VerticalAlignment="Center" />
+
+                                    <StackPanel Grid.Column="1"
+                                                Margin="6,0,0,0">
+                                        <TextBlock Text="{Binding Title}"
+                                                   Style="{StaticResource DownloadLoaderOptionTitleTextStyle}" />
+                                        <TextBlock Text="{Binding Subtitle}"
+                                                   Style="{StaticResource DownloadLoaderOptionSubtitleTextStyle}" />
+                                    </StackPanel>
+
+                                    <TextBlock Grid.Column="2"
+                                               Text="{Binding Version}"
+                                               Foreground="{DynamicResource Brush.AFFFFFFF}"
+                                               FontSize="12"
+                                               VerticalAlignment="Center"
+                                               Margin="8,0,0,0" />
+                                </Grid>
+                            </DataTemplate>
+                        </ListBox.ItemTemplate>
+                    </ListBox>
+
+                    <!-- 加载中提示 -->
+                    <TextBlock Grid.Row="1"
+                               Text="正在加载版本列表..."
+                               Foreground="{DynamicResource LauncherTextSecondaryBrush}"
+                               HorizontalAlignment="Center"
+                               VerticalAlignment="Center"
+                               Visibility="{Binding JavaDownload.IsLoading, Converter={StaticResource BooleanToMenuTextVisibilityConverter}}" />
+                </Grid>
+
+                <!-- 底部固定按钮行 -->
+                <Grid Grid.Row="1"
+                      Margin="0,0,12,8">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+
+                    <TextBlock Grid.Column="0"
+                               Text="{Binding JavaDownload.StatusMessage}"
+                               Foreground="{DynamicResource LauncherTextSecondaryBrush}"
+                               FontSize="12"
+                               VerticalAlignment="Center" />
+
+                    <StackPanel Grid.Column="1"
+                                Orientation="Horizontal"
+                                HorizontalAlignment="Right"
+                                Visibility="{Binding JavaDownload.IsVersionStep, Converter={StaticResource BooleanToMenuTextVisibilityConverter}}">
+                        <Button Content="刷新版本列表"
+                                Command="{Binding JavaDownload.RefreshVersionsCommand}"
+                                Style="{StaticResource LauncherDialogButtonStyle}"
+                                Margin="0,0,8,0"
+                                Visibility="{Binding JavaDownload.HasLoadedDistributions, Converter={StaticResource BooleanToMenuTextVisibilityConverter}}" />
+                        <Button Content="下载 JDK"
+                                Command="{Binding JavaDownload.DownloadCommand}"
+                                IsEnabled="{Binding JavaDownload.HasLoadedDistributions}"
+                                Style="{StaticResource LauncherPrimaryDialogButtonStyle}" />
+                    </StackPanel>
+                </Grid>
+            </Grid>
+        </DataTemplate>
     </UserControl.Resources>
 
     <Grid x:Name="PageRoot">
@@ -112,6 +292,6 @@
                     </Grid>
                 </Grid>
             </controls:ListPageFrame.ListContent>
-        </controls:ListPageFrame>
+    </controls:ListPageFrame>
     </Grid>
 </UserControl>

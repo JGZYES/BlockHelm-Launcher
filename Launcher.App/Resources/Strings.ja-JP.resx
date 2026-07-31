@@ -1153,6 +1153,57 @@
   <data name="GameSettings_DetailExport" xml:space="preserve">
     <value>エクスポート</value>
   </data>
+  <data name="GameSettings_DetailPlayTime" xml:space="preserve">
+    <value>プレイ時間</value>
+  </data>
+  <data name="GameSettings_DropAutoRouteMessageFormat" xml:space="preserve">
+    <value>{0} として自動インストールします</value>
+  </data>
+  <data name="GameSettings_DropTypeMod" xml:space="preserve">
+    <value>Mod</value>
+  </data>
+  <data name="GameSettings_DropTypeWorld" xml:space="preserve">
+    <value>ワールド</value>
+  </data>
+  <data name="GameSettings_DropTypeResourcePack" xml:space="preserve">
+    <value>リソースパック</value>
+  </data>
+  <data name="GameSettings_DropTypeShaderPack" xml:space="preserve">
+    <value>シェーダーパック</value>
+  </data>
+  <data name="GameSettings_DropTypeModpack" xml:space="preserve">
+    <value>Modパック</value>
+  </data>
+  <data name="PlayTime_TotalPlayTime" xml:space="preserve">
+    <value>総プレイ時間</value>
+  </data>
+  <data name="PlayTime_TodayPlayTime" xml:space="preserve">
+    <value>本日</value>
+  </data>
+  <data name="PlayTime_WeekPlayTime" xml:space="preserve">
+    <value>今週</value>
+  </data>
+  <data name="PlayTime_SessionCount" xml:space="preserve">
+    <value>起動回数</value>
+  </data>
+  <data name="PlayTime_LastPlayed" xml:space="preserve">
+    <value>最終プレイ</value>
+  </data>
+  <data name="PlayTime_NoHistory" xml:space="preserve">
+    <value>履歴なし</value>
+  </data>
+  <data name="PlayTime_LessThanOneMinute" xml:space="preserve">
+    <value>1分未満</value>
+  </data>
+  <data name="PlayTime_MinutesFormat" xml:space="preserve">
+    <value>{0} 分</value>
+  </data>
+  <data name="PlayTime_HoursMinutesFormat" xml:space="preserve">
+    <value>{0}時間 {1}分</value>
+  </data>
+  <data name="PlayTime_RecentSessions" xml:space="preserve">
+    <value>最近のセッション</value>
+  </data>
   <data name="Nav_GameInstanceList" xml:space="preserve">
     <value>ゲーム設定</value>
   </data>

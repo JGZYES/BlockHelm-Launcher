@@ -1153,6 +1153,57 @@ Longer content wraps automatically.</value>
   <data name="GameSettings_DetailExport" xml:space="preserve">
     <value>Export</value>
   </data>
+  <data name="GameSettings_DetailPlayTime" xml:space="preserve">
+    <value>Play Time</value>
+  </data>
+  <data name="GameSettings_DropAutoRouteMessageFormat" xml:space="preserve">
+    <value>Will auto-install as: {0}</value>
+  </data>
+  <data name="GameSettings_DropTypeMod" xml:space="preserve">
+    <value>Mod</value>
+  </data>
+  <data name="GameSettings_DropTypeWorld" xml:space="preserve">
+    <value>World</value>
+  </data>
+  <data name="GameSettings_DropTypeResourcePack" xml:space="preserve">
+    <value>Resource Pack</value>
+  </data>
+  <data name="GameSettings_DropTypeShaderPack" xml:space="preserve">
+    <value>Shader Pack</value>
+  </data>
+  <data name="GameSettings_DropTypeModpack" xml:space="preserve">
+    <value>Modpack</value>
+  </data>
+  <data name="PlayTime_TotalPlayTime" xml:space="preserve">
+    <value>Total Play Time</value>
+  </data>
+  <data name="PlayTime_TodayPlayTime" xml:space="preserve">
+    <value>Today</value>
+  </data>
+  <data name="PlayTime_WeekPlayTime" xml:space="preserve">
+    <value>This Week</value>
+  </data>
+  <data name="PlayTime_SessionCount" xml:space="preserve">
+    <value>Launches</value>
+  </data>
+  <data name="PlayTime_LastPlayed" xml:space="preserve">
+    <value>Last Played</value>
+  </data>
+  <data name="PlayTime_NoHistory" xml:space="preserve">
+    <value>No history</value>
+  </data>
+  <data name="PlayTime_LessThanOneMinute" xml:space="preserve">
+    <value>Less than 1 minute</value>
+  </data>
+  <data name="PlayTime_MinutesFormat" xml:space="preserve">
+    <value>{0} min</value>
+  </data>
+  <data name="PlayTime_HoursMinutesFormat" xml:space="preserve">
+    <value>{0}h {1}m</value>
+  </data>
+  <data name="PlayTime_RecentSessions" xml:space="preserve">
+    <value>Recent Sessions</value>
+  </data>
   <data name="Nav_GameInstanceList" xml:space="preserve">
     <value>Game Settings</value>
   </data>

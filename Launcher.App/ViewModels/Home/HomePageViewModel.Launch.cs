@@ -64,6 +64,10 @@ public sealed partial class HomePageViewModel
             if (session is null)
                 return;
 
+            // 记录游戏时长
+            var playTimeSession = playTimeTracker.StartSession(launchInstance);
+            activePlayTimeSessionId = playTimeSession.Id;
+
             ObserveGameExit(session);
             ReportLaunchWarnings(session);
 

@@ -28,6 +28,7 @@ public sealed class JavaSettingsViewModel : SettingsSectionViewModelBase
     internal JavaSettingsViewModel(
         SettingsPersistenceCoordinator persistence,
         IJavaRuntimeDiscoveryService javaRuntimeDiscoveryService,
+        IJavaDownloadService javaDownloadService,
         IStatusService statusService,
         IFilePickerService filePickerService,
         IFloatingMessageService floatingMessageService,
@@ -36,6 +37,7 @@ public sealed class JavaSettingsViewModel : SettingsSectionViewModelBase
     {
         Editor = new JavaSettingsEditorViewModel(
             javaRuntimeDiscoveryService,
+            javaDownloadService,
             statusService,
             filePickerService,
             floatingMessageService,

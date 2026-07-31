@@ -21,7 +21,7 @@ namespace Launcher.Application;
 
 public static class LauncherProjectLinks
 {
-    public const string GitHubOwner = "zqq-699";
+    public const string GitHubOwner = "JGZYES";
     public const string GitHubRepositoryName = "BlockHelm-Launcher";
     public const string GitHubRepositoryUrl = "https://github.com/" + GitHubOwner + "/" + GitHubRepositoryName;
     public const string GitHubLicenseUrl = GitHubRepositoryUrl + "/blob/master/LICENSE";

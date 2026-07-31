@@ -26,6 +26,8 @@ using Launcher.Infrastructure.Accounts.ThirdParty;
 using Launcher.Infrastructure.CurseForge;
 using Launcher.Infrastructure.FileSystem;
 using Launcher.Infrastructure.Minecraft;
+using Launcher.Infrastructure.Java;
+using Launcher.Infrastructure.Mods;
 using Launcher.Infrastructure.Modpacks;
 using Launcher.Infrastructure.Modrinth;
 using Launcher.Infrastructure.Multiplayer;
@@ -168,6 +170,11 @@ public static class ServiceCollectionExtensions
             logger: serviceProvider.GetService<
                 Microsoft.Extensions.Logging.ILogger<MicrosoftAuthProvider>>()));
         services.AddSingleton<ILaunchAccountSessionService, LaunchAccountSessionService>();
+        services.AddSingleton<IPlayTimeTracker, PlayTimeTracker>();
+        services.AddSingleton<IModMetadataExtractor, ModMetadataExtractor>();
+        services.AddSingleton<IModUpdateService, ModUpdateService>();
+        services.AddSingleton<IJavaDownloadService, JavaDownloadService>();
+        services.AddSingleton<IServerFavoriteService, ServerFavoriteService>();
         return services;
     }
 }

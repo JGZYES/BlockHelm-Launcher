@@ -1,4 +1,4 @@
-﻿/*
+/*
  * BlockHelm Launcher
  * Copyright (C) 2026 Quan Zhou
  *
@@ -258,6 +258,9 @@ public partial class MainWindow : Window
         if (HandleLocalImportPagePreview(e))
             return;
 
+        if (HandleUrlDropPreview(e))
+            return;
+
         HandleFileDropPreview(e);
     }
 
@@ -268,6 +271,9 @@ public partial class MainWindow : Window
             return;
 
         if (HandleLocalImportPagePreview(e))
+            return;
+
+        if (HandleUrlDropPreview(e))
             return;
 
         HandleFileDropPreview(e);
@@ -301,6 +307,9 @@ public partial class MainWindow : Window
                 return;
 
             if (await HandleLocalImportPageDropAsync(e))
+                return;
+
+            if (await HandleUrlDropAsync(e))
                 return;
 
             var paths = TryGetDroppedPaths(e);
@@ -367,6 +376,65 @@ public partial class MainWindow : Window
         }
 
         return true;
+    }
+
+    private bool HandleUrlDropPreview(DragEventArgs e)
+    {
+        var url = TryGetDroppedUrl(e);
+        if (url is null)
+            return false;
+
+        e.Effects = DragDropEffects.Copy;
+        e.Handled = true;
+        return true;
+    }
+
+    private async Task<bool> HandleUrlDropAsync(DragEventArgs e)
+    {
+        var url = TryGetDroppedUrl(e);
+        if (url is null)
+            return false;
+
+        e.Handled = true;
+        e.Effects = DragDropEffects.None;
+
+        try
+        {
+            var type = Launcher.App.Utilities.DroppedFileTypeDetector.Detect(url);
+            if (type == Launcher.App.Utilities.DroppedFileType.Modpack)
+            {
+                viewModel.CurrentPage = NavigationCatalog.DownloadPage;
+            }
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, "Failed to handle URL drop: {Url}", url);
+        }
+
+        return true;
+    }
+
+    private static string? TryGetDroppedUrl(DragEventArgs e)
+    {
+        if (!e.Data.GetDataPresent(DataFormats.Text))
+            return null;
+
+        var text = e.Data.GetData(DataFormats.Text) as string;
+        if (string.IsNullOrWhiteSpace(text))
+            return null;
+
+        text = text.Trim();
+        if (text.StartsWith("http://", StringComparison.OrdinalIgnoreCase) ||
+            text.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
+        {
+            // Take only the first line if multi-line text is dropped
+            var firstLine = text.Split('\n')[0].Trim();
+            if (firstLine.StartsWith("http://", StringComparison.OrdinalIgnoreCase) ||
+                firstLine.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
+                return firstLine;
+        }
+
+        return null;
     }
 
     private bool HandleDownloadLocalImportPreview(DragEventArgs e)

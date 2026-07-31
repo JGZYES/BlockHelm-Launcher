@@ -51,6 +51,7 @@ public void Dispose()
         OnPropertyChanged(nameof(IsGeneralSection));
         OnPropertyChanged(nameof(IsLaunchSection));
         OnPropertyChanged(nameof(IsJavaSection));
+        OnPropertyChanged(nameof(IsPlayTimeSection));
         OnPropertyChanged(nameof(SectionTitle));
         OnPropertyChanged(nameof(SectionPlaceholderBody));
         previousSectionViewModel?.OnSectionDeactivated();
@@ -65,6 +66,7 @@ public void Dispose()
             "shaders" => ShaderPackManagement,
             "backup" => Backup,
             "export" => Export,
+            "playtime" => PlayTime,
             _ => Placeholder
         };
         ActivateCurrentSection();

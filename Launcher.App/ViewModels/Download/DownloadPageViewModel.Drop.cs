@@ -132,4 +132,29 @@ private bool CanHandleLocalImportDropCore(IReadOnlyList<string> paths)
             return false;
         }
     }
+
+    private sealed class NullJavaDownloadService : IJavaDownloadService
+    {
+        public static NullJavaDownloadService Instance { get; } = new();
+        public event EventHandler<JavaDownloadProgressEventArgs>? DownloadProgressChanged { add { } remove { } }
+        
+        public Task<IReadOnlyList<JavaDistributionInfo>> GetAvailableDistributionsAsync(
+            string? version = null, string? vendor = null, string? architecture = null, string? platform = null,
+            CancellationToken cancellationToken = default) => Task.FromResult<IReadOnlyList<JavaDistributionInfo>>([]);
+
+        public Task<JavaInstallResult> DownloadAndInstallAsync(
+            JavaDistributionInfo distribution, IProgress<(string Status, double Progress)>? progress = null,
+            CancellationToken cancellationToken = default) => Task.FromResult(new JavaInstallResult { IsSuccess = false, ErrorMessage = "服务未启用" });
+
+        public Task<string?> DownloadAsync(
+            JavaDistributionInfo distribution, string targetDirectory,
+            IProgress<(string Status, double Progress)>? progress = null,
+            CancellationToken cancellationToken = default) => Task.FromResult<string?>(null);
+
+        public Task<IReadOnlyList<string>> GetManagedInstallsAsync(CancellationToken cancellationToken = default) => Task.FromResult<IReadOnlyList<string>>([]);
+        public Task<bool> UninstallAsync(string installPath, CancellationToken cancellationToken = default) => Task.FromResult(false);
+        public Task<IReadOnlyList<JavaDistributionInfo>> CheckForUpdatesAsync(
+            string vendor, string currentVersion, string architecture, string platform,
+            CancellationToken cancellationToken = default) => Task.FromResult<IReadOnlyList<JavaDistributionInfo>>([]);
+    }
 }

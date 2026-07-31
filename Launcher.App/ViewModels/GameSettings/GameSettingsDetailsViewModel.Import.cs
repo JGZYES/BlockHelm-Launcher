@@ -20,6 +20,7 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using Launcher.App.Resources;
 using Launcher.App.Services;
+using Launcher.App.Utilities;
 using Launcher.App.ViewModels.Download;
 using Launcher.Application.Services;
 using Launcher.Domain.Models;
@@ -35,6 +36,16 @@ public GameSettingsFileDropEvaluation EvaluateImportDrop(IReadOnlyList<string> p
         // 由当前分区决定可接受类型，聚合层保证拖放不会路由到隐藏页面。
         if (SelectedInstance is null)
             return GameSettingsFileDropEvaluation.Hidden;
+
+        // 智能识别：如果当前分区不匹配文件类型，尝试自动路由
+        var fileTypes = DroppedFileTypeDetector.Classify(paths);
+        if (fileTypes.Count > 0 && !IsCurrentSectionCompatible(fileTypes.Keys))
+        {
+            // 返回可接受评估但提示将自动路由
+            return GameSettingsFileDropEvaluation.Accept(
+                string.Format(Strings.GameSettings_DropAutoRouteMessageFormat,
+                    string.Join(", ", fileTypes.Keys.Select(MapFileTypeToDisplayName))));
+        }
 
         return SelectedSection?.Id?.ToLowerInvariant() switch
         {
@@ -52,6 +63,13 @@ public GameSettingsFileDropEvaluation EvaluateImportDrop(IReadOnlyList<string> p
         if (SelectedInstance is null)
             return Task.CompletedTask;
 
+        // 智能识别并自动路由
+        var fileTypes = DroppedFileTypeDetector.Classify(paths);
+        if (fileTypes.Count > 0 && !IsCurrentSectionCompatible(fileTypes.Keys))
+        {
+            return RouteByFileTypeAsync(fileTypes);
+        }
+
         return SelectedSection?.Id?.ToLowerInvariant() switch
         {
             "mod_management" => ModManagement.ImportDroppedModFilesAsync(paths),
@@ -61,6 +79,49 @@ public GameSettingsFileDropEvaluation EvaluateImportDrop(IReadOnlyList<string> p
             _ => Task.CompletedTask
         };
     }
+
+    private async Task RouteByFileTypeAsync(IReadOnlyDictionary<DroppedFileType, List<string>> classified)
+    {
+        foreach (var (type, files) in classified)
+        {
+            Task importTask = type switch
+            {
+                DroppedFileType.Mod => ModManagement.ImportDroppedModFilesAsync(files),
+                DroppedFileType.World => SaveManagement.ImportDroppedSaveArchivesAsync(files),
+                DroppedFileType.ResourcePack => ResourcePackManagement.ImportDroppedResourcePackArchivesAsync(files),
+                DroppedFileType.ShaderPack => ShaderPackManagement.ImportDroppedShaderPackArchivesAsync(files),
+                DroppedFileType.Modpack => ModManagement.ImportDroppedModFilesAsync(files),
+                _ => Task.CompletedTask
+            };
+            await importTask.ConfigureAwait(false);
+        }
+    }
+
+    private bool IsCurrentSectionCompatible(IEnumerable<DroppedFileType> fileTypes)
+    {
+        var sectionId = SelectedSection?.Id?.ToLowerInvariant();
+        if (sectionId is null)
+            return false;
+
+        return sectionId switch
+        {
+            "mod_management" => fileTypes.Contains(DroppedFileType.Mod) || fileTypes.Contains(DroppedFileType.Modpack),
+            "saves" => fileTypes.Contains(DroppedFileType.World),
+            "resource_packs" => fileTypes.Contains(DroppedFileType.ResourcePack),
+            "shaders" => fileTypes.Contains(DroppedFileType.ShaderPack),
+            _ => false
+        };
+    }
+
+    private static string MapFileTypeToDisplayName(DroppedFileType type) => type switch
+    {
+        DroppedFileType.Mod => Strings.GameSettings_DropTypeMod,
+        DroppedFileType.World => Strings.GameSettings_DropTypeWorld,
+        DroppedFileType.ResourcePack => Strings.GameSettings_DropTypeResourcePack,
+        DroppedFileType.ShaderPack => Strings.GameSettings_DropTypeShaderPack,
+        DroppedFileType.Modpack => Strings.GameSettings_DropTypeModpack,
+        _ => type.ToString()
+    };
 
     public void ResolvePendingModImportConflict(bool shouldReplace)
     {

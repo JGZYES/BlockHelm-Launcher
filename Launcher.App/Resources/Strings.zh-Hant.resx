@@ -1153,6 +1153,57 @@
   <data name="GameSettings_DetailExport" xml:space="preserve">
     <value>匯出</value>
   </data>
+  <data name="GameSettings_DetailPlayTime" xml:space="preserve">
+    <value>遊戲時長</value>
+  </data>
+  <data name="GameSettings_DropAutoRouteMessageFormat" xml:space="preserve">
+    <value>將自動安裝為：{0}</value>
+  </data>
+  <data name="GameSettings_DropTypeMod" xml:space="preserve">
+    <value>模組</value>
+  </data>
+  <data name="GameSettings_DropTypeWorld" xml:space="preserve">
+    <value>存檔</value>
+  </data>
+  <data name="GameSettings_DropTypeResourcePack" xml:space="preserve">
+    <value>資源包</value>
+  </data>
+  <data name="GameSettings_DropTypeShaderPack" xml:space="preserve">
+    <value>光影包</value>
+  </data>
+  <data name="GameSettings_DropTypeModpack" xml:space="preserve">
+    <value>整合包</value>
+  </data>
+  <data name="PlayTime_TotalPlayTime" xml:space="preserve">
+    <value>總遊戲時長</value>
+  </data>
+  <data name="PlayTime_TodayPlayTime" xml:space="preserve">
+    <value>今日遊戲時長</value>
+  </data>
+  <data name="PlayTime_WeekPlayTime" xml:space="preserve">
+    <value>本週遊戲時長</value>
+  </data>
+  <data name="PlayTime_SessionCount" xml:space="preserve">
+    <value>啟動次數</value>
+  </data>
+  <data name="PlayTime_LastPlayed" xml:space="preserve">
+    <value>最近啟動</value>
+  </data>
+  <data name="PlayTime_NoHistory" xml:space="preserve">
+    <value>暫無記錄</value>
+  </data>
+  <data name="PlayTime_LessThanOneMinute" xml:space="preserve">
+    <value>不足1分鐘</value>
+  </data>
+  <data name="PlayTime_MinutesFormat" xml:space="preserve">
+    <value>{0} 分鐘</value>
+  </data>
+  <data name="PlayTime_HoursMinutesFormat" xml:space="preserve">
+    <value>{0} 小時 {1} 分鐘</value>
+  </data>
+  <data name="PlayTime_RecentSessions" xml:space="preserve">
+    <value>最近啟動記錄</value>
+  </data>
   <data name="Nav_GameInstanceList" xml:space="preserve">
     <value>遊戲設定</value>
   </data>

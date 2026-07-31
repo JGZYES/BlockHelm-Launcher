@@ -43,6 +43,7 @@ public sealed class LocalModsViewModel : IDisposable
     private static readonly TimeSpan IgnoredWatcherPathTtl = TimeSpan.FromSeconds(2);
     // 文件操作和图标解析都在服务层完成；本类只维护当前实例快照及通知顺序。
     private readonly IModService modService;
+    private readonly IModUpdateService? modUpdateService;
     private readonly ILocalModIconEnrichmentService? iconEnrichmentService;
     private readonly LocalResourceCategoryEnrichmentCoordinator<LocalMod> categoryEnrichmentCoordinator;
     private readonly IStatusService statusService;
@@ -61,6 +62,7 @@ public sealed class LocalModsViewModel : IDisposable
 
     public LocalModsViewModel(
         IModService modService,
+        IModUpdateService? modUpdateService,
         IStatusService statusService,
         IInstanceDirectoryMonitor instanceDirectoryMonitor,
         IUiDispatcher? uiDispatcher = null,
@@ -69,6 +71,7 @@ public sealed class LocalModsViewModel : IDisposable
         ILocalResourceCategoryEnrichmentService? categoryEnrichmentService = null)
     {
         this.modService = modService;
+        this.modUpdateService = modUpdateService;
         this.iconEnrichmentService = iconEnrichmentService;
         this.statusService = statusService;
         this.uiDispatcher = uiDispatcher ?? ImmediateUiDispatcher.Instance;
@@ -696,4 +699,73 @@ public sealed class LocalModsViewModel : IDisposable
                 ? path
                 : path + ".disabled";
     }
+
+    /// <summary>
+    /// 检查所有 Mod 的更新状态
+    /// </summary>
+    public async Task CheckForUpdatesAsync()
+    {
+        if (modUpdateService is null || selectedInstance is null || currentMods.Count == 0)
+            return;
+
+        var instance = selectedInstance;
+        var minecraftVersion = instance.MinecraftVersion;
+        var loaderType = instance.Loader.ToString();
+
+        // 标记所有 Mod 正在检查更新
+        foreach (var mod in currentMods)
+        {
+            mod.IsCheckingUpdate = true;
+        }
+        ModsChanged?.Invoke(this, EventArgs.Empty);
+
+        try
+        {
+            var results = await modUpdateService.CheckForUpdatesAsync(
+                currentMods,
+                minecraftVersion,
+                loaderType);
+
+            // 应用更新结果
+            foreach (var result in results)
+            {
+                var mod = currentMods.FirstOrDefault(m => 
+                    string.Equals(m.ModId, result.ModId, StringComparison.OrdinalIgnoreCase) ||
+                    string.Equals(m.Name, result.ModName, StringComparison.OrdinalIgnoreCase));
+                
+                if (mod is not null)
+                {
+                    mod.IsCheckingUpdate = false;
+                    if (result.IsSuccess && result.HasUpdate)
+                    {
+                        mod.UpdateInfo = result.UpdateInfo;
+                    }
+                }
+            }
+
+            // 清除未找到结果的 Mod 的检查状态
+            foreach (var mod in currentMods)
+            {
+                mod.IsCheckingUpdate = false;
+            }
+
+            uiDispatcher.Post(() => ModsChanged?.Invoke(this, EventArgs.Empty));
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, "Failed to check for mod updates");
+            
+            // 清除检查状态
+            foreach (var mod in currentMods)
+            {
+                mod.IsCheckingUpdate = false;
+            }
+            uiDispatcher.Post(() => ModsChanged?.Invoke(this, EventArgs.Empty));
+        }
+    }
+
+    /// <summary>
+    /// 获取有更新的 Mod 数量
+    /// </summary>
+    public int UpdateCount => currentMods.Count(m => m.HasUpdate);
 }

@@ -45,14 +45,15 @@ public sealed partial class HomePageViewModel : ObservableObject
     private readonly IWindowService windowService;
     private readonly IUiDispatcher uiDispatcher;
     private readonly IAccountDialogService? accountDialogService;
+    private readonly IPlayTimeTracker playTimeTracker;
     private readonly Action<double> reportProgressPercent;
     private readonly Func<GameInstance?, Task> openGameSettingsForInstance;
     private readonly ILogger<HomePageViewModel> logger;
     private LauncherSettings settings = new();
-    // 一个首页只允许一个活动启动会话；CTS 的存在也作为取消按钮所需的会话身份。
     private CancellationTokenSource? launchCancellationTokenSource;
     private IDisposable? launchSpeedMeterLifetime;
     private IProgress<LauncherProgress>? launchProgress;
+    private string? activePlayTimeSessionId;
 
     [ObservableProperty]
     private bool isLaunching;
@@ -78,6 +79,7 @@ public sealed partial class HomePageViewModel : ObservableObject
         Func<GameInstance, Task<bool>> selectLaunchInstance,
         Func<bool, Task<bool>> setLaunchMenuPinned,
         Func<GameInstance?, Task> openGameSettingsForInstance,
+        IPlayTimeTracker playTimeTracker,
         ILogger<HomePageViewModel>? logger = null,
         IAccountDialogService? accountDialogService = null)
     {
@@ -88,6 +90,7 @@ public sealed partial class HomePageViewModel : ObservableObject
         this.windowService = windowService;
         this.uiDispatcher = uiDispatcher;
         this.accountDialogService = accountDialogService;
+        this.playTimeTracker = playTimeTracker;
         this.reportProgressPercent = reportProgressPercent;
         this.openGameSettingsForInstance = openGameSettingsForInstance;
         this.logger = logger ?? NullLogger<HomePageViewModel>.Instance;

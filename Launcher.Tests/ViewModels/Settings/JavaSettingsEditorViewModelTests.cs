@@ -27,6 +27,7 @@ public sealed class JavaSettingsEditorViewModelTests
         };
         var viewModel = new JavaSettingsEditorViewModel(
             discovery,
+            new StubJavaDownloadService(),
             new RecordingStatusService(),
             new FixedJavaFilePickerService(TemurinExecutablePath),
             new RecordingFloatingMessageService(),
@@ -59,6 +60,7 @@ public sealed class JavaSettingsEditorViewModelTests
         };
         var viewModel = new JavaSettingsEditorViewModel(
             discovery,
+            new StubJavaDownloadService(),
             new RecordingStatusService(),
             new FixedJavaFilePickerService(TemurinExecutablePath),
             new RecordingFloatingMessageService(),
@@ -94,6 +96,7 @@ public sealed class JavaSettingsEditorViewModelTests
         var viewModel = new JavaSettingsViewModel(
             persistence,
             discovery,
+            new StubJavaDownloadService(),
             status,
             new FixedJavaFilePickerService(TemurinExecutablePath),
             new RecordingFloatingMessageService(),
@@ -125,6 +128,7 @@ public sealed class JavaSettingsEditorViewModelTests
         var viewModel = new JavaSettingsViewModel(
             persistence,
             discovery,
+            new StubJavaDownloadService(),
             status,
             new FixedJavaFilePickerService(TemurinExecutablePath),
             new RecordingFloatingMessageService(),
@@ -149,6 +153,7 @@ public sealed class JavaSettingsEditorViewModelTests
         };
         var viewModel = new JavaSettingsEditorViewModel(
             discovery,
+            new StubJavaDownloadService(),
             new RecordingStatusService(),
             new FixedJavaFilePickerService(TemurinExecutablePath),
             new RecordingFloatingMessageService(),
@@ -261,5 +266,29 @@ public sealed class JavaSettingsEditorViewModelTests
             Messages.Add(message);
             MessageRequested?.Invoke(message);
         }
+    }
+
+    private sealed class StubJavaDownloadService : IJavaDownloadService
+    {
+        public event EventHandler<JavaDownloadProgressEventArgs>? DownloadProgressChanged;
+
+        public Task<IReadOnlyList<JavaDistributionInfo>> GetAvailableDistributionsAsync(
+            string? version = null, string? vendor = null, string? architecture = null, string? platform = null,
+            CancellationToken cancellationToken = default) => Task.FromResult<IReadOnlyList<JavaDistributionInfo>>([]);
+
+        public Task<JavaInstallResult> DownloadAndInstallAsync(
+            JavaDistributionInfo distribution, IProgress<(string Status, double Progress)>? progress = null,
+            CancellationToken cancellationToken = default) => Task.FromResult(new JavaInstallResult { IsSuccess = true });
+
+        public Task<string?> DownloadAsync(
+            JavaDistributionInfo distribution, string targetDirectory,
+            IProgress<(string Status, double Progress)>? progress = null,
+            CancellationToken cancellationToken = default) => Task.FromResult<string?>(null);
+
+        public Task<IReadOnlyList<string>> GetManagedInstallsAsync(CancellationToken cancellationToken = default) => Task.FromResult<IReadOnlyList<string>>([]);
+        public Task<bool> UninstallAsync(string installPath, CancellationToken cancellationToken = default) => Task.FromResult(false);
+        public Task<IReadOnlyList<JavaDistributionInfo>> CheckForUpdatesAsync(
+            string vendor, string currentVersion, string architecture, string platform,
+            CancellationToken cancellationToken = default) => Task.FromResult<IReadOnlyList<JavaDistributionInfo>>([]);
     }
 }

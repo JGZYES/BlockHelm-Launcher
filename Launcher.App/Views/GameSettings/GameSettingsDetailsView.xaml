@@ -60,6 +60,10 @@
             <views:InstanceExportSettingsView />
         </DataTemplate>
 
+        <DataTemplate DataType="{x:Type gameSettings:InstancePlayTimeSettingsViewModel}">
+            <views:InstancePlayTimeSettingsView />
+        </DataTemplate>
+
         <DataTemplate DataType="{x:Type gameSettings:InstancePlaceholderSettingsViewModel}">
             <views:InstancePlaceholderSettingsView />
         </DataTemplate>

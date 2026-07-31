@@ -53,7 +53,8 @@ public sealed partial class ResourcesPageViewModel : ObservableObject
         DownloadTasksPageViewModel? downloadTasksPage = null,
         IResourceProjectInstallationService? resourceProjectInstallationService = null,
         IResourceDependencyPlanningService? resourceDependencyPlanningService = null,
-        IExternalLinkService? externalLinkService = null)
+        IExternalLinkService? externalLinkService = null,
+        IJavaDownloadService? javaDownloadService = null)
     {
         this.logger = logger;
         this.statusService = statusService;
@@ -66,7 +67,8 @@ public sealed partial class ResourcesPageViewModel : ObservableObject
             new ResourcesSectionItem { Id = "resource_packs", Title = Strings.Resources_SectionResourcePacks, IconKey = "main_menu_library" },
             new ResourcesSectionItem { Id = "shader_packs", Title = Strings.Resources_SectionShaderPacks, IconKey = "instance_setting_page/shader" },
             new ResourcesSectionItem { Id = "worlds", Title = Strings.Resources_SectionWorlds, IconKey = "world" },
-            new ResourcesSectionItem { Id = "modpacks", Title = Strings.Resources_SectionModpacks, IconKey = "modpack" }
+            new ResourcesSectionItem { Id = "modpacks", Title = Strings.Resources_SectionModpacks, IconKey = "modpack" },
+            new ResourcesSectionItem { Id = "java", Title = Strings.Resources_SectionJava, IconKey = "instance_download_page/java" }
         ];
 
         ModPage = new ResourcesModPageViewModel(
@@ -146,6 +148,8 @@ public sealed partial class ResourcesPageViewModel : ObservableObject
         SubscribeOnlinePageChildren(ModpacksPage);
         ModpacksPage.ModpackImported += (_, instance) => ModpackImported?.Invoke(this, instance);
         ModpacksPage.ModpackManualDownloadsRequested += (_, args) => ModpackManualDownloadsRequested?.Invoke(this, args);
+
+        JavaPage = new ResourcesJavaPageViewModel(this, javaDownloadService, floatingMessageService, downloadTasksPage);
 
         SelectSection(Sections[0], logSelection: false);
     }
@@ -232,6 +236,8 @@ public sealed partial class ResourcesPageViewModel : ObservableObject
 
     public ResourcesModpacksPageViewModel ModpacksPage { get; }
 
+    public ResourcesJavaPageViewModel JavaPage { get; }
+
     public event EventHandler<GameInstance>? ModpackImported;
 
     public event EventHandler<ResourcesModpackManualDownloadsRequestedEventArgs>? ModpackManualDownloadsRequested;
@@ -253,6 +259,10 @@ public sealed partial class ResourcesPageViewModel : ObservableObject
         : SelectedSection?.Title ?? Strings.Page_Resources;
 
     public bool IsModsSection => SelectedSection?.Id == "mods";
+
+    public bool IsJavaSection => SelectedSection?.Id == "java";
+
+    public ResourcesJavaPageViewModel? CurrentJavaPage => CurrentSectionViewModel as ResourcesJavaPageViewModel;
 
     public bool IsModSearchVisible => CurrentOnlineProjectPage is { } onlineProjectPage
         && (onlineProjectPage.IsProjectListStep || onlineProjectPage.IsProjectVersionsStep);
@@ -379,6 +389,7 @@ public sealed partial class ResourcesPageViewModel : ObservableObject
             "shader_packs" => ShaderPacksPage,
             "worlds" => WorldsPage,
             "modpacks" => ModpacksPage,
+            "java" => JavaPage,
             _ => ModPage
         };
         SelectedSection = section;

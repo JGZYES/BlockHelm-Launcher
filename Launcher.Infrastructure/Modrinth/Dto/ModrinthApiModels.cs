@@ -73,6 +73,12 @@ internal sealed class ModrinthVersion
 
     [JsonPropertyName("files")]
     public List<ModrinthFile> Files { get; set; } = [];
+
+    [JsonPropertyName("date_published")]
+    public DateTimeOffset? DatePublished { get; set; }
+
+    [JsonPropertyName("changelog")]
+    public string? Changelog { get; set; }
 }
 
 internal sealed class ModrinthFile

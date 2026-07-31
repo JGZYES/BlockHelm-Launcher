@@ -47,6 +47,7 @@ public sealed partial class SettingsPageViewModel : ObservableObject, IDisposabl
         IStatusService statusService,
         ISystemMemoryService systemMemoryService,
         IJavaRuntimeDiscoveryService javaRuntimeDiscoveryService,
+        IJavaDownloadService javaDownloadService,
         IFilePickerService filePickerService,
         ICustomFileDownloadService customFileDownloadService,
         IInstanceFolderService instanceFolderService,
@@ -90,6 +91,7 @@ public sealed partial class SettingsPageViewModel : ObservableObject, IDisposabl
         Java = new JavaSettingsViewModel(
             persistence,
             javaRuntimeDiscoveryService,
+            javaDownloadService,
             statusService,
             filePickerService,
             floatingMessageService,

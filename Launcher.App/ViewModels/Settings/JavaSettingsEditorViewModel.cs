@@ -37,6 +37,7 @@ public sealed partial class JavaSettingsEditorViewModel : ObservableObject
     private const string JavaSelectionManualId = "manual";
 
     private readonly IJavaRuntimeDiscoveryService javaRuntimeDiscoveryService;
+    private readonly IJavaDownloadService javaDownloadService;
     private readonly IStatusService statusService;
     private readonly IFilePickerService filePickerService;
     private readonly IFloatingMessageService floatingMessageService;
@@ -60,14 +61,33 @@ public sealed partial class JavaSettingsEditorViewModel : ObservableObject
     [ObservableProperty]
     private bool isEditorEnabled = true;
 
+    [ObservableProperty]
+    private bool isDownloadDialogOpen;
+
+    [ObservableProperty]
+    private bool isDownloading;
+
+    [ObservableProperty]
+    private string downloadStatusMessage = string.Empty;
+
+    [ObservableProperty]
+    private double downloadProgress;
+
+    [ObservableProperty]
+    private JavaDistributionInfo? selectedDownloadVersion;
+
+    public ObservableCollection<JavaDistributionInfo> AvailableDownloadVersions { get; } = [];
+
     public JavaSettingsEditorViewModel(
         IJavaRuntimeDiscoveryService javaRuntimeDiscoveryService,
+        IJavaDownloadService javaDownloadService,
         IStatusService statusService,
         IFilePickerService filePickerService,
         IFloatingMessageService floatingMessageService,
         Func<string?> minecraftDirectoryProvider)
     {
         this.javaRuntimeDiscoveryService = javaRuntimeDiscoveryService;
+        this.javaDownloadService = javaDownloadService;
         this.statusService = statusService;
         this.filePickerService = filePickerService;
         this.floatingMessageService = floatingMessageService;
@@ -76,6 +96,9 @@ public sealed partial class JavaSettingsEditorViewModel : ObservableObject
         JavaSelectionOptions.Add(new SettingsJavaSelectionOption(JavaSelectionAutoId, Strings.Settings_JavaSelectionAuto));
         JavaSelectionOptions.Add(new SettingsJavaSelectionOption(JavaSelectionManualId, Strings.Settings_JavaSelectionManual));
         SelectedJavaSelectionOption = JavaSelectionOptions[0];
+
+        // 异步加载可用版本，不阻塞构造函数
+        _ = LoadAvailableDownloadVersionsAsync();
     }
 
     public ObservableCollection<SettingsJavaSelectionOption> JavaSelectionOptions { get; } = [];
@@ -417,5 +440,85 @@ public sealed partial class JavaSettingsEditorViewModel : ObservableObject
     private static bool IsSameExecutablePath(string? left, string? right)
     {
         return string.Equals(left, right, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [RelayCommand]
+    private void OpenDownloadDialog()
+    {
+        IsDownloadDialogOpen = true;
+        DownloadStatusMessage = string.Empty;
+        DownloadProgress = 0;
+        SelectedDownloadVersion = AvailableDownloadVersions.FirstOrDefault();
+    }
+
+    [RelayCommand]
+    private void CloseDownloadDialog()
+    {
+        IsDownloadDialogOpen = false;
+    }
+
+    [RelayCommand]
+    private async Task DownloadJdkAsync()
+    {
+        if (SelectedDownloadVersion is null || IsDownloading)
+            return;
+
+        IsDownloading = true;
+        DownloadProgress = 0;
+        DownloadStatusMessage = "准备下载...";
+
+        try
+        {
+            var progress = new Progress<(string Status, double Progress)>(p =>
+            {
+                DownloadStatusMessage = p.Status;
+                DownloadProgress = p.Progress;
+            });
+
+            var result = await javaDownloadService.DownloadAndInstallAsync(
+                SelectedDownloadVersion,
+                progress);
+
+            if (result.IsSuccess)
+            {
+                DownloadProgress = 100;
+                DownloadStatusMessage = "下载完成！";
+                floatingMessageService.Show($"JDK {SelectedDownloadVersion.Version} 下载成功");
+                
+                // 刷新 Java 运行时列表
+                await RefreshJavaRuntimesCoreAsync(allowWhenDisabled: true);
+            }
+            else
+            {
+                DownloadStatusMessage = $"下载失败: {result.ErrorMessage}";
+                statusService.Report($"JDK 下载失败: {result.ErrorMessage}");
+            }
+        }
+        catch (Exception ex)
+        {
+            DownloadStatusMessage = $"下载出错: {ex.Message}";
+            statusService.Report("JDK 下载出错");
+        }
+        finally
+        {
+            IsDownloading = false;
+        }
+    }
+
+    private async Task LoadAvailableDownloadVersionsAsync()
+    {
+        try
+        {
+            var versions = await javaDownloadService.GetAvailableDistributionsAsync();
+            AvailableDownloadVersions.Clear();
+            foreach (var version in versions)
+            {
+                AvailableDownloadVersions.Add(version);
+            }
+        }
+        catch
+        {
+            // 静默失败，用户仍可以通过手动导入添加 Java
+        }
     }
 }

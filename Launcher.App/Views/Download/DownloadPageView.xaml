@@ -1,4 +1,4 @@
-﻿<!--
+<!--
   BlockHelm Launcher
   Copyright (C) 2026 Quan Zhou
 
@@ -27,131 +27,138 @@
              x:Name="Root"
              Focusable="False">
     <Grid x:Name="PageRoot">
-        <controls:SecondaryMenuFrame Title="{x:Static res:Strings.Download_VersionListTitle}"
-                                     controls:SecondaryMenuOptionButton.RefreshRequested="SecondaryMenuOptionButton_OnRefreshRequested">
-            <controls:SecondaryMenuFrame.MenuContent>
-                <ItemsControl ItemsSource="{Binding VersionList.VersionCategories}">
-                    <ItemsControl.ItemTemplate>
-                        <DataTemplate>
-                            <controls:SecondaryMenuOptionButton Text="{Binding Title}"
-                                                                IconMode="{Binding IconMode}"
-                                                                IconKey="{Binding IconKey}"
-                                                                Glyph="{Binding Icon}"
-                                                                IsEnabled="{Binding IsEnabled}"
-                                                                IsSelected="{Binding IsSelected}"
-                                                                Command="{Binding DataContext.VersionList.SelectVersionCategoryCommand, RelativeSource={RelativeSource AncestorType={x:Type views:DownloadPageView}}}"
-                                                                CommandParameter="{Binding}" />
-                        </DataTemplate>
-                    </ItemsControl.ItemTemplate>
-                </ItemsControl>
-            </controls:SecondaryMenuFrame.MenuContent>
-        </controls:SecondaryMenuFrame>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
 
-        <controls:ListPageFrame x:Name="DownloadVersionListFrame"
-                                Margin="284,36,24,8"
-                                Title="{Binding PageTitle}"
-                                TitleIconSource="{Binding PageTitleIconSource}"
-                                IsHeaderBackButtonVisible="{Binding IsInstanceOptionsStep}"
-                                HeaderBackCommand="{Binding BackToVersionListCommand}"
-                                SearchText="{Binding VersionList.VersionSearchQuery, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                                IsSearchVisible="{Binding IsVersionListStep}"
-                                IsListVisible="{Binding IsDownloadContentVisible}"
-                                IsProgressiveBlurEnabled="{DynamicResource Is.ProgressiveBlur.Enabled}"
-                                UseFrameScrollViewer="False">
-            <controls:ListPageFrame.OverlayContent>
-                <Grid>
-                    <Grid.Style>
-                        <Style TargetType="Grid">
-                            <Setter Property="Visibility" Value="Collapsed" />
-                            <Style.Triggers>
-                                <DataTrigger Binding="{Binding IsVersionListStep}" Value="True">
-                                    <Setter Property="Visibility" Value="Visible" />
-                                </DataTrigger>
-                            </Style.Triggers>
-                        </Style>
-                    </Grid.Style>
+        <Grid>
+            <controls:SecondaryMenuFrame Title="{x:Static res:Strings.Download_VersionListTitle}"
+                                         controls:SecondaryMenuOptionButton.RefreshRequested="SecondaryMenuOptionButton_OnRefreshRequested">
+                <controls:SecondaryMenuFrame.MenuContent>
+                    <ItemsControl ItemsSource="{Binding VersionList.VersionCategories}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <controls:SecondaryMenuOptionButton Text="{Binding Title}"
+                                                                    IconMode="{Binding IconMode}"
+                                                                    IconKey="{Binding IconKey}"
+                                                                    Glyph="{Binding Icon}"
+                                                                    IsEnabled="{Binding IsEnabled}"
+                                                                    IsSelected="{Binding IsSelected}"
+                                                                    Command="{Binding DataContext.VersionList.SelectVersionCategoryCommand, RelativeSource={RelativeSource AncestorType={x:Type views:DownloadPageView}}}"
+                                                                    CommandParameter="{Binding}" />
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </controls:SecondaryMenuFrame.MenuContent>
+            </controls:SecondaryMenuFrame>
 
-                    <TextBlock Margin="0,122,0,0"
-                               Text="{x:Static res:Strings.Download_LoadingVersions}">
-                        <TextBlock.Style>
-                            <Style TargetType="TextBlock" BasedOn="{StaticResource DownloadOverlayEmptyStateTextStyle}">
-                                <Style.Triggers>
-                                    <DataTrigger Binding="{Binding VersionList.IsLoadingVersions}" Value="True">
-                                        <Setter Property="Visibility" Value="Visible" />
-                                    </DataTrigger>
-                                </Style.Triggers>
-                            </Style>
-                        </TextBlock.Style>
-                    </TextBlock>
-
-                    <TextBlock Margin="0,122,0,0"
-                               Text="{Binding VersionList.VersionLoadError}">
-                        <TextBlock.Style>
-                            <Style TargetType="TextBlock" BasedOn="{StaticResource DownloadOverlayErrorTextStyle}">
-                                <Style.Triggers>
-                                    <DataTrigger Binding="{Binding VersionList.HasVersionLoadError}" Value="True">
-                                        <Setter Property="Visibility" Value="Visible" />
-                                    </DataTrigger>
-                                </Style.Triggers>
-                            </Style>
-                        </TextBlock.Style>
-                    </TextBlock>
-
-                    <TextBlock Margin="0,122,0,0"
-                               Text="{Binding VersionList.VersionEmptyMessage}">
-                        <TextBlock.Style>
-                            <Style TargetType="TextBlock" BasedOn="{StaticResource DownloadOverlayEmptyStateTextStyle}">
-                                <Style.Triggers>
-                                    <DataTrigger Binding="{Binding VersionList.HasVersionEmptyMessage}" Value="True">
-                                        <Setter Property="Visibility" Value="Visible" />
-                                    </DataTrigger>
-                                </Style.Triggers>
-                            </Style>
-                        </TextBlock.Style>
-                    </TextBlock>
-                </Grid>
-            </controls:ListPageFrame.OverlayContent>
-
-            <controls:ListPageFrame.ListContent>
-                <Grid Tag="DownloadStepHost"
-                      ClipToBounds="True">
-                    <Grid Tag="VersionListStep">
-                        <Grid.RenderTransform>
-                            <TranslateTransform />
-                        </Grid.RenderTransform>
-
-                        <views:DownloadVersionListView Tag="DownloadVersionList"
-                                                       DataContext="{Binding VersionList}" />
-                    </Grid>
-
-                    <Grid Tag="InstanceOptionsStep"
-                          Opacity="0"
-                          Visibility="Collapsed">
-                        <Grid.RenderTransform>
-                            <TranslateTransform />
-                        </Grid.RenderTransform>
-
-                        <views:DownloadInstanceOptionsView DataContext="{Binding InstanceOptions}" />
-                    </Grid>
-                </Grid>
-            </controls:ListPageFrame.ListContent>
-
-            <controls:ListPageFrame.FloatingContent>
-                <Grid>
-                    <Button Tag="InstallStep"
-                            Content="{Binding InstallButtonText}"
-                            IsEnabled="{Binding CanInstallSelectedVersion}"
-                            Command="{Binding InstallCommand}">
-                        <Button.Style>
-                            <Style TargetType="Button" BasedOn="{StaticResource DownloadNextStepButtonStyle}">
+            <controls:ListPageFrame x:Name="DownloadVersionListFrame"
+                                    Margin="284,36,24,8"
+                                    Title="{Binding PageTitle}"
+                                    TitleIconSource="{Binding PageTitleIconSource}"
+                                    IsHeaderBackButtonVisible="{Binding IsInstanceOptionsStep}"
+                                    HeaderBackCommand="{Binding BackToVersionListCommand}"
+                                    SearchText="{Binding VersionList.VersionSearchQuery, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                    IsSearchVisible="{Binding IsVersionListStep}"
+                                    IsListVisible="{Binding IsDownloadContentVisible}"
+                                    IsProgressiveBlurEnabled="{DynamicResource Is.ProgressiveBlur.Enabled}"
+                                    UseFrameScrollViewer="False">
+                <controls:ListPageFrame.OverlayContent>
+                    <Grid>
+                        <Grid.Style>
+                            <Style TargetType="Grid">
                                 <Setter Property="Visibility" Value="Collapsed" />
-                                <Setter Property="Opacity" Value="0" />
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding IsVersionListStep}" Value="True">
+                                        <Setter Property="Visibility" Value="Visible" />
+                                    </DataTrigger>
+                                </Style.Triggers>
                             </Style>
-                        </Button.Style>
-                    </Button>
-                </Grid>
-            </controls:ListPageFrame.FloatingContent>
-        </controls:ListPageFrame>
+                        </Grid.Style>
+
+                        <TextBlock Margin="0,122,0,0"
+                                   Text="{x:Static res:Strings.Download_LoadingVersions}">
+                            <TextBlock.Style>
+                                <Style TargetType="TextBlock" BasedOn="{StaticResource DownloadOverlayEmptyStateTextStyle}">
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding VersionList.IsLoadingVersions}" Value="True">
+                                            <Setter Property="Visibility" Value="Visible" />
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </TextBlock.Style>
+                        </TextBlock>
+
+                        <TextBlock Margin="0,122,0,0"
+                                   Text="{Binding VersionList.VersionLoadError}">
+                            <TextBlock.Style>
+                                <Style TargetType="TextBlock" BasedOn="{StaticResource DownloadOverlayErrorTextStyle}">
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding VersionList.HasVersionLoadError}" Value="True">
+                                            <Setter Property="Visibility" Value="Visible" />
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </TextBlock.Style>
+                        </TextBlock>
+
+                        <TextBlock Margin="0,122,0,0"
+                                   Text="{Binding VersionList.VersionEmptyMessage}">
+                            <TextBlock.Style>
+                                <Style TargetType="TextBlock" BasedOn="{StaticResource DownloadOverlayEmptyStateTextStyle}">
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding VersionList.HasVersionEmptyMessage}" Value="True">
+                                            <Setter Property="Visibility" Value="Visible" />
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </TextBlock.Style>
+                        </TextBlock>
+                    </Grid>
+                </controls:ListPageFrame.OverlayContent>
+
+                <controls:ListPageFrame.ListContent>
+                    <Grid Tag="DownloadStepHost"
+                          ClipToBounds="True">
+                        <Grid Tag="VersionListStep">
+                            <Grid.RenderTransform>
+                                <TranslateTransform />
+                            </Grid.RenderTransform>
+
+                            <views:DownloadVersionListView Tag="DownloadVersionList"
+                                                           DataContext="{Binding VersionList}" />
+                        </Grid>
+
+                        <Grid Tag="InstanceOptionsStep"
+                              Opacity="0"
+                              Visibility="Collapsed">
+                            <Grid.RenderTransform>
+                                <TranslateTransform />
+                            </Grid.RenderTransform>
+
+                            <views:DownloadInstanceOptionsView DataContext="{Binding InstanceOptions}" />
+                        </Grid>
+                    </Grid>
+                </controls:ListPageFrame.ListContent>
+
+                <controls:ListPageFrame.FloatingContent>
+                    <Grid>
+                        <Button Tag="InstallStep"
+                                Content="{Binding InstallButtonText}"
+                                IsEnabled="{Binding CanInstallSelectedVersion}"
+                                Command="{Binding InstallCommand}">
+                            <Button.Style>
+                                <Style TargetType="Button" BasedOn="{StaticResource DownloadNextStepButtonStyle}">
+                                    <Setter Property="Visibility" Value="Collapsed" />
+                                    <Setter Property="Opacity" Value="0" />
+                                </Style>
+                            </Button.Style>
+                        </Button>
+                    </Grid>
+                </controls:ListPageFrame.FloatingContent>
+            </controls:ListPageFrame>
+        </Grid>
     </Grid>
 </UserControl>
 

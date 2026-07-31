@@ -33,4 +33,10 @@ public sealed class LocalMod
     public bool IsEnabled { get; set; }
     public long SizeBytes { get; set; }
     public string Source { get; set; } = "Local";
+
+    // 更新状态
+    public ModUpdateInfo? UpdateInfo { get; set; }
+    public bool HasUpdate => UpdateInfo?.HasUpdate ?? false;
+    public bool IsCheckingUpdate { get; set; }
+    public string? LatestVersion => UpdateInfo?.LatestVersion;
 }

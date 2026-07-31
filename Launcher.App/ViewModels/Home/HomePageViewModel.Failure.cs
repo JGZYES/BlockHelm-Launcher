@@ -58,6 +58,14 @@ private void ObserveGameExit(GameLaunchSession session)
             try
             {
                 var exitResult = await session.ExitTask;
+
+                // 结束游戏时长记录
+                if (activePlayTimeSessionId is not null)
+                {
+                    await playTimeTracker.EndSessionAsync(activePlayTimeSessionId, exitResult.IsFailure ? "crashed" : "exited");
+                    activePlayTimeSessionId = null;
+                }
+
                 if (!exitResult.IsFailure
                     || exitResult.FailureReport is null
                     || !session.TryMarkExitHandled())
@@ -69,6 +77,19 @@ private void ObserveGameExit(GameLaunchSession session)
             }
             catch (Exception exception)
             {
+                // 确保异常退出时也结束时长记录
+                if (activePlayTimeSessionId is not null)
+                {
+                    try
+                    {
+                        await playTimeTracker.EndSessionAsync(activePlayTimeSessionId, "unknown");
+                    }
+                    catch
+                    {
+                    }
+                    activePlayTimeSessionId = null;
+                }
+
                 logger.LogWarning(
                     exception,
                     "Failed to observe Minecraft process exit. InstanceId={InstanceId}",

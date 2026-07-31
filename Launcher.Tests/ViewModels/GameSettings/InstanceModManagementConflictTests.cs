@@ -35,7 +35,7 @@ public sealed class InstanceModManagementConflictTests
         var service = new ControlledModService([enabled, disabled], (_, _) => Task.CompletedTask);
         var floating = new RecordingFloatingMessageService();
         var status = new RecordingStatusService();
-        using var localMods = new LocalModsViewModel(service, status, new NoOpDirectoryMonitor());
+        using var localMods = new LocalModsViewModel(service, null, status, new NoOpDirectoryMonitor());
         var viewModel = CreateViewModel(localMods, status, floating);
         await viewModel.SetSelectedInstanceAsync(CreateInstance());
         await viewModel.OnSectionActivatedAsync();
@@ -61,7 +61,7 @@ public sealed class InstanceModManagementConflictTests
             (_, _) => Task.FromException(new ModEnabledStateConflictException(targetPath)));
         var floating = new RecordingFloatingMessageService();
         var status = new RecordingStatusService();
-        using var localMods = new LocalModsViewModel(service, status, new NoOpDirectoryMonitor());
+        using var localMods = new LocalModsViewModel(service, null, status, new NoOpDirectoryMonitor());
         var viewModel = CreateViewModel(localMods, status, floating);
         await viewModel.SetSelectedInstanceAsync(CreateInstance());
         await viewModel.OnSectionActivatedAsync();
@@ -96,7 +96,7 @@ public sealed class InstanceModManagementConflictTests
             });
         var floating = new RecordingFloatingMessageService();
         var status = new RecordingStatusService();
-        using var localMods = new LocalModsViewModel(service, status, new NoOpDirectoryMonitor());
+        using var localMods = new LocalModsViewModel(service, null, status, new NoOpDirectoryMonitor());
         var viewModel = CreateViewModel(localMods, status, floating);
         await viewModel.SetSelectedInstanceAsync(CreateInstance());
         await viewModel.OnSectionActivatedAsync();
@@ -128,7 +128,7 @@ public sealed class InstanceModManagementConflictTests
             (_, _) => Task.FromException(new IOException("controlled failure")));
         var floating = new RecordingFloatingMessageService();
         var status = new RecordingStatusService();
-        using var localMods = new LocalModsViewModel(service, status, new NoOpDirectoryMonitor());
+        using var localMods = new LocalModsViewModel(service, null, status, new NoOpDirectoryMonitor());
         var viewModel = CreateViewModel(localMods, status, floating);
         await viewModel.SetSelectedInstanceAsync(CreateInstance());
         await viewModel.OnSectionActivatedAsync();

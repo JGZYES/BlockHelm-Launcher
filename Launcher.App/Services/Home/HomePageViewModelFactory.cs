@@ -34,6 +34,7 @@ public sealed class HomePageViewModelFactory : IHomePageViewModelFactory
     private readonly IWindowService windowService;
     private readonly IUiDispatcher uiDispatcher;
     private readonly IAccountDialogService accountDialogService;
+    private readonly IPlayTimeTracker playTimeTracker;
     private readonly ILogger<HomePageViewModel> logger;
 
     public HomePageViewModelFactory(
@@ -44,6 +45,7 @@ public sealed class HomePageViewModelFactory : IHomePageViewModelFactory
         IWindowService windowService,
         IUiDispatcher uiDispatcher,
         IAccountDialogService accountDialogService,
+        IPlayTimeTracker playTimeTracker,
         ILogger<HomePageViewModel>? logger = null)
     {
         this.launchService = launchService;
@@ -53,6 +55,7 @@ public sealed class HomePageViewModelFactory : IHomePageViewModelFactory
         this.windowService = windowService;
         this.uiDispatcher = uiDispatcher;
         this.accountDialogService = accountDialogService;
+        this.playTimeTracker = playTimeTracker;
         this.logger = logger ?? NullLogger<HomePageViewModel>.Instance;
     }
 
@@ -75,6 +78,7 @@ public sealed class HomePageViewModelFactory : IHomePageViewModelFactory
             selectLaunchInstance,
             setLaunchMenuPinned,
             openGameSettingsForInstance,
+            playTimeTracker,
             logger,
             accountDialogService);
     }

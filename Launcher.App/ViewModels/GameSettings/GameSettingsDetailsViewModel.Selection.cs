@@ -44,6 +44,7 @@ private void ApplySelectedInstanceChanged(GameSettingsInstanceItem? value)
         ShaderPackManagement.OnSelectedInstanceChanged(instance);
         Backup.OnSelectedInstanceChanged(instance);
         Export.OnSelectedInstanceChanged(instance);
+        PlayTime.OnSelectedInstanceChanged(instance);
         OnPropertyChanged(nameof(HasSelectedInstance));
 
         ActivateCurrentSection();
@@ -64,6 +65,7 @@ private void ApplySelectedInstanceChanged(GameSettingsInstanceItem? value)
             | ShaderPackManagement.RefreshSelectedInstanceReference(instance);
         Backup.OnSelectedInstanceChanged(instance);
         Export.OnSelectedInstanceChanged(instance);
+        PlayTime.OnSelectedInstanceChanged(instance);
 
         if (shouldReactivateCurrentSection)
             ActivateCurrentSection();

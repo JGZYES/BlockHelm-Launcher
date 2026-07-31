@@ -112,14 +112,26 @@ private static void AddCandidate(
 
         AddRoot(roots, userProfile, ".jdks", "UserJava");
         AddRoot(roots, userProfile, ".sdkman", "candidates", "java", "UserJava");
+        AddRoot(roots, userProfile, ".sdkman", "candidates", "java", "current", "UserJava");
+        AddRoot(roots, userProfile, ".jabba", "jdk", "UserJava");
+        AddRoot(roots, userProfile, ".graalvm", "UserJava");
+        AddRoot(roots, userProfile, ".trava", "jdk", "UserJava");
+        AddRoot(roots, userProfile, ".dragonwell", "UserJava");
+        AddRoot(roots, applicationData, ".jdks", "UserJava");
 
         AddRoot(roots, applicationData, ".hmcl", "java", "ThirdPartyLauncherRuntime");
         AddRoot(roots, applicationData, "ATLauncher", "runtimes", "minecraft", "ThirdPartyLauncherRuntime");
         AddRoot(roots, applicationData, "ModrinthApp", "meta", "java_versions", "ThirdPartyLauncherRuntime");
         AddRoot(roots, applicationData, "PrismLauncher", "java", "ThirdPartyLauncherRuntime");
+        AddRoot(roots, applicationData, "MultiMC", "java", "ThirdPartyLauncherRuntime");
         AddRoot(roots, userProfile, "curseforge", "minecraft", "Install", "runtime", "ThirdPartyLauncherRuntime");
         AddRoot(roots, localApplicationData, ".ftba", "bin", "runtime", "ThirdPartyLauncherRuntime");
         AddRoot(roots, documents, "Curse", "Minecraft", "Install", "runtime", "ThirdPartyLauncherRuntime");
+        AddRoot(roots, applicationData, "Feed The Beast", "runtime", "ThirdPartyLauncherRuntime");
+        AddRoot(roots, applicationData, "Technic", "launcher", "runtime", "ThirdPartyLauncherRuntime");
+        AddRoot(roots, applicationData, "VoidLauncher", "java", "ThirdPartyLauncherRuntime");
+        AddRoot(roots, applicationData, "SKlauncher", "java", "ThirdPartyLauncherRuntime");
+        AddRoot(roots, applicationData, "TLauncher", "java", "ThirdPartyLauncherRuntime");
 
         return roots
             .Where(root => !string.IsNullOrWhiteSpace(root.Path))
@@ -130,13 +142,34 @@ private static void AddCandidate(
     private static IReadOnlyList<string> GetJavaVendorDirectoryNames() =>
     [
         "Java",
+        "JavaSoft",
         "Eclipse Adoptium",
+        "Eclipse Foundation",
         "Amazon Corretto",
         "AdoptOpenJDK",
-        "Eclipse Foundation",
         "Semeru",
         "Zulu",
-        "BellSoft"
+        "BellSoft",
+        "Corretto",
+        "Microsoft",
+        "Microsoft Build of OpenJDK",
+        "GraalVM",
+        "Oracle",
+        "JetBrains",
+        "Alibaba",
+        "Tencent",
+        "Huawei",
+        "Red Hat",
+        "SAP",
+        "IcedTea",
+        "Liberica",
+        "Dragonwell",
+        "SapMachine",
+        "Trava",
+        "Azul",
+        "Minecraft",
+        "Minecraft Launcher",
+        "Minecraft Installer"
     ];
 
     private static IEnumerable<string> EnumerateFilesSafely(string path, string searchPattern, SearchOption searchOption)
@@ -185,7 +218,8 @@ private static void AddCandidate(
                              @"SOFTWARE\JavaSoft\Java Runtime Environment",
                              @"SOFTWARE\JavaSoft\Java Development Kit",
                              @"SOFTWARE\JavaSoft\JRE",
-                             @"SOFTWARE\JavaSoft\JDK"
+                             @"SOFTWARE\JavaSoft\JDK",
+                             @"SOFTWARE\JavaSoft\JVM"
                          })
                 {
                     TryCollectJavaSoftHomes(hive, view, keyPath, homes);
@@ -194,7 +228,20 @@ private static void AddCandidate(
                 foreach (var keyPath in new[]
                          {
                              @"SOFTWARE\Eclipse Adoptium",
-                             @"SOFTWARE\AdoptOpenJDK"
+                             @"SOFTWARE\AdoptOpenJDK",
+                             @"SOFTWARE\Microsoft\JDK",
+                             @"SOFTWARE\Microsoft\Java",
+                             @"SOFTWARE\Microsoft Build of OpenJDK",
+                             @"SOFTWARE\Amazon Corretto",
+                             @"SOFTWARE\Azul Systems",
+                             @"SOFTWARE\BellSoft",
+                             @"SOFTWARE\Red Hat",
+                             @"SOFTWARE\SAP",
+                             @"SOFTWARE\GraalVM",
+                             @"SOFTWARE\JetBrains",
+                             @"SOFTWARE\Alibaba",
+                             @"SOFTWARE\Tencent",
+                             @"SOFTWARE\Huawei"
                          })
                 {
                     TryCollectVendorJavaHomes(hive, view, keyPath, homes);
@@ -319,10 +366,28 @@ private static void AddCandidate(
         return displayName.Contains("Java", StringComparison.OrdinalIgnoreCase)
             || displayName.Contains("JDK", StringComparison.OrdinalIgnoreCase)
             || displayName.Contains("JRE", StringComparison.OrdinalIgnoreCase)
+            || displayName.Contains("JVM", StringComparison.OrdinalIgnoreCase)
             || displayName.Contains("Temurin", StringComparison.OrdinalIgnoreCase)
             || displayName.Contains("Adoptium", StringComparison.OrdinalIgnoreCase)
+            || displayName.Contains("AdoptOpenJDK", StringComparison.OrdinalIgnoreCase)
             || displayName.Contains("OpenJDK", StringComparison.OrdinalIgnoreCase)
-            || displayName.Contains("Zulu", StringComparison.OrdinalIgnoreCase);
+            || displayName.Contains("Zulu", StringComparison.OrdinalIgnoreCase)
+            || displayName.Contains("Corretto", StringComparison.OrdinalIgnoreCase)
+            || displayName.Contains("GraalVM", StringComparison.OrdinalIgnoreCase)
+            || displayName.Contains("Liberica", StringComparison.OrdinalIgnoreCase)
+            || displayName.Contains("Dragonwell", StringComparison.OrdinalIgnoreCase)
+            || displayName.Contains("SapMachine", StringComparison.OrdinalIgnoreCase)
+            || displayName.Contains("IcedTea", StringComparison.OrdinalIgnoreCase)
+            || displayName.Contains("Red Hat", StringComparison.OrdinalIgnoreCase)
+            || displayName.Contains("Semeru", StringComparison.OrdinalIgnoreCase)
+            || displayName.Contains("BellSoft", StringComparison.OrdinalIgnoreCase)
+            || displayName.Contains("Eclipse", StringComparison.OrdinalIgnoreCase)
+            || displayName.Contains("Microsoft Build", StringComparison.OrdinalIgnoreCase)
+            || displayName.Contains("Amazon", StringComparison.OrdinalIgnoreCase)
+            || displayName.Contains("Azul", StringComparison.OrdinalIgnoreCase)
+            || displayName.Contains("Oracle", StringComparison.OrdinalIgnoreCase)
+            || displayName.Contains("JetBrains", StringComparison.OrdinalIgnoreCase)
+            || displayName.Contains("Minecraft", StringComparison.OrdinalIgnoreCase);
     }
 
     private static void AddRegisteredJavaHome(string? javaHome, ISet<string> homes)

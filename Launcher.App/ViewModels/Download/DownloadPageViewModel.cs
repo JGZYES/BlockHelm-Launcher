@@ -35,7 +35,6 @@ namespace Launcher.App.ViewModels.Download;
 /// </summary>
 public sealed partial class DownloadPageViewModel : ObservableObject, IDisposable
 {
-    // 子 ViewModel 各自拥有业务状态，本类只维护页面步骤与跨子流程事件转发。
     private readonly IFloatingMessageService floatingMessageService;
     private readonly DownloadTasksPageViewModel downloadTasksPage;
     private readonly ILogger<DownloadPageViewModel> logger;
@@ -47,6 +46,16 @@ public sealed partial class DownloadPageViewModel : ObservableObject, IDisposabl
 
     [ObservableProperty]
     private int contentRefreshToken;
+
+    public DownloadVersionListViewModel VersionList { get; }
+
+    public DownloadInstanceOptionsViewModel InstanceOptions { get; }
+
+    public DownloadInstallViewModel InstallState { get; }
+
+    public DownloadModpackManualDownloadsDialogViewModel ModpackManualDownloadsDialog { get; }
+
+    public DownloadLocalImportDialogViewModel LocalImportDialog { get; }
 
     public DownloadPageViewModel(
         IGameVersionService gameVersionService,
@@ -63,7 +72,8 @@ public sealed partial class DownloadPageViewModel : ObservableObject, IDisposabl
             NullInstanceFolderService.Instance,
             NullFilePickerService.Instance,
             NullLocalModpackImportService.Instance,
-            RejectingExistingFilePathValidator.Instance)
+            RejectingExistingFilePathValidator.Instance,
+            null)
     {
     }
 
@@ -83,7 +93,8 @@ public sealed partial class DownloadPageViewModel : ObservableObject, IDisposabl
             NullInstanceFolderService.Instance,
             NullFilePickerService.Instance,
             NullLocalModpackImportService.Instance,
-            RejectingExistingFilePathValidator.Instance)
+            RejectingExistingFilePathValidator.Instance,
+            null)
     {
     }
 
@@ -145,16 +156,6 @@ public sealed partial class DownloadPageViewModel : ObservableObject, IDisposabl
     }
 
     public event EventHandler<GameInstance>? InstanceInstalled;
-
-    public DownloadVersionListViewModel VersionList { get; }
-
-    public DownloadInstanceOptionsViewModel InstanceOptions { get; }
-
-    public DownloadInstallViewModel InstallState { get; }
-
-    public DownloadModpackManualDownloadsDialogViewModel ModpackManualDownloadsDialog { get; }
-
-    public DownloadLocalImportDialogViewModel LocalImportDialog { get; }
 
     public bool IsVersionListStep => CurrentStep is DownloadPageStep.VersionList;
 

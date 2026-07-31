@@ -61,10 +61,12 @@ public sealed partial class GameSettingsDetailsViewModel : ObservableObject, IDi
         LocalResourcePacksViewModel localResourcePacksViewModel,
         LocalShaderPacksViewModel localShaderPacksViewModel,
         IJavaRuntimeDiscoveryService javaRuntimeDiscoveryService,
+        IJavaDownloadService javaDownloadService,
         IFilePickerService filePickerService,
         IInstanceContentImportPathValidator importPathValidator,
         IFloatingMessageService floatingMessageService,
         IUiDispatcher uiDispatcher,
+        IPlayTimeTracker playTimeTracker,
         ILogger<GameSettingsDetailsViewModel>? logger = null,
         ILoggerFactory? loggerFactory = null,
         IModpackExportService? modpackExportService = null)
@@ -89,6 +91,7 @@ public sealed partial class GameSettingsDetailsViewModel : ObservableObject, IDi
         Java = new InstanceJavaSettingsViewModel(
             persistence,
             javaRuntimeDiscoveryService,
+            javaDownloadService,
             statusService,
             filePickerService,
             floatingMessageService);
@@ -150,6 +153,10 @@ public sealed partial class GameSettingsDetailsViewModel : ObservableObject, IDi
             statusService,
             floatingMessageService,
             modpackExportService);
+        PlayTime = new InstancePlayTimeSettingsViewModel(
+            this,
+            playTimeTracker,
+            logger: loggerFactory?.CreateLogger<InstancePlayTimeSettingsViewModel>());
         Placeholder = new InstancePlaceholderSettingsViewModel(this);
         CurrentSectionViewModel = General;
     }
@@ -188,6 +195,8 @@ public sealed partial class GameSettingsDetailsViewModel : ObservableObject, IDi
 
     public bool IsJavaSection => string.Equals(SelectedSection?.Id, "java", StringComparison.OrdinalIgnoreCase);
 
+    public bool IsPlayTimeSection => string.Equals(SelectedSection?.Id, "playtime", StringComparison.OrdinalIgnoreCase);
+
     public InstanceGeneralSettingsViewModel General { get; }
 
     public InstanceLaunchSettingsViewModel Launch { get; }
@@ -205,6 +214,8 @@ public sealed partial class GameSettingsDetailsViewModel : ObservableObject, IDi
     public InstanceBackupSettingsViewModel Backup { get; }
 
     public InstanceExportSettingsViewModel Export { get; }
+
+    public InstancePlayTimeSettingsViewModel PlayTime { get; }
 
     public InstancePlaceholderSettingsViewModel Placeholder { get; }
 

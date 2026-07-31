@@ -79,6 +79,7 @@
   <data name="Resources_SectionShaderPacks" xml:space="preserve"><value>光影包</value></data>
   <data name="Resources_SectionWorlds" xml:space="preserve"><value>世界</value></data>
   <data name="Resources_SectionModpacks" xml:space="preserve"><value>整合包</value></data>
+  <data name="Resources_SectionJava" xml:space="preserve"><value>JDK 下载</value></data>
   <data name="Resources_PlaceholderMessage" xml:space="preserve"><value>请选择一个资源分类。</value></data>
   <data name="Resources_SelectedPlaceholderMessageFormat" xml:space="preserve"><value>{0} 功能即将接入。</value></data>
   <data name="Resources_ModFilterVersionLabel" xml:space="preserve"><value>版本</value></data>
@@ -393,6 +394,23 @@
   <data name="GameSettings_DetailAdvanced" xml:space="preserve"><value>高级设置</value></data>
   <data name="GameSettings_DetailBackup" xml:space="preserve"><value>备份</value></data>
   <data name="GameSettings_DetailExport" xml:space="preserve"><value>导出</value></data>
+  <data name="GameSettings_DetailPlayTime" xml:space="preserve"><value>游戏时长</value></data>
+  <data name="GameSettings_DropAutoRouteMessageFormat" xml:space="preserve"><value>将自动安装为：{0}</value></data>
+  <data name="GameSettings_DropTypeMod" xml:space="preserve"><value>模组</value></data>
+  <data name="GameSettings_DropTypeWorld" xml:space="preserve"><value>存档</value></data>
+  <data name="GameSettings_DropTypeResourcePack" xml:space="preserve"><value>资源包</value></data>
+  <data name="GameSettings_DropTypeShaderPack" xml:space="preserve"><value>光影包</value></data>
+  <data name="GameSettings_DropTypeModpack" xml:space="preserve"><value>整合包</value></data>
+  <data name="PlayTime_TotalPlayTime" xml:space="preserve"><value>总游戏时长</value></data>
+  <data name="PlayTime_TodayPlayTime" xml:space="preserve"><value>今日游戏时长</value></data>
+  <data name="PlayTime_WeekPlayTime" xml:space="preserve"><value>本周游戏时长</value></data>
+  <data name="PlayTime_SessionCount" xml:space="preserve"><value>启动次数</value></data>
+  <data name="PlayTime_LastPlayed" xml:space="preserve"><value>最近启动</value></data>
+  <data name="PlayTime_NoHistory" xml:space="preserve"><value>暂无记录</value></data>
+  <data name="PlayTime_LessThanOneMinute" xml:space="preserve"><value>不足1分钟</value></data>
+  <data name="PlayTime_MinutesFormat" xml:space="preserve"><value>{0} 分钟</value></data>
+  <data name="PlayTime_HoursMinutesFormat" xml:space="preserve"><value>{0} 小时 {1} 分钟</value></data>
+  <data name="PlayTime_RecentSessions" xml:space="preserve"><value>最近启动记录</value></data>
   <data name="Nav_GameInstanceList" xml:space="preserve"><value>游戏设置</value></data>
   <data name="Nav_JavaMemory" xml:space="preserve"><value>Java/内存</value></data>
   <data name="Nav_DirectoryManagement" xml:space="preserve"><value>目录管理</value></data>

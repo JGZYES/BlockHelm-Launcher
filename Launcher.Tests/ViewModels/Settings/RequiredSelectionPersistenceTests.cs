@@ -129,6 +129,7 @@ public sealed class RequiredSelectionPersistenceTests
             Stub<IStatusService>(),
             Stub<ISystemMemoryService>(),
             Stub<IJavaRuntimeDiscoveryService>(),
+            Stub<IJavaDownloadService>(),
             Stub<IFilePickerService>(),
             Stub<ICustomFileDownloadService>(),
             Stub<IInstanceFolderService>(),
@@ -173,6 +174,7 @@ public sealed class RequiredSelectionPersistenceTests
         var editor = new InstanceJavaSettingsViewModel(
             persistence,
             Stub<IJavaRuntimeDiscoveryService>(),
+            Stub<IJavaDownloadService>(),
             Stub<IStatusService>(),
             Stub<IFilePickerService>(),
             Stub<IFloatingMessageService>());

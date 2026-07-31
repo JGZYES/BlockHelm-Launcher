@@ -43,6 +43,7 @@ public sealed partial class InstanceJavaSettingsViewModel : GameSettingsDetailsS
     internal InstanceJavaSettingsViewModel(
         InstanceSettingsPersistenceCoordinator persistence,
         IJavaRuntimeDiscoveryService javaRuntimeDiscoveryService,
+        IJavaDownloadService javaDownloadService,
         IStatusService statusService,
         IFilePickerService filePickerService,
         IFloatingMessageService floatingMessageService)
@@ -50,6 +51,7 @@ public sealed partial class InstanceJavaSettingsViewModel : GameSettingsDetailsS
         this.persistence = persistence;
         InstanceJavaSettings = new JavaSettingsEditorViewModel(
             javaRuntimeDiscoveryService,
+            javaDownloadService,
             statusService,
             filePickerService,
             floatingMessageService,
@@ -99,6 +101,39 @@ public sealed partial class InstanceJavaSettingsViewModel : GameSettingsDetailsS
     public IAsyncRelayCommand RefreshInstanceJavaRuntimesCommand => InstanceJavaSettings.RefreshJavaRuntimesCommand;
 
     public IAsyncRelayCommand ImportInstanceJavaRuntimeCommand => InstanceJavaSettings.ImportJavaRuntimeCommand;
+
+    public IRelayCommand OpenDownloadJdkDialogCommand => InstanceJavaSettings.OpenDownloadDialogCommand;
+
+    public IRelayCommand CloseDownloadJdkDialogCommand => InstanceJavaSettings.CloseDownloadDialogCommand;
+
+    public IAsyncRelayCommand DownloadJdkCommand => InstanceJavaSettings.DownloadJdkCommand;
+
+    public bool IsDownloadJdkDialogOpen
+    {
+        get => InstanceJavaSettings.IsDownloadDialogOpen;
+        private set
+        {
+            if (InstanceJavaSettings.IsDownloadDialogOpen != value)
+            {
+                InstanceJavaSettings.IsDownloadDialogOpen = value;
+                OnPropertyChanged();
+            }
+        }
+    }
+
+    public bool IsDownloading => InstanceJavaSettings.IsDownloading;
+
+    public string DownloadStatusMessage => InstanceJavaSettings.DownloadStatusMessage;
+
+    public double DownloadProgress => InstanceJavaSettings.DownloadProgress;
+
+    public JavaDistributionInfo? SelectedDownloadVersion
+    {
+        get => InstanceJavaSettings.SelectedDownloadVersion;
+        set => InstanceJavaSettings.SelectedDownloadVersion = value;
+    }
+
+    public ObservableCollection<JavaDistributionInfo> AvailableDownloadVersions => InstanceJavaSettings.AvailableDownloadVersions;
 
     public void PrimeFromSettings(LauncherSettings launcherSettings)
     {
@@ -175,6 +210,21 @@ public sealed partial class InstanceJavaSettingsViewModel : GameSettingsDetailsS
             case nameof(JavaSettingsEditorViewModel.IsJavaManualSelection):
                 OnPropertyChanged(nameof(IsInstanceJavaManualSelection));
                 OnPropertyChanged(nameof(CanInteractWithInstanceJavaRuntimeList));
+                break;
+            case nameof(JavaSettingsEditorViewModel.IsDownloadDialogOpen):
+                OnPropertyChanged(nameof(IsDownloadJdkDialogOpen));
+                break;
+            case nameof(JavaSettingsEditorViewModel.IsDownloading):
+                OnPropertyChanged(nameof(IsDownloading));
+                break;
+            case nameof(JavaSettingsEditorViewModel.DownloadStatusMessage):
+                OnPropertyChanged(nameof(DownloadStatusMessage));
+                break;
+            case nameof(JavaSettingsEditorViewModel.DownloadProgress):
+                OnPropertyChanged(nameof(DownloadProgress));
+                break;
+            case nameof(JavaSettingsEditorViewModel.SelectedDownloadVersion):
+                OnPropertyChanged(nameof(SelectedDownloadVersion));
                 break;
         }
     }
