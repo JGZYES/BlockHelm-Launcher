@@ -25,7 +25,6 @@ using Launcher.Infrastructure.Accounts;
 using Launcher.Infrastructure.Accounts.ThirdParty;
 using Launcher.Infrastructure.CurseForge;
 using Launcher.Infrastructure.FileSystem;
-using Launcher.Infrastructure.Instances;
 using Launcher.Infrastructure.Minecraft;
 using Launcher.Infrastructure.Modpacks;
 using Launcher.Infrastructure.Modrinth;
@@ -107,7 +106,6 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<ISystemMemoryService, WindowsSystemMemoryService>();
         services.AddSingleton<IUserFileDeletionService, UserFileDeletionService>();
         services.AddSingleton<IModService, ModService>();
-        services.AddSingleton<IVanillaLoaderUpgradeService, VanillaLoaderUpgradeService>();
         services.AddSingleton<ILocalModIconEnrichmentService, LocalModIconEnrichmentService>();
         services.AddSingleton<ILocalResourceCategoryEnrichmentService, LocalResourceCategoryEnrichmentService>();
         services.AddSingleton<IInstanceBackupService, InstanceBackupService>();

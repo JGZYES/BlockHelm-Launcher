@@ -17,14 +17,12 @@
  * SPDX-License-Identifier: GPL-3.0-only
  */
 
-using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Windows.Input;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Launcher.App.Resources;
 using Launcher.App.Services;
-using Launcher.App.ViewModels.Download;
 using Launcher.Application.Services;
 using Launcher.Domain.Models;
 using Microsoft.Extensions.Logging;
@@ -39,50 +37,25 @@ public sealed partial class InstanceGeneralSettingsViewModel : GameSettingsDetai
     private readonly IInstanceFolderService instanceFolderService;
     private readonly IStatusService statusService;
     private readonly InstanceSettingsPersistenceCoordinator persistence;
-    private readonly DownloadTasksPageViewModel downloadTasksPage;
-    private readonly IVanillaLoaderUpgradeService? vanillaLoaderUpgradeService;
-    private readonly ISettingsService? settingsService;
-    private readonly IFloatingMessageService floatingMessageService;
-    private readonly IUiDispatcher uiDispatcher;
     private readonly ILogger<InstanceGeneralSettingsViewModel> logger;
     private INotifyPropertyChanged? selectedInstanceNotifier;
     private GameSettingsInstanceItem? selectedInstance;
     private bool suppressAutoSave;
-    private VanillaUpgradeLoaderOption? selectedLoaderOption;
 
     [ObservableProperty]
     private string descriptionText = string.Empty;
-
-    [ObservableProperty]
-    private bool isVanillaLoaderUpgradeInProgress;
-
-    [ObservableProperty]
-    private bool isLoadingAvailableLoaders;
-
-    [ObservableProperty]
-    private string availableLoadersLoadError = string.Empty;
 
     internal InstanceGeneralSettingsViewModel(
         GameSettingsEditDialogViewModel editDialog,
         IInstanceFolderService instanceFolderService,
         IStatusService statusService,
         InstanceSettingsPersistenceCoordinator persistence,
-        DownloadTasksPageViewModel downloadTasksPage,
-        IVanillaLoaderUpgradeService? vanillaLoaderUpgradeService,
-        ISettingsService? settingsService,
-        IFloatingMessageService floatingMessageService,
-        IUiDispatcher uiDispatcher,
         ILogger<InstanceGeneralSettingsViewModel>? logger = null)
     {
         this.editDialog = editDialog;
         this.instanceFolderService = instanceFolderService;
         this.statusService = statusService;
         this.persistence = persistence;
-        this.downloadTasksPage = downloadTasksPage;
-        this.vanillaLoaderUpgradeService = vanillaLoaderUpgradeService;
-        this.settingsService = settingsService;
-        this.floatingMessageService = floatingMessageService;
-        this.uiDispatcher = uiDispatcher;
         this.logger = logger ?? NullLogger<InstanceGeneralSettingsViewModel>.Instance;
     }
 
@@ -98,58 +71,6 @@ public sealed partial class InstanceGeneralSettingsViewModel : GameSettingsDetai
 
     public bool IsVanillaInstance => selectedInstance?.Instance.Loader == LoaderKind.Vanilla;
 
-    private static bool IsKnownLoader(LoaderKind loader) =>
-        loader == LoaderKind.Vanilla
-        || loader == LoaderKind.Fabric
-        || loader == LoaderKind.Forge
-        || loader == LoaderKind.NeoForge
-        || loader == LoaderKind.Quilt;
-
-    public bool CanUseVanillaLoaderUpgrade =>
-        selectedInstance is not null
-        && IsKnownLoader(selectedInstance.Instance.Loader)
-        && vanillaLoaderUpgradeService is not null
-        && !IsVanillaLoaderUpgradeInProgress
-        && !IsLoadingAvailableLoaders;
-
-    public string VanillaLoaderUpgradeStatusText
-    {
-        get
-        {
-            if (selectedInstance is null || !IsKnownLoader(selectedInstance.Instance.Loader))
-                return Strings.GameSettings_GeneralLoaderUpgradeNoVersions;
-            if (IsLoadingAvailableLoaders)
-                return Strings.GameSettings_GeneralLoaderUpgradeLoading;
-            if (!string.IsNullOrEmpty(AvailableLoadersLoadError))
-                return AvailableLoadersLoadError;
-            if (IsVanillaLoaderUpgradeInProgress)
-                return Strings.GameSettings_GeneralLoaderUpgradeInProgress;
-            if (AvailableLoaderOptions.Count == 0)
-                return Strings.GameSettings_GeneralLoaderUpgradeNoVersions;
-            return IsVanillaInstance
-                ? Strings.GameSettings_GeneralLoaderUpgradeHint
-                : Strings.GameSettings_GeneralLoaderUpgradeHintModded;
-        }
-    }
-
-    public bool CanRetryAvailableLoaders =>
-        CanUseVanillaLoaderUpgrade;
-
-    public ObservableCollection<VanillaUpgradeLoaderOption> AvailableLoaderOptions { get; } = [];
-
-    public VanillaUpgradeLoaderOption? SelectedLoaderOption
-    {
-        get => selectedLoaderOption;
-        set
-        {
-            if (SetProperty(ref selectedLoaderOption, value))
-                OnPropertyChanged(nameof(CanStartVanillaLoaderUpgrade));
-        }
-    }
-
-    public bool CanStartVanillaLoaderUpgrade =>
-        CanUseVanillaLoaderUpgrade && SelectedLoaderOption is not null;
-
     public void SetSelectedInstance(GameSettingsInstanceItem? value)
     {
         if (selectedInstanceNotifier is not null)
@@ -162,23 +83,8 @@ public sealed partial class InstanceGeneralSettingsViewModel : GameSettingsDetai
 
         NotifyInstanceDisplayChanged();
         LoadDescriptionFromInstance();
-        SelectedLoaderOption = null;
-        AvailableLoaderOptions.Clear();
-        AvailableLoadersLoadError = string.Empty;
         OnPropertyChanged(nameof(IsVanillaInstance));
-        OnPropertyChanged(nameof(CanUseVanillaLoaderUpgrade));
-        OnPropertyChanged(nameof(CanRetryAvailableLoaders));
-        OnPropertyChanged(nameof(VanillaLoaderUpgradeStatusText));
-        OnPropertyChanged(nameof(CanStartVanillaLoaderUpgrade));
         CommandManager.InvalidateRequerySuggested();
-
-        if (vanillaLoaderUpgradeService is not null
-            && value is not null
-            && IsKnownLoader(value.Instance.Loader))
-        {
-            IsLoadingAvailableLoaders = true;
-            _ = RefreshAvailableLoaderOptionsAsync(value.Instance);
-        }
     }
 
     public void Dispose()
@@ -211,31 +117,6 @@ public sealed partial class InstanceGeneralSettingsViewModel : GameSettingsDetai
             DescriptionSaveDelay);
     }
 
-    partial void OnIsVanillaLoaderUpgradeInProgressChanged(bool value)
-    {
-        OnPropertyChanged(nameof(CanUseVanillaLoaderUpgrade));
-        OnPropertyChanged(nameof(CanStartVanillaLoaderUpgrade));
-        OnPropertyChanged(nameof(CanRetryAvailableLoaders));
-        OnPropertyChanged(nameof(VanillaLoaderUpgradeStatusText));
-        CommandManager.InvalidateRequerySuggested();
-    }
-
-    partial void OnIsLoadingAvailableLoadersChanged(bool value)
-    {
-        OnPropertyChanged(nameof(CanUseVanillaLoaderUpgrade));
-        OnPropertyChanged(nameof(CanStartVanillaLoaderUpgrade));
-        OnPropertyChanged(nameof(CanRetryAvailableLoaders));
-        OnPropertyChanged(nameof(VanillaLoaderUpgradeStatusText));
-        CommandManager.InvalidateRequerySuggested();
-    }
-
-    partial void OnAvailableLoadersLoadErrorChanged(string value)
-    {
-        OnPropertyChanged(nameof(VanillaLoaderUpgradeStatusText));
-        OnPropertyChanged(nameof(CanStartVanillaLoaderUpgrade));
-        CommandManager.InvalidateRequerySuggested();
-    }
-
     [RelayCommand]
     private void RequestEditInstance()
     {
@@ -265,143 +146,6 @@ public sealed partial class InstanceGeneralSettingsViewModel : GameSettingsDetai
     {
         if (selectedInstance is not null)
             DeleteInstanceRequested?.Invoke(selectedInstance);
-    }
-
-    [RelayCommand]
-    private async Task StartVanillaLoaderUpgradeAsync(CancellationToken cancellationToken)
-    {
-        if (selectedInstance is null)
-            return;
-
-        if (SelectedLoaderOption is null)
-        {
-            floatingMessageService.Show(Strings.GameSettings_GeneralLoaderUpgradeSelectFirst);
-            return;
-        }
-
-        if (vanillaLoaderUpgradeService is null)
-        {
-            floatingMessageService.Show(Strings.GameSettings_GeneralLoaderUpgradeServiceUnavailable);
-            return;
-        }
-
-        if (IsVanillaLoaderUpgradeInProgress)
-            return;
-
-        var option = SelectedLoaderOption;
-        var instanceItem = selectedInstance;
-        var title = string.Format(
-            Strings.Status_VanillaLoaderUpgradeRunningFormat,
-            instanceItem.Name,
-            option.Loader);
-        var subtitle = option.DisplayVersion;
-
-        IsVanillaLoaderUpgradeInProgress = true;
-        OnPropertyChanged(nameof(VanillaLoaderUpgradeStatusText));
-        var task = downloadTasksPage.BeginTask(title, subtitle);
-        statusService.Report(title);
-
-        try
-        {
-            var settings = settingsService is null ? new LauncherSettings() : await settingsService.LoadAsync(cancellationToken).ConfigureAwait(false);
-            var progress = task.CreateProgress(p => { });
-            var updatedInstance = await vanillaLoaderUpgradeService.UpgradeAsync(
-                instanceItem.Instance,
-                option,
-                progress,
-                settings.DownloadSourcePreference,
-                cancellationToken,
-                settings.DownloadSpeedLimitMbPerSecond).ConfigureAwait(false);
-
-            task.State = DownloadTaskState.Completed;
-            instanceItem.Update(updatedInstance, updatedInstance.VersionType);
-            logger.LogInformation(
-                "Vanilla loader upgrade succeeded. Instance={Instance} Loader={Loader} VersionName={VersionName}",
-                updatedInstance.Id,
-                updatedInstance.Loader,
-                updatedInstance.VersionName);
-            floatingMessageService.Show(string.Format(Strings.GameSettings_GeneralLoaderUpgradeSucceededFormat, option.Loader));
-        }
-        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested || task.IsCancellationRequested)
-        {
-            task.State = DownloadTaskState.Failed;
-            floatingMessageService.Show(Strings.DownloadTask_Failed);
-        }
-        catch (Exception exception)
-        {
-            task.State = DownloadTaskState.Failed;
-            logger.LogError(exception, "Vanilla loader upgrade failed. Instance={Instance}", instanceItem.Instance.Id);
-            floatingMessageService.Show(
-                string.Format(Strings.GameSettings_GeneralLoaderUpgradeFailedFormat, exception.Message));
-        }
-        finally
-        {
-            IsVanillaLoaderUpgradeInProgress = false;
-        }
-    }
-
-    private async Task RefreshAvailableLoaderOptionsAsync(GameInstance instance)
-    {
-        if (vanillaLoaderUpgradeService is null)
-            return;
-
-        AvailableLoadersLoadError = string.Empty;
-        IsLoadingAvailableLoaders = true;
-
-        try
-        {
-            var settings = settingsService is null ? new LauncherSettings() : await settingsService.LoadAsync().ConfigureAwait(false);
-            var options = await vanillaLoaderUpgradeService.GetAvailableLoadersAsync(
-                instance.MinecraftVersion,
-                settings.DownloadSourcePreference,
-                default,
-                settings.DownloadSpeedLimitMbPerSecond).ConfigureAwait(false);
-
-            uiDispatcher.Invoke(() =>
-            {
-                AvailableLoaderOptions.Clear();
-                foreach (var option in options)
-                    AvailableLoaderOptions.Add(option);
-
-                SelectedLoaderOption = options.Count == 0 ? null : options[0];
-                IsLoadingAvailableLoaders = false;
-                OnPropertyChanged(nameof(VanillaLoaderUpgradeStatusText));
-                OnPropertyChanged(nameof(CanStartVanillaLoaderUpgrade));
-                OnPropertyChanged(nameof(CanRetryAvailableLoaders));
-                CommandManager.InvalidateRequerySuggested();
-            });
-        }
-        catch (Exception exception)
-        {
-            logger.LogWarning(
-                exception,
-                "Failed to resolve vanilla upgrade loader options. MinecraftVersion={MinecraftVersion}",
-                instance.MinecraftVersion);
-            uiDispatcher.Invoke(() =>
-            {
-                AvailableLoaderOptions.Clear();
-                SelectedLoaderOption = null;
-                AvailableLoadersLoadError = string.Format(
-                    Strings.GameSettings_GeneralLoaderUpgradeLoadFailedFormat,
-                    exception.Message);
-                IsLoadingAvailableLoaders = false;
-                OnPropertyChanged(nameof(VanillaLoaderUpgradeStatusText));
-                OnPropertyChanged(nameof(CanStartVanillaLoaderUpgrade));
-                OnPropertyChanged(nameof(CanRetryAvailableLoaders));
-                CommandManager.InvalidateRequerySuggested();
-            });
-        }
-    }
-
-    [RelayCommand(CanExecute = nameof(CanRetryAvailableLoaders))]
-    private void ReloadAvailableLoaders()
-    {
-        if (selectedInstance is null || vanillaLoaderUpgradeService is null)
-            return;
-
-        AvailableLoadersLoadError = string.Empty;
-        IsLoadingAvailableLoaders = true;
-        _ = RefreshAvailableLoaderOptionsAsync(selectedInstance.Instance);
     }
 
     private void SelectedInstance_PropertyChanged(object? sender, PropertyChangedEventArgs e)

@@ -1927,9 +1927,6 @@
   <data name="Status_InstallingLoaderFormat" xml:space="preserve">
     <value>正在安裝 {0} {1}...</value>
   </data>
-  <data name="Status_VanillaLoaderUpgradeRunningFormat" xml:space="preserve">
-    <value>正在為「{0}」安裝 {1}...</value>
-  </data>
   <data name="Status_InstanceInstalledFormat" xml:space="preserve">
     <value>遊戲 {0} 已安裝</value>
   </data>
@@ -2280,48 +2277,6 @@
   </data>
   <data name="GameSettings_GeneralCreatedAtSection" xml:space="preserve">
     <value>建立時間</value>
-  </data>
-  <data name="GameSettings_GeneralLoaderUpgradeSection" xml:space="preserve">
-    <value>載入器升級（僅限原版）</value>
-  </data>
-  <data name="GameSettings_GeneralLoaderUpgradeHint" xml:space="preserve">
-    <value>原版遊戲可以切換為 Fabric / Forge / NeoForge / Quilt 載入器，升級完成後自動保留實例資料。</value>
-  </data>
-  <data name="GameSettings_GeneralLoaderUpgradeButton" xml:space="preserve">
-    <value>安裝並切換到所選載入器</value>
-  </data>
-  <data name="GameSettings_GeneralLoaderUpgradeAlreadyModded" xml:space="preserve">
-    <value>目前實例已使用載入器，無法再次切換。</value>
-  </data>
-  <data name="GameSettings_GeneralLoaderUpgradeNoVersions" xml:space="preserve">
-    <value>暫無可用於此版本的載入器。</value>
-  </data>
-  <data name="GameSettings_GeneralLoaderUpgradeInProgress" xml:space="preserve">
-    <value>正在安裝所選載入器...</value>
-  </data>
-  <data name="GameSettings_GeneralLoaderUpgradeLoading" xml:space="preserve">
-    <value>正在獲取此版本可用的載入器...</value>
-  </data>
-  <data name="GameSettings_GeneralLoaderUpgradeLoadFailedFormat" xml:space="preserve">
-    <value>載入可用載入器失敗：{0}</value>
-  </data>
-  <data name="GameSettings_GeneralLoaderUpgradeRetryButton" xml:space="preserve">
-    <value>重新獲取</value>
-  </data>
-  <data name="GameSettings_GeneralLoaderUpgradeSelectFirst" xml:space="preserve">
-    <value>請先選擇一個載入器</value>
-  </data>
-  <data name="GameSettings_GeneralLoaderUpgradeServiceUnavailable" xml:space="preserve">
-    <value>載入器升級服務暫不可用</value>
-  </data>
-  <data name="GameSettings_GeneralLoaderUpgradeSucceededFormat" xml:space="preserve">
-    <value>已成功切換到 {0}。</value>
-  </data>
-  <data name="GameSettings_GeneralLoaderUpgradeHintModded" xml:space="preserve">
-    <value>已安裝 Mod 載入器，可直接切換到其他載入器，升級完成後保留實例資料。</value>
-  </data>
-  <data name="GameSettings_GeneralLoaderUpgradeFailedFormat" xml:space="preserve">
-    <value>切換載入器失敗：{0}</value>
   </data>
   <data name="GameSettings_DeleteGameButton" xml:space="preserve">
     <value>刪除遊戲</value>

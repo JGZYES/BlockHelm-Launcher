@@ -22,7 +22,6 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:behaviors="clr-namespace:Launcher.App.Behaviors"
              xmlns:controls="clr-namespace:Launcher.App.Controls"
-             xmlns:services="clr-namespace:Launcher.Application.Services;assembly=Launcher.Application"
              xmlns:res="clr-namespace:Launcher.App.Resources"
              Focusable="False">
     <StackPanel>
@@ -73,90 +72,6 @@
                              MinLines="1"
                              Style="{StaticResource LauncherDialogWrappingTextBoxStyle}"
                              Text="{Binding DescriptionText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
-                </StackPanel>
-            </GroupBox>
-
-            <GroupBox Margin="0,26,0,0"
-                      Header="{x:Static res:Strings.GameSettings_GeneralLoaderUpgradeSection}"
-                      Style="{StaticResource LauncherContentSectionStyle}">
-                <StackPanel>
-                    <TextBlock Margin="0,0,0,8"
-                               Text="{Binding VanillaLoaderUpgradeStatusText}"
-                               Foreground="{DynamicResource Brush.8FFFFFFF}"
-                               TextWrapping="Wrap" />
-
-                    <controls:AnimatedComboBox Height="32"
-                              MinWidth="220"
-                              HorizontalAlignment="Left"
-                              ItemsSource="{Binding AvailableLoaderOptions}"
-                              SelectedItem="{Binding SelectedLoaderOption, Mode=TwoWay}"
-                              IsEnabled="{Binding CanUseVanillaLoaderUpgrade}">
-                        <controls:AnimatedComboBox.Style>
-                            <Style TargetType="controls:AnimatedComboBox" BasedOn="{StaticResource LauncherComboBoxStyle}">
-                                <Setter Property="Visibility" Value="Collapsed" />
-                                <Style.Triggers>
-                                    <DataTrigger Binding="{Binding CanUseVanillaLoaderUpgrade}" Value="True">
-                                        <Setter Property="Visibility" Value="Visible" />
-                                    </DataTrigger>
-                                </Style.Triggers>
-                            </Style>
-                        </controls:AnimatedComboBox.Style>
-                        <controls:AnimatedComboBox.ItemTemplate>
-                            <DataTemplate DataType="{x:Type services:VanillaUpgradeLoaderOption}">
-                                <StackPanel Orientation="Horizontal">
-                                    <TextBlock Text="{Binding Loader}" />
-                                    <TextBlock Text=" - " Foreground="{DynamicResource Brush.8FFFFFFF}" />
-                                    <TextBlock Text="{Binding DisplayVersion}" />
-                                </StackPanel>
-                            </DataTemplate>
-                        </controls:AnimatedComboBox.ItemTemplate>
-                        <controls:AnimatedComboBox.SelectionItemTemplate>
-                            <DataTemplate DataType="{x:Type services:VanillaUpgradeLoaderOption}">
-                                <StackPanel Orientation="Horizontal">
-                                    <TextBlock Text="{Binding Loader}" />
-                                    <TextBlock Text=" - " Foreground="{DynamicResource Brush.8FFFFFFF}" />
-                                    <TextBlock Text="{Binding DisplayVersion}" />
-                                </StackPanel>
-                            </DataTemplate>
-                        </controls:AnimatedComboBox.SelectionItemTemplate>
-                    </controls:AnimatedComboBox>
-
-                    <StackPanel Orientation="Horizontal">
-                        <Border Margin="0,14,12,0">
-                            <Border.Style>
-                                <Style TargetType="Border">
-                                    <Setter Property="Visibility" Value="Collapsed" />
-                                    <Style.Triggers>
-                                        <DataTrigger Binding="{Binding CanUseVanillaLoaderUpgrade}" Value="True">
-                                            <Setter Property="Visibility" Value="Visible" />
-                                        </DataTrigger>
-                                    </Style.Triggers>
-                                </Style>
-                            </Border.Style>
-                            <Button HorizontalAlignment="Left"
-                                    Content="{x:Static res:Strings.GameSettings_GeneralLoaderUpgradeButton}"
-                                    Command="{Binding StartVanillaLoaderUpgradeCommand}"
-                                    IsEnabled="{Binding CanStartVanillaLoaderUpgrade}"
-                                    Style="{StaticResource LauncherPrimaryDialogButtonStyle}" />
-                        </Border>
-
-                        <Border Margin="0,14,0,0">
-                            <Border.Style>
-                                <Style TargetType="Border">
-                                    <Setter Property="Visibility" Value="Collapsed" />
-                                    <Style.Triggers>
-                                        <DataTrigger Binding="{Binding CanRetryAvailableLoaders}" Value="True">
-                                            <Setter Property="Visibility" Value="Visible" />
-                                        </DataTrigger>
-                                    </Style.Triggers>
-                                </Style>
-                            </Border.Style>
-                            <Button HorizontalAlignment="Left"
-                                    Content="{x:Static res:Strings.GameSettings_GeneralLoaderUpgradeRetryButton}"
-                                    Command="{Binding ReloadAvailableLoadersCommand}"
-                                    Style="{StaticResource SecondaryMenuButtonStyle}" />
-                        </Border>
-                    </StackPanel>
                 </StackPanel>
             </GroupBox>
 

@@ -1927,9 +1927,6 @@ Longer content wraps automatically.</value>
   <data name="Status_InstallingLoaderFormat" xml:space="preserve">
     <value>Installing {0} {1}...</value>
   </data>
-  <data name="Status_VanillaLoaderUpgradeRunningFormat" xml:space="preserve">
-    <value>Installing {1} for "{0}"...</value>
-  </data>
   <data name="Status_InstanceInstalledFormat" xml:space="preserve">
     <value>Game {0} installed</value>
   </data>
@@ -2280,48 +2277,6 @@ Longer content wraps automatically.</value>
   </data>
   <data name="GameSettings_GeneralCreatedAtSection" xml:space="preserve">
     <value>Created At</value>
-  </data>
-  <data name="GameSettings_GeneralLoaderUpgradeSection" xml:space="preserve">
-    <value>Loader Upgrade (Vanilla Only)</value>
-  </data>
-  <data name="GameSettings_GeneralLoaderUpgradeHint" xml:space="preserve">
-    <value>Vanilla instances can be switched to Fabric / Forge / NeoForge / Quilt loaders. Instance data is preserved after the upgrade.</value>
-  </data>
-  <data name="GameSettings_GeneralLoaderUpgradeButton" xml:space="preserve">
-    <value>Install and switch to selected loader</value>
-  </data>
-  <data name="GameSettings_GeneralLoaderUpgradeAlreadyModded" xml:space="preserve">
-    <value>This instance already uses a loader and cannot be switched again.</value>
-  </data>
-  <data name="GameSettings_GeneralLoaderUpgradeNoVersions" xml:space="preserve">
-    <value>No loader is available for this version.</value>
-  </data>
-  <data name="GameSettings_GeneralLoaderUpgradeInProgress" xml:space="preserve">
-    <value>Installing the selected loader...</value>
-  </data>
-  <data name="GameSettings_GeneralLoaderUpgradeLoading" xml:space="preserve">
-    <value>Loading available loaders for this version...</value>
-  </data>
-  <data name="GameSettings_GeneralLoaderUpgradeLoadFailedFormat" xml:space="preserve">
-    <value>Failed to load available loaders: {0}</value>
-  </data>
-  <data name="GameSettings_GeneralLoaderUpgradeRetryButton" xml:space="preserve">
-    <value>Retry</value>
-  </data>
-  <data name="GameSettings_GeneralLoaderUpgradeSelectFirst" xml:space="preserve">
-    <value>Please select a loader first</value>
-  </data>
-  <data name="GameSettings_GeneralLoaderUpgradeServiceUnavailable" xml:space="preserve">
-    <value>Loader upgrade service is currently unavailable</value>
-  </data>
-  <data name="GameSettings_GeneralLoaderUpgradeSucceededFormat" xml:space="preserve">
-    <value>Successfully switched to {0}.</value>
-  </data>
-  <data name="GameSettings_GeneralLoaderUpgradeHintModded" xml:space="preserve">
-    <value>This instance already has a mod loader installed. You can switch to another loader and keep your instance data.</value>
-  </data>
-  <data name="GameSettings_GeneralLoaderUpgradeFailedFormat" xml:space="preserve">
-    <value>Failed to switch loader: {0}</value>
   </data>
   <data name="GameSettings_DeleteGameButton" xml:space="preserve">
     <value>Delete Game</value>

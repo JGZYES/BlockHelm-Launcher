@@ -67,9 +67,7 @@ public sealed partial class GameSettingsDetailsViewModel : ObservableObject, IDi
         IUiDispatcher uiDispatcher,
         ILogger<GameSettingsDetailsViewModel>? logger = null,
         ILoggerFactory? loggerFactory = null,
-        IModpackExportService? modpackExportService = null,
-        IVanillaLoaderUpgradeService? vanillaLoaderUpgradeService = null,
-        ISettingsService? settingsService = null)
+        IModpackExportService? modpackExportService = null)
     {
         var resolvedLogger = logger ?? NullLogger<GameSettingsDetailsViewModel>.Instance;
         this.logger = resolvedLogger;
@@ -85,11 +83,6 @@ public sealed partial class GameSettingsDetailsViewModel : ObservableObject, IDi
             instanceFolderService,
             statusService,
             persistence,
-            downloadTasksPage,
-            vanillaLoaderUpgradeService,
-            settingsService,
-            floatingMessageService,
-            uiDispatcher,
             loggerFactory?.CreateLogger<InstanceGeneralSettingsViewModel>());
         General.DeleteInstanceRequested += General_DeleteInstanceRequested;
         Launch = new InstanceLaunchSettingsViewModel(systemMemoryService, modService, persistence);
